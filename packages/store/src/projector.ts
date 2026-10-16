@@ -29,7 +29,17 @@ export function project(store: Mutations, event: ContinuumEvent): void {
   const at = event.occurredAt
   switch (event.type) {
     case 'task.upserted': {
-      const { id, ...props } = event.payload
+      const { id, title, status, objective, nextAction, acceptanceCriteria, completedSteps, remainingSteps } = event.payload
+      // Every field is written so each snapshot fully replaces the last (node props otherwise merge).
+      const props = {
+        title,
+        status,
+        objective: objective ?? null,
+        nextAction: nextAction ?? null,
+        acceptanceCriteria: acceptanceCriteria ?? [],
+        completedSteps: completedSteps ?? [],
+        remainingSteps: remainingSteps ?? [],
+      }
       store.upsertNode(keys.task(id), { hash: hashRecord('task', event.payload), props, at })
       return
     }

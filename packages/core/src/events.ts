@@ -36,7 +36,25 @@ export type MemoryRecordedEvent = EventBase<
   { id: string; kind: MemoryKind; title: string; body: string; taskId?: string; anchors: Record<IdentityKey, ContentHash> }
 >
 
-export type TaskUpsertedEvent = EventBase<'task.upserted', { id: string; title: string; objective?: string; status: 'planned' | 'in-progress' | 'blocked' | 'completed' }>
+export interface RecordedCriterion {
+  text: string
+  met: boolean
+}
+
+/** A full snapshot of a task as an agent reported it; each event replaces the previous state. */
+export type TaskUpsertedEvent = EventBase<
+  'task.upserted',
+  {
+    id: string
+    title: string
+    objective?: string
+    status: 'planned' | 'in-progress' | 'blocked' | 'completed'
+    nextAction?: string
+    acceptanceCriteria?: RecordedCriterion[]
+    completedSteps?: string[]
+    remainingSteps?: string[]
+  }
+>
 
 export type ContinuumEvent =
   | SessionStartedEvent

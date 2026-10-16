@@ -54,6 +54,24 @@ describe('ContextStore projection', () => {
     store.close()
   })
 
+  it('replaces a task with each snapshot, clearing fields the snapshot omits', () => {
+    const store = ContextStore.open(':memory:')
+    const task = (payload: Record<string, unknown>) =>
+      ({ type: 'task.upserted', payload, evidence: 'agent-reported', source: 'test', occurredAt: '2026-10-16T10:00:00.000Z' }) as Parameters<ContextStore['record']>[0]
+    store.record(task({ id: 't', title: 'Auth', status: 'in-progress', nextAction: 'Write tests', remainingSteps: ['tests'] }))
+    store.record(task({ id: 't', title: 'Auth', status: 'completed', completedSteps: ['tests'] }))
+    expect(store.graph.get('task:t')?.props).toEqual({
+      title: 'Auth',
+      status: 'completed',
+      objective: null,
+      nextAction: null,
+      acceptanceCriteria: [],
+      completedSteps: ['tests'],
+      remainingSteps: [],
+    })
+    store.close()
+  })
+
   it('keeps the latest progress note on the session without touching when it started', () => {
     const store = ContextStore.open(':memory:')
     store.record(ev.sessionStart('s1'))
