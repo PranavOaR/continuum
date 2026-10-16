@@ -15,6 +15,7 @@ import { toActivity } from './mapActivity'
 import { toGraph } from './mapGraph'
 import { allChangedFileNodes, toFiles, toProject } from './mapProject'
 import { toMemory, toSessions, toVerification } from './mapRecords'
+import { currentTask, toTasks } from './mapTasks'
 import { loadSnapshot, type RepoSnapshot } from './snapshot'
 
 /** Repeated screen loads within this window reuse one read of the store and working tree. */
@@ -67,11 +68,34 @@ function attentionFor(snapshot: RepoSnapshot): AttentionItem[] {
       projectId: snapshot.projectId,
       to,
     }))
-  return [...checks, ...decisions]
+  const blocked = toTasks(snapshot)
+    .filter((task) => task.status === 'blocked')
+    .map<AttentionItem>((task) => ({
+      id: `${snapshot.projectId}~attention~task~${task.id}`,
+      kind: 'incomplete-task',
+      title: `Blocked: ${task.title}`,
+      description: task.nextAction ?? 'The agent reported this task as blocked.',
+      projectId: snapshot.projectId,
+      to: `${to}?task=${encodeURIComponent(task.id)}`,
+    }))
+  return [...blocked, ...checks, ...decisions]
 }
 
 function summarize(snapshot: RepoSnapshot): ProjectSummary {
-  return { project: toProject(snapshot), status: 'idle', progress: { done: 0, total: 0 }, changedFileCount: allChangedFileNodes(snapshot).length }
+  const task = currentTask(snapshot)
+  const criteria = task?.acceptanceCriteria ?? []
+  // Progress follows acceptance criteria when there are any, otherwise steps.
+  const progress =
+    criteria.length > 0
+      ? { done: criteria.filter((criterion) => criterion.status === 'complete').length, total: criteria.length }
+      : { done: task?.completedSteps.length ?? 0, total: (task?.completedSteps.length ?? 0) + (task?.remainingSteps.length ?? 0) }
+  return {
+    project: toProject(snapshot),
+    ...(task ? { currentTask: task } : {}),
+    status: task?.status ?? 'idle',
+    progress,
+    changedFileCount: allChangedFileNodes(snapshot).length,
+  }
 }
 
 const newestFirst = (a: ActivityEvent, b: ActivityEvent) => b.timestamp.localeCompare(a.timestamp)
@@ -133,7 +157,7 @@ export class LocalContinuumService implements ContinuumService {
     const projects = snapshots.map(summarize)
     return {
       projects,
-      activeTaskCount: 0,
+      activeTaskCount: snapshots.flatMap(toTasks).filter((task) => task.status === 'in-progress' || task.status === 'blocked').length,
       changedFileCount: projects.reduce((total, project) => total + project.changedFileCount, 0),
       recentEvents: snapshots.flatMap(toActivity).sort(newestFirst).slice(0, RECENT_EVENTS),
       attention: snapshots.flatMap(attentionFor),
@@ -145,14 +169,14 @@ export class LocalContinuumService implements ContinuumService {
   }
 
   async listTasks(): Promise<ProjectTask[]> {
-    return []
+    return (await this.snapshots()).flatMap(toTasks)
   }
 
   async getWorkspace(projectId: string): Promise<ProjectWorkspace> {
     const snapshot = await this.snapshot(projectId)
     return {
       project: toProject(snapshot),
-      tasks: [],
+      tasks: toTasks(snapshot),
       files: toFiles(snapshot),
       events: toActivity(snapshot),
       verification: toVerification(snapshot),
@@ -181,6 +205,9 @@ export class LocalContinuumService implements ContinuumService {
     for (const snapshot of await this.snapshots()) {
       const to = `/app/projects/${snapshot.projectId}`
       if (snapshot.name.toLowerCase().includes(needle)) results.push({ id: snapshot.projectId, kind: 'project', title: snapshot.name, subtitle: snapshot.root, to })
+      for (const task of toTasks(snapshot).filter((candidate) => candidate.title.toLowerCase().includes(needle))) {
+        results.push({ id: task.id, kind: 'task', title: task.title, subtitle: snapshot.name, to: `${to}?task=${encodeURIComponent(task.id)}` })
+      }
       for (const file of toFiles(snapshot).filter((candidate) => candidate.path.toLowerCase().includes(needle))) {
         results.push({ id: file.id, kind: 'file', title: file.path, subtitle: snapshot.name, to: `${to}?file=${encodeURIComponent(file.id)}` })
       }

@@ -108,6 +108,25 @@ describe('ingestHook', () => {
     expect(context.length).toBeLessThan(10_000)
   })
 
+  it('links edits to the current task and briefs the next session on it', async () => {
+    const { repo, storePath } = await initialized()
+    withStore(storePath, (store) =>
+      store.record({ type: 'task.upserted', payload: { id: 'oauth', title: 'Add Google sign-in', status: 'in-progress', nextAction: 'Validate state' }, evidence: 'agent-reported', source: 'mcp', occurredAt: NOW.toISOString() }),
+    )
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'one'), { now: () => NOW })
+    repo.write('src/a.ts', 'oauth work')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/a.ts') } }, 'one'), { now: () => NOW })
+    withStore(storePath, (store) => {
+      expect(store.graph.neighbors('task:oauth', { direction: 'out', types: ['touches'] })).toEqual(['file:src/a.ts'])
+      expect(store.graph.neighbors('session:one', { direction: 'out', types: ['worked_on'] })).toEqual(['task:oauth'])
+    })
+    const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'two'), { now: () => NOW })
+    const context = next.status === 'recorded' ? (next.additionalContext ?? '') : ''
+    expect(context).toContain('## Current task')
+    expect(context).toContain('Next action: "Validate state"')
+    expect(context).toContain('start_task when you begin')
+  })
+
   it('adds no context when there is nothing from before', async () => {
     const { repo } = await initialized()
     const first = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }))

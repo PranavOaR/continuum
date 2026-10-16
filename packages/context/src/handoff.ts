@@ -1,5 +1,6 @@
 import { basename } from 'node:path'
 import type { CheckSummary, DecisionSummary, ProjectState, SessionSummary } from './projectState'
+import type { TaskSummary } from './tasks'
 import { agoFromIso } from './time'
 
 /** Fits comfortably in a SessionStart hook (10k chars) and an MCP tool result. */
@@ -45,6 +46,43 @@ function listPaths(paths: readonly string[]): string {
 function describeSession(session: SessionSummary, now: Date): string {
   const state = session.ended ? 'ended' : 'still open'
   return `${code(session.agent)} session, started ${agoFromIso(session.startedAt, now)}, last active ${agoFromIso(session.lastActivityAt, now)}, ${state}`
+}
+
+const MAX_STEPS = 8
+
+const step = (text: string) => `  - ${quote(text, 200).slice(1, -1)}`
+
+/** Remaining steps: the next ones first. */
+function upcoming(label: string, steps: readonly string[]): string[] {
+  if (steps.length === 0) return []
+  const more = steps.length > MAX_STEPS ? [`  - …and ${steps.length - MAX_STEPS} more`] : []
+  return [`${label}:`, ...steps.slice(0, MAX_STEPS).map(step), ...more]
+}
+
+/** Completed steps: the most recent ones, since those say where work stopped. */
+function recent(label: string, steps: readonly string[]): string[] {
+  if (steps.length === 0) return []
+  const earlier = steps.length > MAX_STEPS ? [`  - …${steps.length - MAX_STEPS} earlier`] : []
+  return [`${label}:`, ...earlier, ...steps.slice(-MAX_STEPS).map(step)]
+}
+
+function describeTask(task: TaskSummary): string[] {
+  const lines = [`[agent-reported] ${quote(task.title, 200)} (${task.status})`]
+  if (task.objective) lines.push(`Objective: ${quote(task.objective)}`)
+  if (task.nextAction) lines.push(`Next action: ${quote(task.nextAction)}`)
+  if (task.acceptanceCriteria.length > 0) {
+    lines.push('Acceptance criteria:')
+    for (const criterion of task.acceptanceCriteria.slice(0, MAX_STEPS)) lines.push(`  - [${criterion.met ? 'x' : ' '}] ${quote(criterion.text, 200).slice(1, -1)}`)
+  }
+  lines.push(...recent('Done', task.completedSteps), ...upcoming('Remaining', task.remainingSteps))
+  if (task.files.length > 0) lines.push(`Files touched: ${listPaths(task.files)}`)
+  return lines
+}
+
+function taskSection(state: ProjectState): string[] {
+  const current = state.tasks.find((task) => task.id === state.currentTaskId)
+  if (!current) return []
+  return ['## Current task', ...describeTask(current)]
 }
 
 function leftOffSection(state: ProjectState, now: Date): string[] {
@@ -139,7 +177,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
     'Evidence labels: [verified] = recorded check run, [agent-reported] = an agent said so, not proof.',
   ]
   return fit(
-    [header, leftOffSection(state, now), checksSection(state, now), decisionsSection(state), unrecordedSection(state), earlierSection(state, now)],
+    [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), unrecordedSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }

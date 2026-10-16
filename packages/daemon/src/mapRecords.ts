@@ -37,7 +37,9 @@ export function toVerification(snapshot: RepoSnapshot): VerificationRecord[] {
 }
 
 export function toMemory(snapshot: RepoSnapshot): MemoryRecord[] {
+  const taskOf = new Map(snapshot.edges.filter((edge) => edge.type === 'informs').map((edge) => [edge.from, edge.to.slice('task:'.length)]))
   return snapshot.state.decisions.map((decision) => {
+    const taskId = taskOf.get(`memory:${decision.id}`)
     const node = snapshot.nodeByKey.get(`memory:${decision.id}`)
     const anchors = Object.keys((node?.props.anchors ?? {}) as Record<string, string>).map((key) => key.slice('file:'.length))
     const stale = decision.status === 'anchor-changed' ? ` Anchored code changed since: ${list(decision.changed)}.` : ''
@@ -52,6 +54,7 @@ export function toMemory(snapshot: RepoSnapshot): MemoryRecord[] {
       evidenceType: decision.evidence,
       relatedFileIds: anchors.map((path) => ids.file(snapshot.projectId, path)),
       createdAt: decision.recordedAt,
+      ...(taskId ? { taskId } : {}),
     }
   })
 }
