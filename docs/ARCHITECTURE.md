@@ -118,7 +118,7 @@ Milestones are sequential; each ends with something demonstrable. Detailed tasks
 | M0 | **Restructure + spikes** | Monorepo (`apps/web`, `packages/*`); go/no-go notes on Claude Code hooks, MCP, `node:sqlite`, tree-sitter |
 | M1 | **Context Store core** | Object store, identity map, graph, events, projectors, evidence and out-of-date rules, all unit-tested |
 | M2 | **Repository capture** | `continuum init/start/status`; git + file watcher; `continuum run -- npm test` records verified checks against content hashes |
-| M3 | **Claude Code integration** | MCP server + hooks + plugin bundle; Claude can call `get_handoff` and passive capture works in a real session |
+| M3 | **Claude Code integration** | MCP server + hooks via `continuum setup claude-code`; Claude can call `get_handoff` and passive capture works in a real session. The plugin bundle moves to M6, because it needs the published npm package to point at |
 | M4 | **Real UI** | Web app switches from mock to the local daemon; live activity; onboarding to pick a workspace; demo mode kept |
 | M5 | **Retrieval quality** | Symbol-level graph via tree-sitter; ranked, token-budgeted handoffs; evaluated on real sessions |
 | M6 | **Second agent + release** | Codex or Cursor over MCP; redaction, ignore rules, `forget`; packaged `v0.1` |
