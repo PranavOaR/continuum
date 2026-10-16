@@ -89,6 +89,9 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       store.upsertNode(REPOSITORY_NODE, { hash: null, props: { head: hash, headMessage: message, headRecordedAt: at }, at })
       return
     }
+    case 'data.forgotten':
+      // A marker in the log only; the rewrite it records already changed the graph.
+      return
     case 'session.ended': {
       const session = keys.session(event.payload.sessionId)
       ensure(store, session, at)

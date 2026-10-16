@@ -1,5 +1,6 @@
 import type { ContextStore } from '@continuum/store'
 import { REPOSITORY_NODE } from '@continuum/store'
+import { loadContinuumIgnore } from './continuumIgnore'
 import { gitOutput } from './git'
 
 /** Commits recorded per scan at most; a large pull or rebase is summarized by its newest commits. */
@@ -40,7 +41,8 @@ export async function commitsSince(root: string, head: string, since: string | n
   try {
     // -m --first-parent: a merge lists the files it brought into this branch instead of none.
     const output = await gitOutput(root, ['-c', 'core.quotePath=false', 'log', `--max-count=${MAX_COMMITS_PER_SCAN}`, '--no-renames', '-m', '--first-parent', `--format=${RECORD}%H${FIELD}%s`, '--name-only', ...range, '--'])
-    return parseLog(output)
+    const isContinuumIgnored = await loadContinuumIgnore(root)
+    return parseLog(output).map((commit) => ({ ...commit, files: commit.files.filter((file) => !isContinuumIgnored(file)) }))
   } catch {
     // `since` no longer exists (garbage-collected after a rebase): record just HEAD.
     return since ? commitsSince(root, head, null) : []

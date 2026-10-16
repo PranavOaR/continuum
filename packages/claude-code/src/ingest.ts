@@ -7,6 +7,7 @@ import {
   isRegularFileInRepo,
   locateWorkspace,
   NotAGitRepositoryError,
+  applyRepositoryRedactions,
   readConfig,
   readWorkingTree,
   scanRepository,
@@ -88,6 +89,7 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
   if (!payload) return { status: 'ignored', reason: 'hook event not used by Continuum' }
   const workspace = await findWorkspace(payload.cwd)
   if (!workspace) return { status: 'ignored', reason: 'Continuum is not set up in this repository' }
+  await applyRepositoryRedactions(workspace.root)
 
   if ('tool_name' in payload && payload.tool_name === SHELL_TOOL) return recordAgentCheck(payload, workspace, now)
   if (payload.hook_event_name === 'PostToolUseFailure') return { status: 'ignored', reason: 'only failed Bash checks are recorded' }

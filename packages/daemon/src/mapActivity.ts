@@ -81,6 +81,8 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
       const { hash, message, files } = event.payload
       return { type: 'commit', title: clip(message) || `Commit ${hash.slice(0, 7)}`, description: `Committed as ${hash.slice(0, 7)}; ${files.length} file${files.length === 1 ? '' : 's'}.` }
     }
+    case 'data.forgotten':
+      return { type: 'session', title: 'Recorded data was forgotten', description: `continuum forget removed ${event.payload.removedEvents} and rewrote ${event.payload.changedEvents} records.` }
     case 'task.upserted':
       return {
         type: 'task-update',

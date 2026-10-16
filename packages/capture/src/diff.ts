@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DiffLine } from '@continuum/core'
+import { loadContinuumIgnore, type IgnorePredicate } from './continuumIgnore'
 import { gitOutput, isRegularFileInRepo } from './git'
 import { redactSecrets } from './redact'
 
@@ -68,8 +69,8 @@ function parsePatch(patch: string): Map<string, { excerpt: DiffLine[]; truncated
   return files
 }
 
-async function untrackedDiffs(root: string): Promise<Map<string, UncommittedDiff>> {
-  const paths = (await gitOutput(root, ['ls-files', '-z', '--others', '--exclude-standard'])).split('\0').filter(Boolean).slice(0, MAX_UNTRACKED_FILES)
+async function untrackedDiffs(root: string, isContinuumIgnored: IgnorePredicate): Promise<Map<string, UncommittedDiff>> {
+  const paths = (await gitOutput(root, ['ls-files', '-z', '--others', '--exclude-standard'])).split('\0').filter((path) => path !== '' && !isContinuumIgnored(path)).slice(0, MAX_UNTRACKED_FILES)
   const entries = await Promise.all(
     paths.map(async (path): Promise<[string, UncommittedDiff] | null> => {
       try {
@@ -94,7 +95,7 @@ async function untrackedDiffs(root: string): Promise<Map<string, UncommittedDiff
  * Continuum never stores file contents, so this is read live from the repository.
  */
 export async function uncommittedChanges(root: string): Promise<Map<string, UncommittedDiff>> {
-  const against = await base(root)
+  const [against, isContinuumIgnored] = await Promise.all([base(root), loadContinuumIgnore(root)])
   const options = ['-c', 'core.quotePath=false', 'diff', '--no-color', '--no-ext-diff', '--no-renames']
   const tracked = parseNumstat(await gitOutput(root, [...options, '--numstat', '-z', against]))
   const changedLines = [...tracked.values()].reduce((total, diff) => total + (diff.additions ?? 0) + (diff.deletions ?? 0), 0)
@@ -104,5 +105,5 @@ export async function uncommittedChanges(root: string): Promise<Map<string, Unco
       if (counts) tracked.set(path, { ...counts, ...excerpt })
     }
   }
-  return new Map([...tracked, ...(await untrackedDiffs(root))])
+  return new Map([...[...tracked].filter(([path]) => !isContinuumIgnored(path)), ...(await untrackedDiffs(root, isContinuumIgnored))])
 }

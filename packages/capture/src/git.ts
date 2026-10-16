@@ -3,6 +3,7 @@ import { lstat, realpath } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import type { ContentHash } from '@continuum/core'
 import { normalizePath } from '@continuum/store'
+import { loadContinuumIgnore } from './continuumIgnore'
 
 /** Directory where a workspace keeps its local context store. Never captured as project content. */
 export const CONTINUUM_DIR = '.continuum'
@@ -105,7 +106,7 @@ async function isRegularFile(root: string, path: string): Promise<boolean> {
 
 /** Whether git ignores a repository-relative path, matching what scans capture: tracked files are never ignored. `.continuum/` always is. */
 export async function isIgnored(root: string, path: string): Promise<boolean> {
-  if (!isCapturable(path)) return true
+  if (!isCapturable(path) || (await loadContinuumIgnore(root))(path)) return true
   try {
     await git(root, ['check-ignore', '--quiet', '--', path])
     return true
@@ -223,14 +224,14 @@ async function changedPaths(root: string): Promise<string[]> {
  * reports as changed or untracked are hashed from disk.
  */
 export async function readWorkingTree(root: string): Promise<WorkingTree> {
-  const [index, changed, revision] = await Promise.all([readIndex(root), changedPaths(root), headRevision(root)])
+  const [index, changed, revision, isContinuumIgnored] = await Promise.all([readIndex(root), changedPaths(root), headRevision(root), loadContinuumIgnore(root)])
   const fromDisk = new Set(changed)
   const files = new Map<string, ContentHash>()
   for (const [path, entry] of index) {
     if (entry.skipWorktree) fromDisk.add(path)
-    else if (!fromDisk.has(path) && REGULAR_MODES.has(entry.mode) && isCapturable(path)) files.set(path, entry.hash)
+    else if (!fromDisk.has(path) && REGULAR_MODES.has(entry.mode) && isCapturable(path) && !isContinuumIgnored(path)) files.set(path, entry.hash)
   }
-  const candidates = [...fromDisk].filter(isCapturable)
+  const candidates = [...fromDisk].filter((path) => isCapturable(path) && !isContinuumIgnored(path))
   const present = (await Promise.all(candidates.map(async (path) => ((await isRegularFile(root, path)) ? path : null)))).filter((path): path is string => path !== null)
   for (const [path, hash] of await hashFiles(root, present)) files.set(path, hash)
   return { root, revision, files: new Map([...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) }

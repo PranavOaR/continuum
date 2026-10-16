@@ -46,7 +46,7 @@ export async function compactCommand(io: Io, args: readonly string[]): Promise<n
       io.out(`Nothing to compact: no events older than ${keepDays} day${keepDays === 1 ? '' : 's'}.`)
       return EXIT_OK
     }
-    const shrunk = store.vacuum()
+    const { shrunk } = store.vacuum()
     io.out(`Folded ${removedEvents} event${removedEvents === 1 ? '' : 's'} from before ${cutoff.toISOString().slice(0, 10)} into a checkpoint.`)
     io.out(`Store: ${megabytes(before)} → ${megabytes(storeBytes(workspace.storePath))}${shrunk ? '' : ' (another process is reading it; the freed space will be reused instead)'}.`)
     io.out('Current tasks, checks and decisions are unchanged; older activity no longer appears in the feed.')

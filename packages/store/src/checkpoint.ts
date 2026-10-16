@@ -35,3 +35,43 @@ export function mergeFirstEvents(existing: readonly FirstEvent[], added: readonl
   }
   return [...firsts.values()]
 }
+
+/**
+ * A rewrite of recorded history (used by `forget`). Check coverage arrives
+ * inline: events carry `ranAgainst`, and check nodes in the checkpoint carry
+ * their last run as `props.lastRun` with `ranAgainst` inline.
+ */
+export interface HistoryRewrite {
+  /** The event to keep, possibly changed, or null to remove it. */
+  event(event: ContinuumEvent): ContinuumEvent | null
+  /** The compaction checkpoint's graph, rewritten the same way. */
+  state(state: GraphState): GraphState
+}
+
+export interface RewriteResult {
+  removedEvents: number
+  changedEvents: number
+  /** The compaction checkpoint held matching data and was rewritten. */
+  changedCheckpoint: boolean
+}
+
+/** What a vacuum managed: shrinking the file, and emptying the write-ahead log that may still hold old pages. */
+export interface VacuumResult {
+  shrunk: boolean
+  walCleared: boolean
+}
+
+export const EXPORT_FORMAT = 'continuum-history'
+export const EXPORT_VERSION = 1
+
+/**
+ * A store's whole history as plain JSON, independent of how objects are
+ * stored: coverage manifests and check runs are written inline.
+ */
+export interface HistoryExport {
+  format: typeof EXPORT_FORMAT
+  version: typeof EXPORT_VERSION
+  exportedAt: string
+  checkpoint: Checkpoint | null
+  events: FirstEvent[]
+}

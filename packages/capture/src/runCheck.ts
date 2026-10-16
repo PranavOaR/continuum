@@ -4,7 +4,7 @@ import type { Writable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
 import type { CheckRecordedEvent, CheckStatus, ContentHash, IdentityKey } from '@continuum/core'
 import { keys, type ContextStore } from '@continuum/store'
-import { redactSecrets } from './redact'
+import { redactSecrets, redactWithCount } from './redact'
 import { scanRepository } from './scan'
 
 export const RUN_SOURCE = 'cli:run'
@@ -50,11 +50,15 @@ export interface RunCheckResult {
   status: CheckStatus
   /** Set when the run was recorded but the follow-up scan failed. */
   warning?: string
+  /** Secrets masked in the command and its output before they were stored. */
+  redactions: number
 }
 
 interface ProcessOutcome {
   exitCode: number
   output: string
+  /** Secrets masked in `output`. */
+  redactions: number
   interrupted: boolean
 }
 
@@ -68,8 +72,12 @@ function keep(text: string, limit: number): string {
 
 /** Clean, redacted, bounded tail; never starts with half a surrogate pair. */
 export function finalizeTail(raw: string): string {
-  const cleaned = redactSecrets(raw.replace(ANSI_ESCAPE, '')).trim()
-  return keep(cleaned, MAX_OUTPUT_TAIL_CHARS).replace(LOW_SURROGATE, '')
+  return finalizeTailCounted(raw).text
+}
+
+function finalizeTailCounted(raw: string): { text: string; count: number } {
+  const { text, count } = redactWithCount(raw.replace(ANSI_ESCAPE, ''))
+  return { text: keep(text.trim(), MAX_OUTPUT_TAIL_CHARS).replace(LOW_SURROGATE, ''), count }
 }
 
 /** Forwards output until the destination fails (e.g. EPIPE from `| head`); the run itself carries on. */
@@ -121,7 +129,8 @@ function execute(options: RunCheckOptions): Promise<ProcessOutcome> {
     })
     child.on('close', (code, signal) => {
       options.signal?.removeEventListener('abort', stop)
-      resolve({ exitCode: exitCodeOf(code, signal), output: finalizeTail(tail), interrupted })
+      const output = finalizeTailCounted(tail)
+      resolve({ exitCode: exitCodeOf(code, signal), output: output.text, redactions: output.count, interrupted })
     })
   })
 }
@@ -138,7 +147,7 @@ export function coverage(files: ReadonlyMap<string, ContentHash>): Record<Identi
  */
 export async function runCheck(store: ContextStore, options: RunCheckOptions): Promise<RunCheckResult> {
   const now = options.now ?? (() => new Date())
-  const commandLine = redactSecrets([options.command, ...options.args].join(' '))
+  const { text: commandLine, count: commandRedactions } = redactWithCount([options.command, ...options.args].join(' '))
   const name = redactSecrets(options.name ?? commandLine)
   const { tree } = await scanRepository(store, options.root, { now })
   const startedAt = now()
@@ -161,7 +170,7 @@ export async function runCheck(store: ContextStore, options: RunCheckOptions): P
   }
   // The manifest and the event that names it are written together.
   store.transact(() => [{ ...event, payload: { ...event.payload, coverage: store.putCoverage(coverage(tree.files)) } }])
-  const result: RunCheckResult = { name, exitCode: outcome.exitCode, durationMs, status: 'unknown' }
+  const result: RunCheckResult = { name, exitCode: outcome.exitCode, durationMs, status: 'unknown', redactions: commandRedactions + outcome.redactions }
   try {
     await scanRepository(store, options.root, { now })
   } catch (error) {

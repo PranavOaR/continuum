@@ -111,3 +111,35 @@ describe('ContextStore.compact', () => {
     store.close()
   })
 })
+
+describe('ContextStore export and import', () => {
+  it('reproduces the same graph and statuses in another store, including a checkpoint', () => {
+    const source = ContextStore.open(':memory:')
+    history(source)
+    source.compact(new Date('2026-10-03T00:00:00Z'))
+    const exported = JSON.parse(JSON.stringify(source.exportHistory()))
+    const target = ContextStore.open(':memory:')
+    target.importHistory(exported)
+    expect(target.snapshot()).toEqual(source.snapshot())
+    expect(target.checkStatus('npm test')).toEqual(source.checkStatus('npm test'))
+    expect(target.checkRun('npm test')).toEqual(source.checkRun('npm test'))
+    expect(target.firstEvent({ type: 'file.changed' })).toEqual(source.firstEvent({ type: 'file.changed' }))
+    target.rebuild()
+    expect(target.snapshot()).toEqual(source.snapshot())
+    source.close()
+    target.close()
+  })
+
+  it('refuses to import over existing history or an unknown format', () => {
+    const source = ContextStore.open(':memory:')
+    history(source)
+    const exported = source.exportHistory()
+    expect(() => source.importHistory(exported)).toThrow(/already has history/)
+    expect(() => ContextStore.open(':memory:').importHistory({ ...exported, format: 'other' } as never)).toThrow(/not a valid Continuum history export: unknown format/)
+    const outOfOrder = { ...exported, events: [...exported.events].reverse() }
+    expect(() => ContextStore.open(':memory:').importHistory(outOfOrder)).toThrow(/sequence numbers must increase/)
+    const malformed = { ...exported, events: [{ seq: 1, event: { type: 'file.changed', payload: 'not an object' } }] }
+    expect(() => ContextStore.open(':memory:').importHistory(malformed as never)).toThrow(/malformed events/)
+    source.close()
+  })
+})
