@@ -33,6 +33,11 @@ export class QueryCache {
     this.ttlMs = ttlMs
   }
 
+  /** Keeps every result for display but refetches each on its next use (stale-while-revalidate). */
+  markAllStale(): void {
+    for (const [key, entry] of this.entries) this.entries.set(key, { ...entry, at: Number.NEGATIVE_INFINITY })
+  }
+
   has(key: string): boolean {
     return this.entries.has(key)
   }
