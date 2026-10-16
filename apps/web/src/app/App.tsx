@@ -1,4 +1,5 @@
 import { RouterProvider } from 'react-router-dom'
+import { DataModeProvider } from '../state/dataMode'
 import { HandoffsProvider } from '../state/handoffs'
 import { PreferencesProvider } from '../state/preferences'
 import { ToastProvider } from '../state/toasts'
@@ -7,6 +8,7 @@ import { router } from './router'
 
 export function App() {
   return (
+    <DataModeProvider>
     <PreferencesProvider>
       <HandoffsProvider>
         <ToastProvider>
@@ -16,5 +18,6 @@ export function App() {
         </ToastProvider>
       </HandoffsProvider>
     </PreferencesProvider>
+    </DataModeProvider>
   )
 }

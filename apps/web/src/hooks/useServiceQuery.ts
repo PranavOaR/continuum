@@ -7,8 +7,22 @@ export interface QueryState<T> {
   isLoading: boolean
 }
 
-// The mock dataset is static, so results can be cached for the session to keep navigation instant.
-const cache = new Map<string, unknown>()
+// The demo dataset is static, so results are cached for the session to keep navigation instant.
+// Live local data changes, so entries then go stale after a few seconds and are refetched
+// on the next visit, while the stale copy keeps showing (stale-while-revalidate).
+const cache = new Map<string, { data: unknown; at: number }>()
+let cacheTtlMs = Number.POSITIVE_INFINITY
+
+export const LIVE_CACHE_TTL_MS = 5_000
+
+export function setQueryCacheTtl(ttlMs: number): void {
+  cacheTtlMs = ttlMs
+}
+
+const isFresh = (key: string) => {
+  const entry = cache.get(key)
+  return entry !== undefined && Date.now() - entry.at < cacheTtlMs
+}
 
 interface Settled<T> {
   key: string
@@ -24,11 +38,11 @@ export function useServiceQuery<T>(key: string, fetcher: () => Promise<T>): Quer
   const [settled, setSettled] = useState<Settled<T> | undefined>(undefined)
 
   useEffect(() => {
-    if (cache.has(key)) return
+    if (isFresh(key)) return
     let isCancelled = false
     fetcher().then(
       (data) => {
-        cache.set(key, data)
+        cache.set(key, { data, at: Date.now() })
         if (!isCancelled) setSettled({ key, data })
       },
       (error: unknown) => {
@@ -44,7 +58,8 @@ export function useServiceQuery<T>(key: string, fetcher: () => Promise<T>): Quer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
-  if (cache.has(key)) return { data: cache.get(key) as T, error: undefined, isLoading: false }
   const current = settled?.key === key ? settled : undefined
+  const cached = cache.get(key)
+  if (cached && !current?.error) return { data: (current?.data ?? cached.data) as T, error: undefined, isLoading: false }
   return { data: current?.data, error: current?.error, isLoading: current === undefined }
 }
