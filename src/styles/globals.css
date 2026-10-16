@@ -3,53 +3,53 @@
 @import "@fontsource-variable/geist-mono";
 
 /*
- * Design tokens. Visual language: white canvas, near-black ink, a single blue accent,
- * hairline borders, square corners, Geist + Geist Mono. Light is the default theme.
+ * Design tokens. Visual language: warm paper canvas, ink text, a single iris accent,
+ * hairline borders, soft radii, Geist + Geist Mono, and a "thread" motif. Light is the default theme.
  */
 :root,
 :root[data-theme="light"] {
-  --bg: #ffffff;
+  --bg: #fafaf7;
   --surface: #ffffff;
-  --surface-2: #f4f4f6;
-  --surface-3: #ededed;
-  --line: #dfdfdf;
-  --line-strong: #c8c9cc;
-  --fg: #0b1015;
-  --muted: #595c60;
-  --subtle: #8e9196;
-  --accent: #0562ef;
-  --accent-strong: #0562ef;
-  --accent-hover: #0450c8;
+  --surface-2: #f3f2ee;
+  --surface-3: #e9e7e1;
+  --line: #e4e2dc;
+  --line-strong: #cfccc4;
+  --fg: #141318;
+  --muted: #5c5a62;
+  --subtle: #8d8a93;
+  --accent: #5b45ff;
+  --accent-strong: #5b45ff;
+  --accent-hover: #4a33f0;
   --accent-fg: #ffffff;
-  --success: #00894a;
-  --live: #00c763;
-  --warning: #a86400;
-  --danger: #d1281f;
-  --backdrop: rgb(11 16 21 / 0.32);
-  --dot: rgb(11 16 21 / 0.14);
+  --success: #12804c;
+  --live: #1fbf6f;
+  --warning: #a35f00;
+  --danger: #cc2f2f;
+  --backdrop: rgb(20 19 24 / 0.32);
+  --dot: rgb(20 19 24 / 0.1);
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --bg: #0b1015;
-  --surface: #0f151b;
-  --surface-2: #151c23;
-  --surface-3: #1c242c;
-  --line: #242c35;
-  --line-strong: #344049;
-  --fg: #fffbf5;
-  --muted: #a9adb2;
-  --subtle: #747a81;
-  --accent: #3f86ff;
-  --accent-strong: #0562ef;
-  --accent-hover: #2a74f5;
+  --bg: #0e0d12;
+  --surface: #15141b;
+  --surface-2: #1c1b23;
+  --surface-3: #26242f;
+  --line: #2a2833;
+  --line-strong: #3a3745;
+  --fg: #f4f2ee;
+  --muted: #aeaab6;
+  --subtle: #78748a;
+  --accent: #8f7fff;
+  --accent-strong: #6a55ff;
+  --accent-hover: #7b68ff;
   --accent-fg: #ffffff;
-  --success: #2fcf80;
-  --live: #00c763;
-  --warning: #e3a640;
-  --danger: #f0645b;
+  --success: #3ccf8a;
+  --live: #3ccf8a;
+  --warning: #e4a947;
+  --danger: #f06a6a;
   --backdrop: rgb(0 0 0 / 0.6);
-  --dot: rgb(255 251 245 / 0.12);
+  --dot: rgb(244 242 238 / 0.08);
   color-scheme: dark;
 }
 
@@ -74,13 +74,13 @@
   --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
-  /* Square corners throughout; rounded-full remains for dots and switches. */
-  --radius-xs: 0px;
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-2xl: 0px;
+  /* Soft, consistent radii: small for chips, medium for controls, large for surfaces. */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
 }
 
 /* Small uppercase mono label used for eyebrows, metadata and section captions. */
@@ -123,21 +123,45 @@
   }
 }
 
-/* Corner tick marks framing a bordered surface. */
-.cn-ticks {
-  --tick: var(--line-strong);
-  background-image:
-    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
-    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
-    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
-    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
-  background-repeat: no-repeat;
-  background-size: 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px;
-  background-position:
-    left 6px top 6px, left 6px top 6px,
-    right 6px top 6px, right 6px top 6px,
-    left 6px bottom 6px, left 6px bottom 6px,
-    right 6px bottom 6px, right 6px bottom 6px;
+/*
+ * The continuity thread: a short accent line with a node on a surface's top edge.
+ * It extends on hover/focus, echoing work carrying forward.
+ */
+.cn-thread {
+  position: relative;
+}
+
+.cn-thread::before,
+.cn-thread::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  background: var(--accent);
+  transition: width 260ms ease, opacity 260ms ease;
+}
+
+.cn-thread::before {
+  top: -1px;
+  left: 20px;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+.cn-thread::after {
+  top: -3px;
+  left: 16px;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+}
+
+.cn-thread:hover::before,
+.cn-thread:focus-visible::before,
+.cn-thread:focus-within::before {
+  width: 64px;
+  opacity: 1;
 }
 
 /* Dotted grid used behind diagrams and the graph canvas. */
@@ -230,4 +254,26 @@ dialog.cn-drawer[open] .cn-dialog-panel {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* Draws a stroked SVG path once (used for the hero thread underline). */
+.cn-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: cn-draw 1.1s 0.35s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+
+@keyframes cn-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Soft accent glow used behind hero and closing sections. */
+.cn-glow {
+  background:
+    radial-gradient(40rem 22rem at 85% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(28rem 18rem at -10% 10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%);
+}
+
+.cn-dots-fade {
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
 }
