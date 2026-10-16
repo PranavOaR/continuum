@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError } from '@continuum/capture'
+import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError, readRegistry } from '@continuum/capture'
 import { HOOK_EVENTS, HOOKS_FILE, isContinuumHandler, isContinuumServer, MCP_FILE, MCP_SERVER_NAME, type Invocation } from '@continuum/claude-code'
 import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@continuum/store'
 
@@ -27,6 +27,8 @@ export interface DoctorEnvironment {
   /** How this CLI would configure Claude Code now, to spot hooks left pointing at another install. */
   invocation: Invocation
   webDist: string
+  /** Holds the registry of connected repositories that `continuum serve` shows. */
+  configDir: string
 }
 
 type Json = Record<string, unknown>
@@ -152,5 +154,11 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   findings.push(checkStore(workspace.storePath))
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
   findings.push(checkHooks(settings, env.invocation), ...(await checkMcp(workspace.root, mcpConfig, settings)), checkDashboard(env.webDist))
+  const listed = (await readRegistry(env.configDir)).some((entry) => entry.root === workspace.root)
+  findings.push(
+    listed
+      ? { status: 'ok', label: 'Shown by `continuum serve` from anywhere' }
+      : { status: 'warn', label: 'Not in your dashboard list', detail: 'set up before Continuum kept one', fix: SETUP_FIX },
+  )
   return findings
 }

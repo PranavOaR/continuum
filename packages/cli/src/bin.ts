@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import './warnings'
+import { defaultConfigDir } from '@continuum/capture'
 import { handlesInterrupts, main } from './main'
 
 async function readStdin(): Promise<string> {
@@ -28,4 +29,5 @@ process.exitCode = await main(argv, {
   now: () => new Date(),
   signal: controller.signal,
   readStdin,
+  configDir: defaultConfigDir(),
 })

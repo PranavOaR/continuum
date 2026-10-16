@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, rmdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { CONTINUUM_DIR, includeInGit, locateWorkspace } from '@continuum/capture'
+import { CONTINUUM_DIR, includeInGit, locateWorkspace, unregisterRepository } from '@continuum/capture'
 import { HOOKS_FILE, removeClaudeCodeSetup } from '@continuum/claude-code'
 import { isStoreBusy } from '@continuum/store'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
@@ -30,6 +30,7 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
     return EXIT_FAILURE
   }
   const result = await removeClaudeCodeSetup(root)
+  await unregisterRepository(io.configDir, root)
   removeIfEmpty(join(root, dirname(HOOKS_FILE)))
   for (const file of result.files) io.out(`  ${file.action.padEnd(9)} ${file.path}`)
 

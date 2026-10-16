@@ -1,4 +1,4 @@
-import { initWorkspace, locateWorkspace, scanRepository } from '@continuum/capture'
+import { initWorkspace, locateWorkspace, registerRepository, scanRepository, unregisterRepository } from '@continuum/capture'
 import { MCP_FILE, removeClaudeCodeSetup, setupClaudeCode, type Invocation, type SetupResult } from '@continuum/claude-code'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -18,7 +18,9 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
     return EXIT_USAGE
   }
   if (remove) {
-    const result = await removeClaudeCodeSetup((await locateWorkspace(io.cwd)).root)
+    const { root } = await locateWorkspace(io.cwd)
+    const result = await removeClaudeCodeSetup(root)
+    await unregisterRepository(io.configDir, root)
     io.out(result.files.length === 0 ? 'Claude Code was not set up here; nothing to remove.' : 'Removed Continuum from Claude Code for this repository:')
     report(io, result)
     return EXIT_OK
@@ -30,6 +32,7 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
     store.close()
   }
   const result = await setupClaudeCode(workspace.root, invocation)
+  await registerRepository(io.configDir, workspace.root, io.now())
   io.out(`Connected Claude Code to Continuum in ${workspace.root}${created ? ' (and initialized Continuum)' : ''}:`)
   report(io, result)
   io.out('')

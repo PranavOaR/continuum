@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { isInitialized, locateWorkspace, NotInitializedError } from '@continuum/capture'
+import { isInitialized, locateWorkspace, NotAGitRepositoryError, NotInitializedError, readRegistry, type Workspace } from '@continuum/capture'
 import { createAccessToken, createChangeFeed, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
 import { basename, resolve } from 'node:path'
 import { BUILD_INFO } from '../build'
@@ -35,6 +35,36 @@ function parseServeArgs(args: readonly string[]): ServeArgs | { error: string } 
   return { port, repositories }
 }
 
+/** Repositories named on the command line must all be set up: a typo should not silently serve less. */
+async function namedWorkspaces(io: Io, paths: readonly string[]): Promise<Workspace[]> {
+  const workspaces = await Promise.all(paths.map((path) => locateWorkspace(resolve(io.cwd, path))))
+  const missing = workspaces.find((workspace) => !isInitialized(workspace))
+  if (missing) throw new NotInitializedError(missing.root)
+  return workspaces
+}
+
+/**
+ * With no arguments: every repository connected with `continuum setup`, plus
+ * the one you are in. Registered repositories that were moved, deleted or
+ * uninstalled are skipped with a note.
+ */
+async function everyConnectedWorkspace(io: Io): Promise<Workspace[]> {
+  const here = await locateWorkspace(io.cwd).catch((error: unknown) => {
+    if (error instanceof NotAGitRepositoryError) return null
+    throw error
+  })
+  const registered = await Promise.all(
+    (await readRegistry(io.configDir)).map(async ({ root }) => {
+      const workspace = await locateWorkspace(root).catch(() => null)
+      if (!workspace || !isInitialized(workspace)) io.err(`continuum: skipping ${root}: no longer set up (run \`continuum setup claude-code\` there to add it back)`)
+      return workspace && isInitialized(workspace) ? workspace : null
+    }),
+  )
+  const workspaces = [...(here && isInitialized(here) ? [here] : []), ...registered.filter((workspace): workspace is Workspace => workspace !== null)]
+  if (workspaces.length === 0) throw new NotInitializedError(here?.root ?? io.cwd)
+  return workspaces
+}
+
 function untilAborted(signal: AbortSignal): Promise<void> {
   return new Promise((done) => {
     if (signal.aborted) done()
@@ -50,9 +80,7 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
     io.err(SERVE_USAGE)
     return EXIT_USAGE
   }
-  const workspaces = await Promise.all((parsed.repositories.length > 0 ? parsed.repositories : ['.']).map((path) => locateWorkspace(resolve(io.cwd, path))))
-  const missing = workspaces.find((workspace) => !isInitialized(workspace))
-  if (missing) throw new NotInitializedError(missing.root)
+  const workspaces = parsed.repositories.length > 0 ? await namedWorkspaces(io, parsed.repositories) : await everyConnectedWorkspace(io)
   const unique = [...new Map(workspaces.map((workspace) => [workspace.root, workspace])).values()]
   const ids = projectIds(unique.map((workspace) => basename(workspace.root)))
   const describeError = (error: unknown) => (error instanceof Error ? (error.stack ?? error.message) : String(error))

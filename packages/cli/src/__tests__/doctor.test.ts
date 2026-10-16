@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { checkNode, runDoctor, type Finding } from '../doctor'
 import { selfInvocation } from '../invocation'
 import { EXIT_FAILURE, EXIT_OK } from '../io'
-import { cli } from './harness'
+import { cli, TEST_CONFIG_DIR } from './harness'
 
 const sandboxes: Sandbox[] = []
 const dirs: string[] = []
@@ -26,7 +26,7 @@ const readSettings = (root: string) => JSON.parse(readFileSync(join(root, SETTIN
 const writeSettings = (root: string, value: unknown) => writeFileSync(join(root, SETTINGS), JSON.stringify(value))
 
 const doctor = (cwd: string, overrides: Partial<Parameters<typeof runDoctor>[0]> = {}) =>
-  runDoctor({ cwd, nodeVersion: '24.1.0', invocation: selfInvocation(), webDist: '/nowhere', ...overrides })
+  runDoctor({ cwd, nodeVersion: '24.1.0', invocation: selfInvocation(), webDist: '/nowhere', configDir: TEST_CONFIG_DIR, ...overrides })
 
 const find = (findings: Finding[], label: RegExp) => findings.find((finding) => label.test(finding.label))
 
@@ -56,6 +56,7 @@ describe('continuum doctor', () => {
     expect(find(findings, /hooks registered/)?.status).toBe('ok')
     expect(find(findings, /not approved yet/)?.status).toBe('warn')
     expect(find(findings, /Dashboard/)?.status).toBe('warn')
+    expect(find(findings, /continuum serve/)?.status).toBe('ok')
   })
 
   it('reports an approved or declined MCP server', async () => {
