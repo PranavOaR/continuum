@@ -82,6 +82,23 @@ describe('ContextStore projection', () => {
     expect(store.graph.size).toBe(0)
     store.close()
   })
+
+  it('records a batch of events in one transaction', () => {
+    const store = ContextStore.open(':memory:')
+    store.recordAll([ev.file('a.ts', 'h-a'), ev.file('b.ts', 'h-b')])
+    expect(store.eventCount()).toBe(2)
+    expect(store.graph.currentHashes()).toEqual(new Map([['file:a.ts', 'h-a'], ['file:b.ts', 'h-b']]))
+    store.close()
+  })
+
+  it('records none of a batch when any event in it fails', () => {
+    const store = ContextStore.open(':memory:')
+    const bad = { ...ev.task('x'), type: 'nonsense.event' } as unknown as Parameters<ContextStore['record']>[0]
+    expect(() => store.recordAll([ev.file('a.ts', 'h-a'), bad])).toThrow(/Unsupported event type/)
+    expect(store.eventCount()).toBe(0)
+    expect(store.graph.size).toBe(0)
+    store.close()
+  })
 })
 
 describe('ContextStore persistence', () => {

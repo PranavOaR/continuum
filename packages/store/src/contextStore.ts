@@ -72,11 +72,17 @@ export class ContextStore implements Mutations {
 
   /** Appends an event and projects it, atomically. On failure nothing is persisted and memory is restored. */
   record(event: ContinuumEvent): void {
+    this.recordAll([event])
+  }
+
+  /** Appends and projects several events in one transaction: all of them are recorded, or none. */
+  recordAll(events: readonly ContinuumEvent[]): void {
     this.transaction(() => {
-      this.db
-        .prepare('INSERT INTO events (type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(event.type, canonicalJson(event.payload), event.evidence, event.source, event.occurredAt, event.revision ?? null)
-      project(this, event)
+      const insert = this.db.prepare('INSERT INTO events (type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?)')
+      for (const event of events) {
+        insert.run(event.type, canonicalJson(event.payload), event.evidence, event.source, event.occurredAt, event.revision ?? null)
+        project(this, event)
+      }
     })
   }
 
