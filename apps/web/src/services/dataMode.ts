@@ -1,29 +1,24 @@
 export type DataMode = 'local' | 'demo'
 
-/** How long to wait for a local daemon before settling on demo data. */
-export const DETECT_TIMEOUT_MS = 1_500
-
-type Fetch = typeof fetch
+/** `continuum serve` injects this tag into the app shell it serves; no other host does. */
+export const DATA_MODE_META = 'continuum-data'
 
 /**
- * Local mode when this page is served by `continuum serve` (its /api/health
- * answers as a Continuum daemon); demo mode everywhere else, e.g. a static host.
+ * Local mode when this page was served by `continuum serve`, demo mode on any
+ * other host (e.g. the static public demo). Read synchronously, with no request,
+ * so the page never flickers between the two. During development,
+ * VITE_CONTINUUM_DATA=local (with CONTINUUM_API set) forces local mode.
  */
-export async function detectDataMode(fetchImpl: Fetch = fetch, timeoutMs = DETECT_TIMEOUT_MS): Promise<DataMode> {
-  try {
-    const response = await fetchImpl('/api/health', { signal: AbortSignal.timeout(timeoutMs), headers: { Accept: 'application/json' } })
-    if (!response.ok || !(response.headers.get('content-type') ?? '').includes('application/json')) return 'demo'
-    const body = (await response.json()) as { data?: { mode?: unknown } }
-    return body.data?.mode === 'local' ? 'local' : 'demo'
-  } catch {
-    return 'demo'
-  }
+export function readDataMode(doc: Pick<Document, 'querySelector'> | undefined = globalThis.document, forced: string | undefined = import.meta.env.VITE_CONTINUUM_DATA): DataMode {
+  if (forced === 'local') return 'local'
+  const meta = doc?.querySelector<HTMLMetaElement>(`meta[name="${DATA_MODE_META}"]`)
+  return meta?.content === 'local' ? 'local' : 'demo'
 }
 
-let detected: Promise<DataMode> | null = null
+let current: DataMode | null = null
 
-/** The page's data mode, detected once. */
-export function dataMode(): Promise<DataMode> {
-  detected ??= detectDataMode()
-  return detected
+/** The page's data mode, read once. */
+export function dataMode(): DataMode {
+  current ??= readDataMode()
+  return current
 }

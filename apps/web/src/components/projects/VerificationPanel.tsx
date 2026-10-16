@@ -1,11 +1,13 @@
 import { FlaskConical, Info } from 'lucide-react'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
 import type { VerificationRecord } from '@continuum/core'
+import { useIsLive } from '../../state/dataMode'
 import { Panel } from '../shared/Panel'
 import { EmptyState } from '../shared/States'
 import { EvidenceBadge, VerificationBadge } from '../shared/StatusBadge'
 
 export function VerificationPanel({ records, currentRevision }: { records: VerificationRecord[]; currentRevision?: string }) {
+  const isLive = useIsLive()
   const format = useTimeFormat()
 
   return (
@@ -38,7 +40,9 @@ export function VerificationPanel({ records, currentRevision }: { records: Verif
       )}
       <p className="mt-3 flex gap-1.5 text-[11px] text-subtle">
         <Info className="mt-px size-3 shrink-0" aria-hidden />
-        Demonstrates the intended state model. No tests are run by this prototype.
+        {isLive
+          ? 'Recorded by continuum run and judged against the current file contents: a result goes out of date as soon as a file it covered changes.'
+          : 'Demonstrates the intended state model. No tests are run by this prototype.'}
       </p>
     </Panel>
   )

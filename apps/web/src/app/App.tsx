@@ -9,15 +9,15 @@ import { router } from './router'
 export function App() {
   return (
     <DataModeProvider>
-    <PreferencesProvider>
-      <HandoffsProvider>
-        <ToastProvider>
-          <UIProvider>
-            <RouterProvider router={router} />
-          </UIProvider>
-        </ToastProvider>
-      </HandoffsProvider>
-    </PreferencesProvider>
+      <PreferencesProvider>
+        <HandoffsProvider>
+          <ToastProvider>
+            <UIProvider>
+              <RouterProvider router={router} />
+            </UIProvider>
+          </ToastProvider>
+        </HandoffsProvider>
+      </PreferencesProvider>
     </DataModeProvider>
   )
 }

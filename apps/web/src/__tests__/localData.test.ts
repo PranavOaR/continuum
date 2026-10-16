@@ -1,6 +1,6 @@
 import { NotFoundError } from '@continuum/core'
 import { describe, expect, it } from 'vitest'
-import { detectDataMode } from '../services/dataMode'
+import { readDataMode } from '../services/dataMode'
 import { ApiError, createHttpContinuumService } from '../services/httpContinuumService'
 
 function respond(status: number, body: unknown, contentType = 'application/json; charset=utf-8') {
@@ -9,22 +9,22 @@ function respond(status: number, body: unknown, contentType = 'application/json;
 
 const fetchReturning = (response: () => Response | Promise<Response>) => (async () => response()) as unknown as typeof fetch
 
-describe('detectDataMode', () => {
-  it('is local only when a Continuum daemon answers the health check', async () => {
-    expect(await detectDataMode(fetchReturning(() => respond(200, { data: { ok: true, mode: 'local' } })))).toBe('local')
+describe('readDataMode', () => {
+  const page = (meta?: string) => {
+    const doc = document.implementation.createHTMLDocument('t')
+    if (meta !== undefined) doc.head.insertAdjacentHTML('beforeend', `<meta name="continuum-data" content="${meta}">`)
+    return doc
+  }
+
+  it('is local only when continuum serve marked the page', () => {
+    expect(readDataMode(page('local'), undefined)).toBe('local')
+    expect(readDataMode(page(), undefined)).toBe('demo')
+    expect(readDataMode(page('other'), undefined)).toBe('demo')
+    expect(readDataMode(undefined, undefined)).toBe('demo')
   })
 
-  it('falls back to demo for static hosts, dev servers and failures', async () => {
-    expect(await detectDataMode(fetchReturning(() => respond(404, 'Not found', 'text/plain')))).toBe('demo')
-    expect(await detectDataMode(fetchReturning(() => respond(200, '<!doctype html>', 'text/html')))).toBe('demo')
-    expect(await detectDataMode(fetchReturning(() => respond(200, { data: { mode: 'other' } })))).toBe('demo')
-    expect(await detectDataMode(fetchReturning(() => Promise.reject(new TypeError('offline'))))).toBe('demo')
-  })
-
-  it('gives up after the timeout', async () => {
-    const hanging = ((_url: string, init?: RequestInit) =>
-      new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('timeout', 'TimeoutError'))))) as unknown as typeof fetch
-    expect(await detectDataMode(hanging, 20)).toBe('demo')
+  it('can be forced to local during development', () => {
+    expect(readDataMode(page(), 'local')).toBe('local')
   })
 })
 

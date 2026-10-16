@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
 import type { MemoryRecord, ProjectFile, ProjectTask } from '@continuum/core'
 import { cn } from '../../utils/cn'
+import { useIsLive } from '../../state/dataMode'
 import { MEMORY_KIND_LABEL } from '@continuum/core'
 import { Dialog } from '../shared/Dialog'
 import { ChangeTypeBadge, EvidenceBadge, FileStatusBadge } from '../shared/StatusBadge'
@@ -12,6 +13,11 @@ interface FileDetailDrawerProps {
   decisions: MemoryRecord[]
   onClose: () => void
   onSelectTask: (taskId: string) => void
+}
+
+/** Line counts of zero with no diff mean the counts were never captured. */
+export function hasLineDetail(file: ProjectFile): boolean {
+  return file.additions > 0 || file.deletions > 0 || file.diff.length > 0
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -30,6 +36,7 @@ const DIFF_STYLE = {
 }
 
 export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask }: FileDetailDrawerProps) {
+  const isLive = useIsLive()
   const format = useTimeFormat()
 
   return (
@@ -61,7 +68,13 @@ export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask 
               <div>
                 <dt className="label-mono text-subtle">Lines</dt>
                 <dd>
-                  <span className="text-success">+{file.additions}</span> <span className="text-danger">−{file.deletions}</span>
+                  {hasLineDetail(file) ? (
+                    <>
+                      <span className="text-success">+{file.additions}</span> <span className="text-danger">−{file.deletions}</span>
+                    </>
+                  ) : (
+                    <span className="text-subtle">Not captured yet</span>
+                  )}
                 </dd>
               </div>
             </dl>
@@ -112,7 +125,12 @@ export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask 
             )}
           </Section>
 
-          <Section title="Illustrative diff excerpt">
+          {file.diff.length === 0 ? (
+            <Section title="Diff">
+              <p className="text-[12.5px] text-muted">Line-level diffs are not captured yet. The change is recorded by its content hash; run git diff to see it.</p>
+            </Section>
+          ) : (
+          <Section title={isLive ? 'Diff excerpt' : 'Illustrative diff excerpt'}>
             <pre className="overflow-x-auto rounded-md border border-line bg-bg py-2 font-mono text-[11.5px] leading-relaxed">
               {file.diff.map((line, index) => (
                 <div key={index} className={cn('px-3 whitespace-pre', DIFF_STYLE[line.kind].row)}>
@@ -123,8 +141,9 @@ export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask 
                 </div>
               ))}
             </pre>
-            <p className="mt-2 text-[11px] text-subtle">Mock excerpt for demonstration. Not read from a live repository.</p>
+            {!isLive && <p className="mt-2 text-[11px] text-subtle">Mock excerpt for demonstration. Not read from a live repository.</p>}
           </Section>
+          )}
         </>
       )}
     </Dialog>

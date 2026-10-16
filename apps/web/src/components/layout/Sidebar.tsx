@@ -1,4 +1,5 @@
-import { ArrowRightLeft, FlaskConical } from 'lucide-react'
+import { ArrowRightLeft, FlaskConical, HardDrive } from 'lucide-react'
+import { useIsLive } from '../../state/dataMode'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useProjects } from '../../hooks/useWorkspace'
 import { useUI } from '../../state/ui'
@@ -90,13 +91,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <ProjectLinks onNavigate={onNavigate} />
 
       <div className="mt-auto pt-8">
-        <div className="rounded-lg border border-dashed border-line-strong bg-surface px-3 py-2.5">
-          <p className="flex items-center gap-1.5 label-mono text-fg">
-            <FlaskConical className="size-3" aria-hidden />
-            Demo workspace
-          </p>
-          <p className="mt-1.5 text-[12px] leading-relaxed text-muted">All data is mock data. No agents, repositories, or files are connected.</p>
-        </div>
+        <DataNote />
       </div>
     </div>
   )
@@ -107,5 +102,22 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-line bg-bg lg:block">
       <SidebarContent />
     </aside>
+  )
+}
+
+function DataNote() {
+  const isLive = useIsLive()
+  return (
+    <div className="rounded-lg border border-dashed border-line-strong bg-surface px-3 py-2.5">
+      <p className="flex items-center gap-1.5 label-mono text-fg">
+        {isLive ? <HardDrive className="size-3" aria-hidden /> : <FlaskConical className="size-3" aria-hidden />}
+        {isLive ? 'Local workspace' : 'Demo workspace'}
+      </p>
+      <p className="mt-1.5 text-[12px] leading-relaxed text-muted">
+        {isLive
+          ? 'Live records from repositories on this machine, served by continuum serve. Nothing leaves it.'
+          : 'All data is mock data. No agents, repositories, or files are connected.'}
+      </p>
+    </div>
   )
 }

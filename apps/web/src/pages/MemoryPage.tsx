@@ -16,6 +16,7 @@ import { usePreferences } from '../state/preferences'
 import type { GraphNode } from '@continuum/core'
 import { cn } from '../utils/cn'
 import { matchesQuery } from '../utils/search'
+import { useIsLive } from '../state/dataMode'
 
 type View = 'graph' | 'list'
 
@@ -57,6 +58,7 @@ function NodeList({ nodes, selectedId, onSelect }: { nodes: GraphNode[]; selecte
 }
 
 export function MemoryPage() {
+  const isLive = useIsLive()
   useDocumentTitle('Memory')
   const { preferences } = usePreferences()
   const projects = useProjects()
@@ -95,7 +97,7 @@ export function MemoryPage() {
     <>
       <PageHeader
         title="Memory Explorer"
-        description="How tasks, files, decisions, sessions and checks relate. A fixed sample, derived from the mock dataset."
+        description={isLive ? 'How sessions, the files they changed, checks and decisions relate, straight from the local context graph.' : 'How tasks, files, decisions, sessions and checks relate. A fixed sample, derived from the mock dataset.'}
         crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Memory' }]}
       />
 

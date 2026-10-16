@@ -2,6 +2,7 @@ import { Activity, ArrowRightLeft, Brain, Copy, Ellipsis, GitBranch, Settings } 
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
+import { useIsLive } from '../../state/dataMode'
 import { useToast } from '../../state/toasts'
 import { useUI } from '../../state/ui'
 import type { Project, ProjectStatus } from '@continuum/core'
@@ -22,6 +23,7 @@ function Meta({ label, children }: { label: string; children: ReactNode }) {
 }
 
 export function ProjectHeader({ project, status, taskId }: { project: Project; status: ProjectStatus; taskId?: string }) {
+  const isLive = useIsLive()
   const { openHandoffDialog } = useUI()
   const notify = useToast()
   const navigate = useNavigate()
@@ -99,7 +101,9 @@ export function ProjectHeader({ project, status, taskId }: { project: Project; s
         </Meta>
         <Meta label="Last updated">{format(project.updatedAt)}</Meta>
       </dl>
-      <p className="mt-2 text-[11px] text-subtle">Illustrative metadata from the demo dataset. No repository is connected.</p>
+      <p className="mt-2 text-[11px] text-subtle">
+        {isLive ? 'From git and the local Continuum store. Stack is detected from files at the repository root.' : 'Illustrative metadata from the demo dataset. No repository is connected.'}
+      </p>
     </div>
   )
 }

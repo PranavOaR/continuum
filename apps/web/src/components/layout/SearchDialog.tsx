@@ -8,6 +8,7 @@ import { useUI } from '../../state/ui'
 import { cn } from '../../utils/cn'
 import { Dialog } from '../shared/Dialog'
 import { EmptyState } from '../shared/States'
+import { useIsLive } from '../../state/dataMode'
 
 const SEARCH_DEBOUNCE_MS = 150
 const KIND_META: Record<SearchResultKind, { icon: LucideIcon; label: string }> = {
@@ -74,6 +75,7 @@ function SearchResults({ query, onSelect }: { query: string; onSelect: (to: stri
 }
 
 export function SearchDialog() {
+  const isLive = useIsLive()
   const { isSearchOpen, closeSearch } = useUI()
   const [query, setQuery] = useState('')
   const debouncedQuery = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS)
@@ -89,7 +91,7 @@ export function SearchDialog() {
   }
 
   return (
-    <Dialog open={isSearchOpen} onClose={close} title="Search" description="Projects, tasks, file paths, and activity in the demo dataset." size="lg">
+    <Dialog open={isSearchOpen} onClose={close} title="Search" description={isLive ? 'Projects, changed files, and activity in your local repositories.' : 'Projects, tasks, file paths, and activity in the demo dataset.'} size="lg">
       <div className="relative mb-4">
         <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
         <input

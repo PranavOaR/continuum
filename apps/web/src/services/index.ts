@@ -5,19 +5,19 @@ import { mockContinuumService } from './mockContinuumService'
 
 const httpService = createHttpContinuumService()
 
-async function active(): Promise<ContinuumService> {
-  return (await dataMode()) === 'local' ? httpService : mockContinuumService
+function active(): ContinuumService {
+  return dataMode() === 'local' ? httpService : mockContinuumService
 }
 
 /** Live data from `continuum serve` when available, the demo dataset otherwise. */
 export const continuumService: ContinuumService = {
-  getOverview: async () => (await active()).getOverview(),
-  listProjects: async () => (await active()).listProjects(),
-  listTasks: async () => (await active()).listTasks(),
-  getWorkspace: async (projectId) => (await active()).getWorkspace(projectId),
-  listActivity: async () => (await active()).listActivity(),
-  getMemoryGraph: async (projectId) => (await active()).getMemoryGraph(projectId),
-  search: async (query) => (await active()).search(query),
+  getOverview: () => active().getOverview(),
+  listProjects: () => active().listProjects(),
+  listTasks: () => active().listTasks(),
+  getWorkspace: (projectId) => active().getWorkspace(projectId),
+  listActivity: () => active().listActivity(),
+  getMemoryGraph: (projectId) => active().getMemoryGraph(projectId),
+  search: (query) => active().search(query),
 }
 
 export { dataMode, type DataMode } from './dataMode'

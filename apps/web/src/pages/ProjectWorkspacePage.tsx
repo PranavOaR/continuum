@@ -5,6 +5,7 @@ import { ActivityTimeline } from '../components/activity/ActivityTimeline'
 import { EventDetailDrawer } from '../components/activity/EventDetailDrawer'
 import { FileDetailDrawer } from '../components/projects/FileDetailDrawer'
 import { FileExplorer } from '../components/projects/FileExplorer'
+import { LeftOffPanel } from '../components/projects/LeftOffPanel'
 import { MemoryPanel } from '../components/projects/MemoryPanel'
 import { ProjectHeader } from '../components/projects/ProjectHeader'
 import { TaskPanel } from '../components/projects/TaskPanel'
@@ -71,7 +72,7 @@ export function ProjectWorkspacePage() {
     return (
       <ErrorState
         title="Project not found"
-        description={error?.message ?? 'This project does not exist in the demo dataset.'}
+        description={error?.message ?? 'This project could not be found.'}
         action={<ButtonLink to="/app/projects">Back to projects</ButtonLink>}
       />
     )
@@ -83,40 +84,38 @@ export function ProjectWorkspacePage() {
   const selectedEvent = events.find((event) => event.id === searchParams.get('event'))
   const status = tasks.find((candidate) => candidate.id === project.currentTaskId)?.status ?? 'idle'
 
-  if (!task) {
-    return (
-      <>
-        <ProjectHeader project={project} status={status} />
-        <EmptyState title="No task details" description="This project has no recorded tasks yet." />
-      </>
-    )
-  }
-
-  const taskFiles = files.filter((file) => task.relatedFileIds.includes(file.id))
-  const taskEvents = events.filter((event) => event.taskId === task.id).toReversed()
-  const taskVerification = verification.filter((record) => task.verificationIds.includes(record.id))
-  const taskMemory = memory.filter((record) => record.taskId === task.id)
+  // Without a recorded task, show everything recorded for the project rather than a dead end.
+  const taskFiles = task ? files.filter((file) => task.relatedFileIds.includes(file.id)) : files
+  const taskEvents = task
+    ? events.filter((event) => event.taskId === task.id).toReversed()
+    : events.toSorted((a, b) => a.timestamp.localeCompare(b.timestamp))
+  const taskVerification = task ? verification.filter((record) => task.verificationIds.includes(record.id)) : verification
+  const taskMemory = task ? memory.filter((record) => record.taskId === task.id) : memory
   const latestRevision = taskFiles.find((file) => file.revision)?.revision
 
   return (
     <>
-      <ProjectHeader project={project} status={status} taskId={task.id} />
+      <ProjectHeader project={project} status={status} taskId={task?.id} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
-          <TaskPanel
-            tasks={tasks}
-            task={task}
-            currentTaskId={project.currentTaskId}
-            verification={verification}
-            onSelectTask={(taskId) => setParam({ task: taskId, file: null })}
-            onPrepareHandoff={() => openHandoffDialog({ projectId: project.id, taskId: task.id })}
-          />
+          {task ? (
+            <TaskPanel
+              tasks={tasks}
+              task={task}
+              currentTaskId={project.currentTaskId}
+              verification={verification}
+              onSelectTask={(taskId) => setParam({ task: taskId, file: null })}
+              onPrepareHandoff={() => openHandoffDialog({ projectId: project.id, taskId: task.id })}
+            />
+          ) : (
+            <LeftOffPanel sessions={workspace.sessions} />
+          )}
           <FileExplorer files={taskFiles} onOpenFile={(fileId) => setParam({ file: fileId })} />
           <Panel
             id="timeline"
             title="Agent activity"
-            description="Recorded work events for this task, oldest first."
+            description={task ? 'Recorded work events for this task, oldest first.' : 'Recorded work events for this project, oldest first.'}
             actions={
               <Link to={`/app/activity?project=${project.id}`} className="text-[12px] text-accent hover:underline">
                 All project activity
