@@ -28,6 +28,13 @@ export interface ProjectWorkspace {
   verification: VerificationRecord[]
   memory: MemoryRecord[]
   sessions: AgentSession[]
+  /** Live data only: how far this repository is through first-run setup. */
+  setup?: ProjectSetup
+}
+
+export interface ProjectSetup {
+  /** Claude Code's hooks for Continuum are registered in this repository. */
+  agentConnected: boolean
 }
 
 export type AttentionKind = 'incomplete-task' | 'awaiting-verification' | 'stale-context' | 'handoff-review'

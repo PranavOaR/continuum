@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@continuum/capture": "*",
+    "@continuum/claude-code": "*",
     "@continuum/context": "*",
     "@continuum/core": "*",
     "@continuum/store": "*"

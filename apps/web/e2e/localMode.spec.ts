@@ -185,3 +185,21 @@ test('a project without tasks offers its briefing, and Prepare Handoff says why 
   await expect(prepare).toBeDisabled()
   await expect(dialog.getByText('This project has no recorded task to hand off. Copy the briefing instead.')).toBeVisible()
 })
+
+test('a new project shows a getting-started checklist that ticks itself off live', async ({ page }) => {
+  const name = emptyRepo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  const guide = page.locator('#getting-started')
+  await expect(guide.getByText('0 of 4 done', { exact: false })).toBeVisible()
+  await expect(guide.getByText('continuum setup claude-code')).toBeVisible()
+
+  execFileSync(process.execPath, [...CLI, '-C', emptyRepo, 'run', '--name', 'smoke', '--', process.execPath, '-e', '0'], { cwd: ROOT })
+  await expect(guide.getByText('1 of 4 done', { exact: false })).toBeVisible({ timeout: 4_000 })
+  await expect(guide.getByText('Record a check (done)')).toBeAttached()
+
+  await guide.getByRole('button', { name: 'Hide getting started' }).click()
+  await expect(page.locator('#getting-started')).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Where we left off' })).toBeVisible()
+  await expect(page.locator('#getting-started')).toHaveCount(0)
+})

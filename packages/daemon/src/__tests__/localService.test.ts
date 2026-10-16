@@ -298,3 +298,13 @@ describe('LocalContinuumService task edits', () => {
     await expect(local.updateTask('elsewhere', 'auth-1', { kind: 'status', status: 'completed' })).rejects.toBeInstanceOf(NotFoundError)
   })
 })
+
+describe('LocalContinuumService setup state', () => {
+  it('reports whether Claude Code is connected to the repository', async () => {
+    const { repo, service: local } = await service()
+    expect((await local.getWorkspace('acme')).setup).toEqual({ agentConnected: false })
+    const { setupClaudeCode } = await import('@continuum/claude-code')
+    await setupClaudeCode(repo.root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
+    expect((await local.getWorkspace('acme')).setup).toEqual({ agentConnected: true })
+  })
+})

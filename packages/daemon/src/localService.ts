@@ -195,6 +195,7 @@ export class LocalContinuumService implements ContinuumService {
       verification: toVerification(snapshot),
       memory: toMemory(snapshot),
       sessions: toSessions(snapshot),
+      setup: { agentConnected: snapshot.agentConnected },
     }
   }
 
