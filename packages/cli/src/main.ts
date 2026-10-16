@@ -12,6 +12,7 @@ import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
+import { uninstallCommand } from './commands/uninstall'
 import { VERSION } from './build'
 import { selfInvocation } from './invocation'
 import { EXIT_FAILURE, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE, type Io } from './io'
@@ -33,6 +34,7 @@ Commands
   handoff              Print where the project left off, for any agent or chat
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
+  uninstall [--purge]  Disconnect Claude Code; --purge also deletes .continuum/
 
 Used by agents
   mcp                  Serve the Continuum MCP server on stdio
@@ -60,6 +62,7 @@ const COMMANDS: Record<string, Command> = {
   setup: (io, args) => setupCommand(io, args, selfInvocation()),
   mcp: (io) => mcpCommand(io, VERSION),
   ingest: (io) => ingestCommand(io),
+  uninstall: (io, args) => uninstallCommand(io, args),
 }
 
 interface GlobalArgs {

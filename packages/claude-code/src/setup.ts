@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { addGitExclude, isTracked } from '@continuum/capture'
+import { addGitExclude, isTracked, removeGitExclude } from '@continuum/capture'
 import { FILE_EDIT_TOOLS } from './hookPayload'
 
 /** Hooks hold machine-specific paths, so they go in the gitignored local settings, never in ~/.claude. */
@@ -190,8 +190,10 @@ export async function removeClaudeCodeSetup(root: string): Promise<SetupResult> 
       continue
     }
     // A file left with nothing but empty containers was ours alone; remove it unless the team tracks it.
-    if (isEmptyConfig(after) && !(await isTracked(root, file))) await rm(path)
-    else await writeAtomically(path, after)
+    if (isEmptyConfig(after) && !(await isTracked(root, file))) {
+      await rm(path)
+      await removeGitExclude(root, `/${file}`, GIT_EXCLUDE_COMMENT)
+    } else await writeAtomically(path, after)
     files.push({ path: file, action: 'removed' })
   }
   return { files }
