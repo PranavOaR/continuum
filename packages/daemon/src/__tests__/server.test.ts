@@ -114,7 +114,7 @@ describe('daemon access token', () => {
 
   it('exchanges the launch link for an HttpOnly, SameSite=Strict cookie', async () => {
     const daemon = await start(webBuild())
-    expect(daemon.launchUrl).toBe(`${daemon.url}/?token=${TOKEN}`)
+    expect(daemon.launchUrl).toBe(`${daemon.url}/app?token=${TOKEN}`)
     const launch = await raw(daemon, `/app/projects?view=all&token=${TOKEN}`, { authorization: '' })
     expect(launch.status).toBe(302)
     expect(launch.headers.location).toBe('/app/projects?view=all')
@@ -124,6 +124,9 @@ describe('daemon access token', () => {
     expect(setCookie).toContain('SameSite=Strict')
     const withCookie = await raw(daemon, '/api/overview', { authorization: '', cookie: `other=1; continuum_${daemon.port}=${TOKEN}` })
     expect(withCookie.status).toBe(200)
+    const again = await raw(daemon, `/app?token=${TOKEN}`, { authorization: '', cookie: `continuum_${daemon.port}=${TOKEN}` })
+    expect(again.status).toBe(302)
+    expect(again.headers.location).toBe('/app')
   })
 })
 
