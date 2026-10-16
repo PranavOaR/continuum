@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findRepoRoot, hashFiles, headRevision, NotAGitRepositoryError, readWorkingTree } from '../git'
+import { findRepoRoot, hashFiles, headRevision, isIgnored, NotAGitRepositoryError, readWorkingTree } from '../git'
 import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
@@ -102,5 +102,23 @@ describe('hashFiles', () => {
     const hashes = await hashFiles(repo.root, ['a.ts', 'gone.ts', 'b.ts'])
     expect([...hashes.keys()]).toEqual(['a.ts', 'b.ts'])
     expect(hashes.get('b.ts')).toBe(blobHash(repo.root, 'b.ts'))
+  })
+})
+
+describe('isIgnored', () => {
+  it('follows .gitignore and always ignores .continuum', async () => {
+    const repo = sandbox({ '.gitignore': 'dist/\n*.log\n', 'src/a.ts': 'a' })
+    expect(await isIgnored(repo.root, 'src/a.ts')).toBe(false)
+    expect(await isIgnored(repo.root, 'src/not-yet-created.ts')).toBe(false)
+    expect(await isIgnored(repo.root, 'dist/out.js')).toBe(true)
+    expect(await isIgnored(repo.root, 'debug.log')).toBe(true)
+    expect(await isIgnored(repo.root, '.continuum/context.db')).toBe(true)
+  })
+
+  it('treats a tracked file as captured even if a pattern matches it, like scans do', async () => {
+    const repo = sandbox({ 'keep.log': 'tracked' })
+    repo.commit()
+    repo.write('.gitignore', '*.log\n')
+    expect(await isIgnored(repo.root, 'keep.log')).toBe(false)
   })
 })

@@ -97,6 +97,18 @@ async function listFiles(root: string): Promise<string[]> {
   return present.filter((path): path is string => path !== null)
 }
 
+/** Whether git ignores a repository-relative path, matching what scans capture: tracked files are never ignored. `.continuum/` always is. */
+export async function isIgnored(root: string, path: string): Promise<boolean> {
+  if (!isCapturable(path)) return true
+  try {
+    await git(root, ['check-ignore', '--quiet', '--', path])
+    return true
+  } catch (error) {
+    if (error instanceof GitCommandError && error.exitCode === 1) return false
+    throw error
+  }
+}
+
 async function hashBatch(root: string, paths: readonly string[]): Promise<Map<string, ContentHash>> {
   const hashes = (await git(root, ['hash-object', '--stdin-paths'], `${paths.join('\n')}\n`)).trim().split('\n')
   if (hashes.length !== paths.length) throw new Error(`git hash-object returned ${hashes.length} hashes for ${paths.length} files`)
