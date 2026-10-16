@@ -12,6 +12,7 @@ function event<T extends ContinuumEvent['type']>(type: T, payload: Body<T>, evid
 export const ev = {
   task: (id: string, title = 'Implement Google authentication') => event('task.upserted', { id, title, status: 'in-progress' }),
   sessionStart: (sessionId: string, taskId?: string) => event('session.started', { sessionId, agent: 'claude-code', taskId }),
+  sessionProgress: (sessionId: string, note: string) => event('session.progress', { sessionId, note }, 'agent-reported'),
   sessionEnd: (sessionId: string, summary?: string) => event('session.ended', { sessionId, summary }, 'agent-reported'),
   file: (path: string, contentHash: string | null, extra: { sessionId?: string; taskId?: string } = {}) =>
     event('file.changed', { path, contentHash, changeType: contentHash ? 'modified' : 'deleted', ...extra }),

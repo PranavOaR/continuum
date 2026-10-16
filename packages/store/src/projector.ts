@@ -43,6 +43,12 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       }
       return
     }
+    case 'session.progress': {
+      const session = keys.session(event.payload.sessionId)
+      ensure(store, session, at)
+      store.upsertNode(session, { hash: hashRecord('session-progress', event.payload), props: { lastNote: event.payload.note, lastActivityAt: at }, at })
+      return
+    }
     case 'session.ended': {
       const session = keys.session(event.payload.sessionId)
       ensure(store, session, at)
