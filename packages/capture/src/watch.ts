@@ -89,9 +89,18 @@ export async function startCapture(store: ContextStore, root: string, options: C
     }
   }
 
-  const scan = async () => {
-    const { changes } = await scanRepository(store, root)
-    if (changes.length > 0) options.onChanges?.(changes)
+  /** Every scan still running: close() waits for all of them, so none touches the store after it is closed. */
+  const inFlight = new Set<Promise<void>>()
+
+  const scan = (): Promise<void> => {
+    if (closed) return Promise.resolve()
+    const work = scanRepository(store, root).then(({ changes }) => {
+      if (changes.length > 0 && !closed) options.onChanges?.(changes)
+    })
+    inFlight.add(work)
+    const forget = () => inFlight.delete(work)
+    work.then(forget, forget)
+    return work
   }
 
   const rescan = (): Promise<void> => {
@@ -157,7 +166,7 @@ export async function startCapture(store: ContextStore, root: string, options: C
     clearTimeout(timer)
     clearInterval(reconcile)
     watcher?.close()
-    await running
+    await Promise.allSettled([running, ...inFlight])
   }
 
   try {
