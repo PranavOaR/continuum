@@ -98,7 +98,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
     case 'file.changed': {
       const { path, contentHash, changeType, additions, deletions, sessionId, taskId } = event.payload
       const file = keys.file(path)
-      store.upsertNode(file, { hash: contentHash, props: { path: file.slice('file:'.length), changeType, additions, deletions, revision: event.revision }, at })
+      store.upsertNode(file, { hash: contentHash, props: { path: file.slice('file:'.length), changeType, additions, deletions, revision: event.revision, changedBy: sessionId ?? null }, at })
       if (sessionId) {
         ensure(store, keys.session(sessionId), at)
         store.link(keys.session(sessionId), 'modified', file)

@@ -136,12 +136,22 @@ function decisionsSection(state: ProjectState): string[] {
   ]
 }
 
-function unrecordedSection(state: ProjectState): string[] {
-  const { unrecorded } = state.files
-  if (unrecorded.length === 0) return []
-  const shown = unrecorded.slice(0, MAX_LISTED).map((change) => `- ${change.changeType} ${code(change.path)}`)
-  const more = unrecorded.length > MAX_LISTED ? [`- …and ${unrecorded.length - MAX_LISTED} more`] : []
-  return ['## Changes not yet recorded', ...shown, ...more]
+/** Changes no agent session made or explained: ask about them rather than assume they are part of the task. */
+function outsideSessionsSection(state: ProjectState): string[] {
+  const { unrecorded, outsideSessions } = state.files
+  const pending = new Set(unrecorded.map((change) => change.path))
+  const changes = [
+    ...unrecorded.map((change) => `- ${change.changeType} ${code(change.path)} (not yet recorded)`),
+    ...outsideSessions.filter((change) => !pending.has(change.path)).map((change) => `- ${change.changeType} ${code(change.path)}`),
+  ]
+  if (changes.length === 0) return []
+  const more = changes.length > MAX_LISTED ? [`- …and ${changes.length - MAX_LISTED} more`] : []
+  return [
+    '## Changed outside agent sessions',
+    '[observed] No agent session made or explained these: edits by hand, or by a tool Continuum does not see.',
+    ...changes.slice(0, MAX_LISTED),
+    ...more,
+  ]
 }
 
 function earlierSection(state: ProjectState, now: Date): string[] {
@@ -183,7 +193,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
     'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof.',
   ]
   return fit(
-    [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), unrecordedSection(state), earlierSection(state, now)],
+    [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }

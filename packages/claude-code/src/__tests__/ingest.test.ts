@@ -239,3 +239,26 @@ describe('ingestHook prompts', () => {
     expect(next.status === 'recorded' && next.additionalContext).toContain('Last request [said by you]: "Fix login')
   })
 })
+
+describe('changes outside agent sessions', () => {
+  it('tells the next session which edits no agent made', async () => {
+    const { repo, storePath } = await initialized({ 'src/a.ts': 'a', 'about.html': '<p>hi</p>' })
+    // After the helper's first scan, which uses the real clock.
+    const start = Date.now()
+    const later = (ms: number) => () => new Date(start + ms)
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: later(1000) })
+    repo.write('src/a.ts', 'by the agent')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/a.ts') } }), { now: later(2000) })
+    repo.write('about.html', '<p>edited by hand</p>')
+    const { scanRepository: scan } = await import('@continuum/capture')
+    const store = ContextStore.open(storePath)
+    await scan(store, repo.root, { now: later(3000) })
+    store.close()
+
+    const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: later(4000) })
+    const context = next.status === 'recorded' ? (next.additionalContext ?? '') : ''
+    const section = context.slice(context.indexOf('## Changed outside agent sessions'))
+    expect(section).toContain('- modified `about.html`')
+    expect(section).not.toContain('src/a.ts')
+  })
+})
