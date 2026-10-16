@@ -22,17 +22,17 @@ export function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
       <button
         type="button"
         onClick={openSearch}
-        className="flex h-8 min-w-0 flex-1 items-center gap-2 border border-line bg-surface-2 px-2.5 text-[13px] text-subtle hover:border-line-strong sm:max-w-sm"
+        className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-[13px] text-subtle hover:border-line-strong sm:max-w-sm"
       >
         <Search className="size-4 shrink-0" aria-hidden />
         <span className="truncate">Search projects, tasks, files…</span>
-        <kbd className="ml-auto hidden border border-line bg-surface px-1.5 font-mono text-[10px] text-muted sm:inline">
+        <kbd className="ml-auto hidden rounded-sm border border-line bg-surface-2 px-1.5 font-mono text-[10px] text-muted sm:inline">
           {isMac ? '⌘K' : 'Ctrl K'}
         </kbd>
       </button>
 
       <div className="ml-auto flex items-center gap-1">
-        <span title="Everything in this workspace is mock data" className="mr-2 hidden items-center gap-2 border border-line bg-surface-2 px-2.5 py-1.5 text-[12px] text-muted sm:inline-flex">
+        <span title="Everything in this workspace is mock data" className="mr-2 hidden items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-[12px] text-muted sm:inline-flex">
           <span aria-hidden className="size-1.5 rounded-full bg-live" />
           Demo workspace
           <span className="flex items-center gap-1 border-l border-line pl-2 label-mono text-fg">
@@ -47,7 +47,7 @@ export function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
             <IconButton label={`Notifications, ${items.length} items need attention`} className="relative" {...props}>
               <Bell aria-hidden />
               {items.length > 0 && (
-                <span aria-hidden className="absolute top-0.5 right-0.5 flex size-3.5 items-center justify-center bg-accent-strong font-mono text-[9px] font-medium text-accent-fg">
+                <span aria-hidden className="absolute top-0.5 right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent-strong font-mono text-[9px] font-medium text-accent-fg">
                   {items.length}
                 </span>
               )}
@@ -72,7 +72,7 @@ export function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
           className="w-64"
           trigger={(props) => (
             <IconButton label="Account menu" {...props}>
-              <span className="flex size-6 items-center justify-center border border-line bg-surface-2 text-fg">
+              <span className="flex size-6 items-center justify-center rounded-full border border-line bg-surface-2 text-fg">
                 <User className="size-3.5" aria-hidden />
               </span>
             </IconButton>

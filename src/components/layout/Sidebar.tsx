@@ -13,7 +13,7 @@ function ProjectLinks({ onNavigate }: { onNavigate?: () => void }) {
   if (!data) return null
 
   return (
-    <div className="mt-8 border-t border-dashed border-line-strong pt-6">
+    <div className="mt-8 border-t border-line pt-6">
       <p className="mb-3 label-mono text-muted">Projects</p>
       <ul className="space-y-0.5">
         {data.map(({ project }) => {
@@ -26,7 +26,7 @@ function ProjectLinks({ onNavigate }: { onNavigate?: () => void }) {
                 aria-current={isActive ? 'page' : undefined}
                 className={cn('group flex h-8 items-center gap-3 text-[14px]', isActive ? 'text-fg' : 'text-muted hover:text-fg')}
               >
-                <span aria-hidden className={cn('h-px shrink-0 transition-all', isActive ? 'w-5 bg-accent' : 'w-3 bg-line-strong group-hover:w-4')} />
+                <span aria-hidden className={cn('size-1.5 shrink-0 rounded-full transition-colors', isActive ? 'bg-accent' : 'bg-line-strong group-hover:bg-subtle')} />
                 <span className="truncate">{project.name}</span>
               </Link>
             </li>
@@ -48,19 +48,23 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <nav aria-label="Primary" className="mt-10">
         <ul className="space-y-0.5">
-          {NAV_ITEMS.map(({ to, label, end }) => (
+          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
             <li key={to}>
               <NavLink
                 to={to}
                 end={end}
                 onClick={onNavigate}
                 className={({ isActive }) =>
-                  cn('relative flex h-9 items-center text-[15px] transition-colors', isActive ? 'text-fg' : 'text-muted hover:text-fg')
+                  cn(
+                    'relative -mx-3 flex h-9 items-center gap-2.5 rounded-md px-3 text-[14.5px] transition-colors',
+                    isActive ? 'bg-surface-2 text-fg' : 'text-muted hover:bg-surface-2/60 hover:text-fg',
+                  )
                 }
               >
                 {({ isActive }) => (
                   <>
-                    {isActive && <span aria-hidden className="absolute top-1/2 -left-4 size-1.5 -translate-y-1/2 bg-accent" />}
+                    {isActive && <span aria-hidden className="absolute top-2 bottom-2 left-0 w-[3px] rounded-full bg-accent" />}
+                    <Icon className={cn('size-4', isActive ? 'text-accent' : 'text-subtle')} aria-hidden />
                     {label}
                   </>
                 )}
@@ -86,7 +90,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <ProjectLinks onNavigate={onNavigate} />
 
       <div className="mt-auto pt-8">
-        <div className="cn-hatch border border-line px-3 py-2.5">
+        <div className="rounded-lg border border-dashed border-line-strong bg-surface px-3 py-2.5">
           <p className="flex items-center gap-1.5 label-mono text-fg">
             <FlaskConical className="size-3" aria-hidden />
             Demo workspace
