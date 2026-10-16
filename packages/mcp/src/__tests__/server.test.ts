@@ -50,7 +50,7 @@ describe('Continuum MCP server', () => {
   it('lists its tools with read-only hints on the read tools', async () => {
     const client = await connect((await initializedRepo()).root)
     const { tools } = await client.listTools()
-    expect(tools.map((tool) => tool.name).sort()).toEqual(['get_handoff', 'get_project_state', 'record_decision'])
+    expect(tools.map((tool) => tool.name).sort()).toEqual(['get_handoff', 'get_project_state', 'record_decision', 'start_task', 'update_task'])
     expect(tools.find((tool) => tool.name === 'get_handoff')?.annotations?.readOnlyHint).toBe(true)
     expect(tools.find((tool) => tool.name === 'record_decision')?.annotations?.readOnlyHint).toBe(false)
   })

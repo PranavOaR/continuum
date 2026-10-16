@@ -3,9 +3,10 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
-import { DEFAULT_HANDOFF_CHARS, projectState, renderHandoff, type ProjectState } from '@continuum/context'
+import { currentTaskId, DEFAULT_HANDOFF_CHARS, projectState, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
+import { registerTaskTools, TaskToolError } from './taskTools'
 
 export const SERVER_NAME = 'continuum'
 export const MCP_SOURCE = 'mcp'
@@ -48,7 +49,9 @@ async function guarded(run: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
     return await run()
   } catch (error) {
-    if (error instanceof ToolInputError || error instanceof NotInitializedError || error instanceof NotAGitRepositoryError) return failure(error.message)
+    if (error instanceof ToolInputError || error instanceof TaskToolError || error instanceof NotInitializedError || error instanceof NotAGitRepositoryError) {
+      return failure(error.message)
+    }
     throw error
   }
 }
@@ -149,19 +152,25 @@ export function createContinuumServer(options: ServerOptions): McpServer {
         withStore(options.cwd, async (store, root) => {
           const anchors = await anchorsFor(root, options.cwd, files)
           const id = randomUUID()
-          const event: MemoryRecordedEvent = {
-            type: 'memory.recorded',
-            payload: { id, kind, title: redactSecrets(title), body: redactSecrets(body), anchors },
-            evidence: 'agent-reported',
-            source: MCP_SOURCE,
-            occurredAt: now().toISOString(),
-          }
-          store.record(event)
+          // Decisions belong to the task being worked on, read under the same lock that records them.
+          store.transact(() => {
+            const taskId = currentTaskId(store)
+            const event: MemoryRecordedEvent = {
+              type: 'memory.recorded',
+              payload: { id, kind, title: redactSecrets(title), body: redactSecrets(body), anchors, ...(taskId ? { taskId } : {}) },
+              evidence: 'agent-reported',
+              source: MCP_SOURCE,
+              occurredAt: now().toISOString(),
+            }
+            return [event]
+          })
           const anchored = Object.keys(anchors).length
           return ok(`Recorded ${kind} ${id}${anchored > 0 ? `, anchored to ${anchored} file${anchored === 1 ? '' : 's'}` : ''}. It will appear in future handoffs.`)
         }),
       ),
   )
+
+  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store) => ok(await work(store)))), now)
 
   return server
 }
