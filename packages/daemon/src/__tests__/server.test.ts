@@ -24,6 +24,7 @@ const fakeService: ContinuumService = {
     throw new NotFoundError('Project', id)
   },
   getMemoryGraph: async (id) => ({ projectId: id, nodes: [], edges: [] }),
+  getBriefing: async (id) => `# Continuum handoff: ${id}`,
   search: async (query) => [{ id: query, kind: 'project', title: query, subtitle: '', to: '/' }],
 }
 
@@ -64,6 +65,7 @@ describe('daemon API', () => {
     expect(JSON.parse((await raw(daemon, '/api/overview')).body).data.changedFileCount).toBe(3)
     expect(JSON.parse((await raw(daemon, '/api/projects/acme/graph')).body).data.projectId).toBe('acme')
     expect(JSON.parse((await raw(daemon, '/api/search?q=auth')).body).data[0].title).toBe('auth')
+    expect(JSON.parse((await raw(daemon, '/api/projects/acme/briefing')).body).data).toBe('# Continuum handoff: acme')
     expect(JSON.parse((await raw(daemon, '/api/projects/my%20app/graph')).body).data.projectId).toBe('my app')
   })
 

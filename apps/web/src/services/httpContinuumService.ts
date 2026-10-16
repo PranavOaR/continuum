@@ -39,5 +39,6 @@ export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = ''):
     listActivity: () => get('/api/activity'),
     getMemoryGraph: (projectId) => get(`${project(projectId)}/graph`),
     search: (query) => get(`/api/search?q=${encodeURIComponent(query)}`),
+    getBriefing: (projectId) => get(`${project(projectId)}/briefing`),
   }
 }

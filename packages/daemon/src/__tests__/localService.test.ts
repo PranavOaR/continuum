@@ -114,6 +114,14 @@ describe('LocalContinuumService', () => {
     expect(graph.edges.every((edge) => graph.nodes.some((node) => node.id === edge.from) && graph.nodes.some((node) => node.id === edge.to))).toBe(true)
   })
 
+  it('renders the same briefing a new agent session receives', async () => {
+    const { service: local } = await service()
+    const briefing = await local.getBriefing('acme')
+    expect(briefing).toContain('# Continuum handoff:')
+    expect(briefing).toContain('"Auth now hashes passwords. Next: rate limiting."')
+    await expect(local.getBriefing('nope')).rejects.toBeInstanceOf(NotFoundError)
+  })
+
   it('searches projects, changed files and activity', async () => {
     const { service: local } = await service()
     expect((await local.search('auth')).map((result) => result.kind)).toEqual(['file', 'activity'])

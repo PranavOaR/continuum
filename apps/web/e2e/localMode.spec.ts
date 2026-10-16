@@ -93,6 +93,16 @@ test('shows the repository, its session, changed file and verified check', async
   await expect(drawer.getByText('Mock excerpt')).toHaveCount(0)
 })
 
+test('prepare handoff shows the briefing a new agent session receives', async ({ page }) => {
+  const name = repo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('# Continuum handoff:', { exact: false })).toBeVisible()
+  await expect(dialog.getByText('Bumped app to 2. Next: wire the config loader.', { exact: false })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Copy briefing' })).toBeVisible()
+})
+
 test('memory graph comes from the local context graph', async ({ page }) => {
   await page.goto(`${url}/app/memory`)
   await expect(page.getByText('straight from the local context graph')).toBeVisible()

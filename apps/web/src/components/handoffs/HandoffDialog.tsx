@@ -15,6 +15,8 @@ import { Button } from '../shared/Button'
 import { Dialog } from '../shared/Dialog'
 import { Checkbox, SelectField } from '../shared/Fields'
 import { EmptyState, ErrorState, LoadingBlock } from '../shared/States'
+import { useIsLive } from '../../state/dataMode'
+import { BriefingPreview } from './BriefingPreview'
 import { HandoffContextPreview, TokenEstimate } from './HandoffContextPreview'
 
 function pickTarget(source: AgentType, preferred: AgentType): AgentType {
@@ -57,6 +59,7 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
   const [included, setIncluded] = useState<ContextCategory[]>(preferences.defaultContext)
 
   const workspace = useWorkspace(projectId)
+  const isLive = useIsLive()
   const task = workspace.data ? resolveTask(workspace.data, requestedTaskId) : undefined
 
   const context = useMemo(() => {
@@ -170,7 +173,8 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
         </div>
         {workspace.isLoading && <LoadingBlock rows={3} label="Loading project context" />}
         {workspace.error && <ErrorState title="Could not load this project" description={workspace.error.message} />}
-        {workspace.data && !task && <EmptyState title="This project has no tasks" description="Choose another project to prepare a handoff." />}
+        {workspace.data && !task && isLive && <BriefingPreview projectId={projectId} />}
+        {workspace.data && !task && !isLive && <EmptyState title="This project has no tasks" description="Choose another project to prepare a handoff." />}
         {context instanceof Error && <ErrorState title="Handoff could not be prepared" description={context.message} />}
         {context && !(context instanceof Error) && <HandoffContextPreview context={context} compact />}
       </div>

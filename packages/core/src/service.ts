@@ -71,6 +71,8 @@ export interface ContinuumService {
   listActivity(): Promise<ActivityEvent[]>
   getMemoryGraph(projectId: string): Promise<MemoryGraph>
   search(query: string): Promise<SearchResult[]>
+  /** The plain-text handoff briefing a new agent session receives for this project. */
+  getBriefing(projectId: string): Promise<string>
 }
 
 export class NotFoundError extends Error {

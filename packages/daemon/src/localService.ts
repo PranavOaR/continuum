@@ -10,6 +10,7 @@ import {
   type ProjectWorkspace,
   type SearchResult,
 } from '@continuum/core'
+import { renderHandoff } from '@continuum/context'
 import { toActivity } from './mapActivity'
 import { toGraph } from './mapGraph'
 import { toFiles, toProject } from './mapProject'
@@ -136,6 +137,11 @@ export class LocalContinuumService implements ContinuumService {
 
   async getMemoryGraph(projectId: string): Promise<MemoryGraph> {
     return toGraph(await this.snapshot(projectId))
+  }
+
+  async getBriefing(projectId: string): Promise<string> {
+    const snapshot = await this.snapshot(projectId)
+    return renderHandoff(snapshot.state, { now: this.now() })
   }
 
   async search(query: string): Promise<SearchResult[]> {

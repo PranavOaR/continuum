@@ -13,7 +13,11 @@ export function VerificationPanel({ records, currentRevision }: { records: Verif
   return (
     <Panel id="verification" title="Verification" description="Recorded check results, tracked separately from task progress.">
       {records.length === 0 ? (
-        <EmptyState icon={<FlaskConical />} title="No checks recorded" description="Verification status is unknown for this task." />
+        <EmptyState
+          icon={<FlaskConical />}
+          title="No checks recorded"
+          description={isLive ? 'Record one with continuum run -- <your test command>.' : 'Verification status is unknown for this task.'}
+        />
       ) : (
         <ul className="space-y-2.5">
           {records.map((record) => (
