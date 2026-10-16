@@ -8,6 +8,10 @@ export const DEFAULT_DEBOUNCE_MS = 300
 export const DEFAULT_MAX_WAIT_MS = 2_000
 /** Safety-net rescan: OS watchers can drop events (e.g. FSEvents while a stream warms up). */
 export const DEFAULT_RECONCILE_MS = 60_000
+/** Scan interval when the OS cannot watch the repository. Scans read clean files from the git index, so this stays cheap. */
+export const DEFAULT_POLL_MS = 2_000
+/** Watcher failures that mean "out of watch capacity" or "unsupported here", where polling still works. */
+const POLLABLE_ERRORS = new Set(['ENOSPC', 'EMFILE', 'ENFILE', 'ENOSYS', 'ERR_FEATURE_UNAVAILABLE_ON_PLATFORM'])
 const IGNORED_SEGMENTS = new Set(['.git', CONTINUUM_DIR, 'node_modules'])
 
 export class WatchUnavailableError extends Error {
@@ -28,9 +32,16 @@ export interface CaptureOptions {
   debounceMs?: number
   maxWaitMs?: number
   reconcileMs?: number
+  pollMs?: number
   onChanges?: (changes: FileChange[]) => void
   onError?: (error: unknown) => void
+  /** Called once when watching is unavailable and capture falls back to polling. */
+  onPolling?: (reason: string) => void
+  /** Injected in tests to simulate an OS without watch capacity. */
+  openWatcher?: (root: string, onPath: (path: string | null) => void) => FSWatcher
 }
+
+export type CaptureMode = 'watching' | 'polling'
 
 export interface CaptureHandle {
   /** Requests a scan now; coalesces with any scan already queued. */
@@ -38,15 +49,20 @@ export interface CaptureHandle {
   /** Resolves once no scan is running or queued. */
   idle(): Promise<void>
   close(): Promise<void>
+  /** How changes are being noticed right now. */
+  readonly mode: CaptureMode
 }
 
-function openWatcher(root: string, onPath: (path: string | null) => void): FSWatcher {
-  try {
-    return watch(root, { recursive: true }, (_event, filename) => onPath(filename ? filename.toString() : null))
-  } catch (error) {
-    throw new WatchUnavailableError(root, error)
-  }
+function watchRecursively(root: string, onPath: (path: string | null) => void): FSWatcher {
+  return watch(root, { recursive: true }, (_event, filename) => onPath(filename ? filename.toString() : null))
 }
+
+function isPollable(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code
+  return typeof code === 'string' && POLLABLE_ERRORS.has(code)
+}
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /**
  * Watches the repository, scans once, then rescans after each quiet period (at
@@ -104,19 +120,43 @@ export async function startCapture(store: ContextStore, root: string, options: C
     }, wait)
   }
 
-  const watcher = openWatcher(root, (path) => {
-    if (closed || (path && isIgnoredPath(path))) return
-    schedule()
-  })
-  watcher.on('error', report)
-  const reconcile = setInterval(() => void rescan(), options.reconcileMs ?? DEFAULT_RECONCILE_MS)
-  reconcile.unref()
+  let mode: CaptureMode = 'watching'
+  let watcher: FSWatcher | null = null
+  let reconcile: NodeJS.Timeout
+
+  const startTimer = (ms: number) => {
+    clearInterval(reconcile)
+    reconcile = setInterval(() => void rescan(), ms)
+    reconcile.unref()
+  }
+
+  /** Out of inotify watches (or no recursive watch at all): keep capturing by scanning on a short interval. */
+  const fallBackToPolling = (error: unknown) => {
+    if (mode === 'polling') return
+    mode = 'polling'
+    watcher?.close()
+    watcher = null
+    startTimer(options.pollMs ?? DEFAULT_POLL_MS)
+    options.onPolling?.(messageOf(error))
+  }
+
+  try {
+    watcher = (options.openWatcher ?? watchRecursively)(root, (path) => {
+      if (closed || (path && isIgnoredPath(path))) return
+      schedule()
+    })
+    watcher.on('error', (error) => (isPollable(error) ? fallBackToPolling(error) : report(error)))
+    startTimer(options.reconcileMs ?? DEFAULT_RECONCILE_MS)
+  } catch (error) {
+    if (!isPollable(error)) throw new WatchUnavailableError(root, error)
+    fallBackToPolling(error)
+  }
 
   const stop = async () => {
     closed = true
     clearTimeout(timer)
     clearInterval(reconcile)
-    watcher.close()
+    watcher?.close()
     await running
   }
 
@@ -136,5 +176,8 @@ export async function startCapture(store: ContextStore, root: string, options: C
       await running
     },
     close: stop,
+    get mode() {
+      return mode
+    },
   }
 }

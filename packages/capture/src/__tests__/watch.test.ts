@@ -110,3 +110,53 @@ describe('startCapture', () => {
     await expect(handle.rescan()).resolves.toBeUndefined()
   })
 })
+
+describe('startCapture without watch capacity', () => {
+  const failure = (code: string) => Object.assign(new Error(`watch failed: ${code}`), { code })
+
+  async function pollingSetup(openWatcher: NonNullable<Parameters<typeof startCapture>[2]>['openWatcher']) {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    const store = ContextStore.open(':memory:')
+    sandboxes.push(repo)
+    stores.push(store)
+    const reasons: string[] = []
+    const changes: FileChange[] = []
+    const handle = await startCapture(store, repo.root, { pollMs: 30, openWatcher, onPolling: (reason) => reasons.push(reason), onChanges: (batch) => changes.push(...batch) })
+    handles.push(handle)
+    return { repo, handle, reasons, changes }
+  }
+
+  it('falls back to polling when the OS is out of watches, and still records edits', async () => {
+    const { repo, handle, reasons, changes } = await pollingSetup(() => {
+      throw failure('ENOSPC')
+    })
+    expect(handle.mode).toBe('polling')
+    expect(reasons).toEqual(['watch failed: ENOSPC'])
+    repo.write('b.ts', 'b')
+    await vi.waitFor(() => expect(changes.map((change) => change.path)).toContain('b.ts'), { timeout: 2000 })
+  })
+
+  it('switches to polling when a running watcher runs out of capacity', async () => {
+    const { EventEmitter } = await import('node:events')
+    const fake = Object.assign(new EventEmitter(), { close: () => {} }) as unknown as import('node:fs').FSWatcher
+    const { handle, reasons } = await pollingSetup(() => fake)
+    expect(handle.mode).toBe('watching')
+    fake.emit('error', failure('ENOSPC'))
+    expect(handle.mode).toBe('polling')
+    expect(reasons).toHaveLength(1)
+  })
+
+  it('still refuses to start for errors polling cannot work around', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    const store = ContextStore.open(':memory:')
+    stores.push(store)
+    await expect(
+      startCapture(store, repo.root, {
+        openWatcher: () => {
+          throw failure('EACCES')
+        },
+      }),
+    ).rejects.toThrow(/Cannot watch/)
+  })
+})
