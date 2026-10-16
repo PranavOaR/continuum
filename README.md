@@ -49,7 +49,10 @@ npm run continuum -- -C ~/code/my-app setup claude-code
 It writes two project-scoped files and nothing in `~/.claude`:
 
 - `.claude/settings.local.json`: hooks that record each session, the files Claude edits, and Claude's last message in each turn. At session start, the hook briefs Claude on where the previous session left off.
-- `.mcp.json`: the `continuum` MCP server. Claude can call `get_handoff` and `get_project_state`, and use `record_decision` to save decisions, known issues and next steps tied to specific files.
+- `.mcp.json`: the `continuum` MCP server.
+  - Reading: `get_handoff` and `get_project_state`.
+  - Tasks: `start_task` and `update_task` record what Claude is working on (objective, acceptance criteria, steps and next action), and edits are attributed to the current task.
+  - Decisions: `record_decision` saves decisions, known issues and next steps tied to specific files.
 
 Restart Claude Code in that repository and approve the `continuum` server when prompted. Both files point at this checkout, so they are kept out of git. `setup claude-code --remove` takes out exactly what setup added. `npm run continuum -- handoff` prints the same briefing for pasting into any other agent or chat.
 
@@ -66,7 +69,7 @@ npm run continuum -- serve ~/code/my-app ~/code/api    # prints http://127.0.0.1
 - checks, with whether they still cover the current code;
 - recorded decisions, and the context graph.
 
-It listens on 127.0.0.1 only and accepts requests only from its own origin. It also requires the access token in the printed link, which changes on every run, so other users on the machine cannot read it. *Prepare handoff* shows the exact briefing a new agent session receives. Some data is not captured yet: line-level diffs and tasks. Screens say so rather than showing placeholders.
+It listens on 127.0.0.1 only and accepts requests only from its own origin. It also requires the access token in the printed link, which changes on every run, so other users on the machine cannot read it. *Prepare handoff* shows the exact briefing a new agent session receives. Some data is not captured yet, such as line-level diffs. Screens say so rather than showing placeholders.
 
 To work on the UI against live data, run `continuum serve`, then `CONTINUUM_API='<the printed link>' VITE_CONTINUUM_DATA=local npm run dev`. The dev server forwards `/api` to the daemon with the link's token.
 
@@ -89,12 +92,12 @@ npm workspaces:
 | `packages/capture` | `@continuum/capture` | Git working-tree hashing, change scanning, the file watcher and verified check runs |
 | `packages/context` | `@continuum/context` | Project state judged against the live working tree, and the token-bounded handoff |
 | `packages/claude-code` | `@continuum/claude-code` | Claude Code hook ingestion and project-scoped setup |
-| `packages/mcp` | `@continuum/mcp` | The local stdio MCP server (`get_handoff`, `get_project_state`, `record_decision`) |
+| `packages/mcp` | `@continuum/mcp` | The local stdio MCP server (`get_handoff`, `get_project_state`, `record_decision`, `start_task`, `update_task`) |
 | `packages/daemon` | `@continuum/daemon` | The local daemon: maps context stores onto the dashboard's service contract and serves it on 127.0.0.1 |
 | `packages/cli` | `@continuum/cli` | The `continuum` command |
 | `apps/web` | `@continuum/web` | The web app: landing page and dashboard, reading live data from the daemon or the mock demo dataset |
 
-Upcoming pieces (recorded tasks, symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
+Upcoming pieces (symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
 
 Inside `apps/web/src`: `data/` holds the mock dataset, `services/` the mock and HTTP services, `state/` data mode, preferences and handoff history, and `components/` + `pages/` the UI.
 
