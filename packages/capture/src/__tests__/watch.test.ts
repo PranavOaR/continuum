@@ -1,3 +1,5 @@
+import { rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isIgnoredPath, startCapture, type CaptureHandle } from '../watch'
@@ -14,7 +16,7 @@ afterEach(async () => {
   for (const repo of sandboxes.splice(0)) repo.cleanup()
 })
 
-async function setup(files: Record<string, string> = { 'a.ts': 'a' }, timing: { debounceMs?: number; reconcileMs?: number } = { debounceMs: 20 }) {
+async function setup(files: Record<string, string> = { 'a.ts': 'a' }, timing: { debounceMs?: number; maxWaitMs?: number; reconcileMs?: number; onError?: (error: unknown) => void } = { debounceMs: 20 }) {
   const repo = createSandbox(files)
   const store = ContextStore.open(':memory:')
   const changes: FileChange[] = []
@@ -22,9 +24,9 @@ async function setup(files: Record<string, string> = { 'a.ts': 'a' }, timing: { 
   sandboxes.push(repo)
   stores.push(store)
   const handle = await startCapture(store, repo.root, {
-    ...timing,
     onChanges: (batch) => changes.push(...batch),
     onError: (error) => errors.push(error),
+    ...timing,
   })
   handles.push(handle)
   return { repo, store, changes, errors, handle }
@@ -76,5 +78,35 @@ describe('startCapture', () => {
     repo.write('late.ts', 'late')
     await new Promise((resolve) => setTimeout(resolve, 150))
     expect(store.eventCount()).toBe(before)
+  })
+
+  it('scans within the max wait even while a file is rewritten continuously', async () => {
+    const { repo, changes } = await setup({ 'a.ts': 'a' }, { debounceMs: 200, maxWaitMs: 300, reconcileMs: 60_000 })
+    let tick = 0
+    const writer = setInterval(() => repo.write('noisy.log', String(tick++)), 40)
+    try {
+      await vi.waitFor(() => expect(changes.map((change) => change.path)).toContain('noisy.log'), { timeout: 1500, interval: 25 })
+    } finally {
+      clearInterval(writer)
+    }
+  })
+
+  it('rejects instead of pretending to run when the first scan fails', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    const store = ContextStore.open(':memory:')
+    store.close()
+    await expect(startCapture(store, repo.root, { debounceMs: 20 })).rejects.toThrow()
+  })
+
+  it('survives an error reporter that itself throws', async () => {
+    const { repo, handle } = await setup({ 'a.ts': 'a' }, {
+      debounceMs: 20,
+      onError: () => {
+        throw new Error('stderr is closed')
+      },
+    })
+    rmSync(join(repo.root, '.git'), { recursive: true, force: true })
+    await expect(handle.rescan()).resolves.toBeUndefined()
   })
 })
