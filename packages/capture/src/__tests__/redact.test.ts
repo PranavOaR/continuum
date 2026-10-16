@@ -20,6 +20,9 @@ describe('redactSecrets', () => {
     [`aws ${fake('AK', 'IA', 'X'.repeat(16))}`, 'aws [redacted]'],
     [`slack ${fake('xo', 'xb-', '0'.repeat(10), '-', 'x'.repeat(10))}`, 'slack [redacted]'],
     [`jwt ${JWT}`, 'jwt [redacted]'],
+    [`stripe ${fake('sk', '_live_', 'x'.repeat(24))}`, 'stripe [redacted]'],
+    [`key:\n${fake('-----BEGIN ', 'RSA PRIVATE KEY-----')}\nMIIEabc\ndef\n${fake('-----END ', 'RSA PRIVATE KEY-----')}\ndone`, 'key:\n[redacted]\ndone'],
+    [`cut off ${fake('-----BEGIN ', 'PRIVATE KEY-----')}\nMIIEabc`, 'cut off [redacted]'],
   ])('redacts case %#', (input, expected) => {
     expect(redactSecrets(input)).toBe(expected)
   })
