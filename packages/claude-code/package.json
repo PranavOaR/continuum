@@ -1,0 +1,21 @@
+{
+  "name": "@continuum/claude-code",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Claude Code integration: turns hook payloads into Continuum events and writes project-scoped hook and MCP configuration.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@continuum/capture": "*",
+    "@continuum/context": "*",
+    "@continuum/core": "*",
+    "@continuum/store": "*",
+    "zod": "4.6.7"
+  }
+}

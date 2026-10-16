@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findRepoRoot, hashFiles, headRevision, NotAGitRepositoryError, readWorkingTree } from '../git'
+import { findRepoRoot, hashFiles, headRevision, isIgnored, isRegularFileInRepo, isTracked, NotAGitRepositoryError, readWorkingTree } from '../git'
 import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
@@ -102,5 +102,53 @@ describe('hashFiles', () => {
     const hashes = await hashFiles(repo.root, ['a.ts', 'gone.ts', 'b.ts'])
     expect([...hashes.keys()]).toEqual(['a.ts', 'b.ts'])
     expect(hashes.get('b.ts')).toBe(blobHash(repo.root, 'b.ts'))
+  })
+})
+
+describe('isIgnored', () => {
+  it('follows .gitignore and always ignores .continuum', async () => {
+    const repo = sandbox({ '.gitignore': 'dist/\n*.log\n', 'src/a.ts': 'a' })
+    expect(await isIgnored(repo.root, 'src/a.ts')).toBe(false)
+    expect(await isIgnored(repo.root, 'src/not-yet-created.ts')).toBe(false)
+    expect(await isIgnored(repo.root, 'dist/out.js')).toBe(true)
+    expect(await isIgnored(repo.root, 'debug.log')).toBe(true)
+    expect(await isIgnored(repo.root, '.continuum/context.db')).toBe(true)
+  })
+
+  it('treats a tracked file as captured even if a pattern matches it, like scans do', async () => {
+    const repo = sandbox({ 'keep.log': 'tracked' })
+    repo.commit()
+    repo.write('.gitignore', '*.log\n')
+    expect(await isIgnored(repo.root, 'keep.log')).toBe(false)
+  })
+})
+
+describe('isTracked', () => {
+  it('is true only for files in the index', async () => {
+    const repo = sandbox({ 'a.ts': 'a' })
+    expect(await isTracked(repo.root, 'a.ts')).toBe(false)
+    repo.commit()
+    expect(await isTracked(repo.root, 'a.ts')).toBe(true)
+    expect(await isTracked(repo.root, 'missing.ts')).toBe(false)
+  })
+})
+
+describe('isRegularFileInRepo', () => {
+  it('accepts real files and rejects symlinks, symlinked directories, directories and missing paths', async () => {
+    const repo = sandbox({ 'src/a.ts': 'a' })
+    const outside = mkdtempSync(join(tmpdir(), 'continuum-outside-'))
+    try {
+      writeFileSync(join(outside, 'secret.txt'), 'x')
+      symlinkSync(join(outside, 'secret.txt'), join(repo.root, 'link.txt'))
+      symlinkSync(outside, join(repo.root, 'linked-dir'))
+      mkdirSync(join(repo.root, 'empty'))
+      expect(await isRegularFileInRepo(repo.root, 'src/a.ts')).toBe(true)
+      expect(await isRegularFileInRepo(repo.root, 'link.txt')).toBe(false)
+      expect(await isRegularFileInRepo(repo.root, 'linked-dir/secret.txt')).toBe(false)
+      expect(await isRegularFileInRepo(repo.root, 'empty')).toBe(false)
+      expect(await isRegularFileInRepo(repo.root, 'missing.ts')).toBe(false)
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+    }
   })
 })

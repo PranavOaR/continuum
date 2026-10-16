@@ -8,6 +8,8 @@ export interface Io {
   now: () => Date
   /** Aborted on Ctrl-C / SIGTERM: stops `start` and the command under `run`. */
   signal: AbortSignal
+  /** Reads all of stdin (hook payloads arrive there). */
+  readStdin: () => Promise<string>
   /** Raw streams for child-process output (`run`); default to the process's own. */
   stdout?: Writable
   stderr?: Writable

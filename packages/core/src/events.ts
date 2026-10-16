@@ -17,6 +17,8 @@ interface EventBase<TType extends string, TPayload> {
 }
 
 export type SessionStartedEvent = EventBase<'session.started', { sessionId: string; agent: AgentType; taskId?: string }>
+/** The agent's latest account of where it is (e.g. its last message in a turn). Agent-reported, never verified. */
+export type SessionProgressEvent = EventBase<'session.progress', { sessionId: string; note: string }>
 export type SessionEndedEvent = EventBase<'session.ended', { sessionId: string; summary?: string }>
 
 export type FileChangedEvent = EventBase<
@@ -38,6 +40,7 @@ export type TaskUpsertedEvent = EventBase<'task.upserted', { id: string; title: 
 
 export type ContinuumEvent =
   | SessionStartedEvent
+  | SessionProgressEvent
   | SessionEndedEvent
   | FileChangedEvent
   | CheckRecordedEvent

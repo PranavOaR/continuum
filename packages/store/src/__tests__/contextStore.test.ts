@@ -54,6 +54,24 @@ describe('ContextStore projection', () => {
     store.close()
   })
 
+  it('keeps the latest progress note on the session without touching when it started', () => {
+    const store = ContextStore.open(':memory:')
+    store.record(ev.sessionStart('s1'))
+    const startedAt = store.graph.get('session:s1')?.props.startedAt
+    store.record(ev.sessionProgress('s1', 'Wired the callback route; tests next'))
+    store.record(ev.sessionProgress('s1', 'Tests written; two failing'))
+    expect(store.graph.get('session:s1')?.props).toMatchObject({ startedAt, lastNote: 'Tests written; two failing' })
+    expect(store.graph.get('session:s1')?.props.lastActivityAt).toEqual(expect.any(String))
+    store.close()
+  })
+
+  it('creates the session when progress arrives first', () => {
+    const store = ContextStore.open(':memory:')
+    store.record(ev.sessionProgress('late', 'note'))
+    expect(store.graph.get('session:late')?.props.lastNote).toBe('note')
+    store.close()
+  })
+
   it('reports a passing check as out of date once a covered file changes', () => {
     const store = ContextStore.open(':memory:')
     seed(store)

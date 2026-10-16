@@ -1,0 +1,22 @@
+{
+  "name": "@continuum/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Local MCP server that lets any agent read a project's handoff and state from Continuum and record decisions.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@continuum/capture": "*",
+    "@continuum/context": "*",
+    "@continuum/core": "*",
+    "@continuum/store": "*",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  }
+}

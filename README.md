@@ -36,7 +36,30 @@ npm run continuum -- -C ~/code/my-app status
 
 `run` records the result as *verified* evidence tied to the exact content hash of every file it ran against, and passes the command's exit code through. Edit a covered file afterwards and `status` reports the result as out of date, naming what changed. Nothing leaves your machine.
 
-Known limits: the last 4,000 characters of a check's output are stored as-is (redaction comes later), and nothing is captured from agents yet. That is the next milestone.
+Known limits: redaction of stored commands and output is best effort, and a check stores the hash of every tracked file it ran against.
+
+## Use with Claude Code
+
+One command connects Claude Code to Continuum for a single repository:
+
+```bash
+npm run continuum -- -C ~/code/my-app setup claude-code
+```
+
+It writes two project-scoped files and nothing in `~/.claude`:
+
+- `.claude/settings.local.json`: hooks that record each session, the files Claude edits, and Claude's last message in each turn. At session start, the hook briefs Claude on where the previous session left off.
+- `.mcp.json`: the `continuum` MCP server. Claude can call `get_handoff` and `get_project_state`, and use `record_decision` to save decisions, known issues and next steps tied to specific files.
+
+Restart Claude Code in that repository and approve the `continuum` server when prompted. Both files point at this checkout, so they are kept out of git. `setup claude-code --remove` takes out exactly what setup added. `npm run continuum -- handoff` prints the same briefing for pasting into any other agent or chat.
+
+Every item in a handoff is labelled with its evidence:
+
+- **verified:** a check run recorded against exact file hashes.
+- **observed:** captured from git, the file watcher or a hook.
+- **agent-reported:** something an agent said. It is a note, not a fact.
+
+A recorded check whose files have since changed is reported as out of date, along with the files that changed.
 
 ## Structure
 
@@ -47,10 +70,13 @@ npm workspaces:
 | `packages/core` | `@continuum/core` | Domain types, event schema, evidence rules, the `ContinuumService` contract and the handoff builder, shared by every other package |
 | `packages/store` | `@continuum/store` | The local context store: content-addressed objects, an identity hash map of graph nodes, typed edges, and the append-only event log they are projected from (SQLite) |
 | `packages/capture` | `@continuum/capture` | Git working-tree hashing, change scanning, the file watcher and verified check runs |
+| `packages/context` | `@continuum/context` | Project state judged against the live working tree, and the token-bounded handoff |
+| `packages/claude-code` | `@continuum/claude-code` | Claude Code hook ingestion and project-scoped setup |
+| `packages/mcp` | `@continuum/mcp` | The local stdio MCP server (`get_handoff`, `get_project_state`, `record_decision`) |
 | `packages/cli` | `@continuum/cli` | The `continuum` command |
 | `apps/web` | `@continuum/web` | The web app: landing page and dashboard, currently backed by mock data through `mockContinuumService` |
 
-Upcoming pieces (Claude Code integration over MCP and hooks, the local daemon that will feed the web app) are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
+Upcoming pieces (the local daemon that will feed the web app, symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
 
 Inside `apps/web/src`: `data/` holds the mock dataset, `services/` the mock service, `state/` preferences and handoff history, and `components/` + `pages/` the UI.
 

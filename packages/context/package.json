@@ -1,0 +1,19 @@
+{
+  "name": "@continuum/context",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Builds a project's current state from the context store and renders token-bounded handoffs for agents.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@continuum/capture": "*",
+    "@continuum/core": "*",
+    "@continuum/store": "*"
+  }
+}

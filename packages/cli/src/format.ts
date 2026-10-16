@@ -1,10 +1,9 @@
 import type { CheckStatus } from '@continuum/core'
 import type { FileChange } from '@continuum/capture'
 
+export { formatAgo } from '@continuum/context'
+
 const SECOND = 1000
-const MINUTE = 60 * SECOND
-const HOUR = 60 * MINUTE
-const DAY = 24 * HOUR
 
 const CHANGE_MARKS: Record<FileChange['changeType'], string> = { added: '+', modified: '~', deleted: '-' }
 
@@ -14,14 +13,6 @@ export const CHECK_LABELS: Record<CheckStatus, string> = {
   'out-of-date': 'out of date',
   unknown: 'unknown',
   'not-run': 'not run',
-}
-
-export function formatAgo(from: Date, now: Date): string {
-  const elapsed = Math.max(0, now.getTime() - from.getTime())
-  if (elapsed < MINUTE) return 'just now'
-  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)}m ago`
-  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)}h ago`
-  return `${Math.floor(elapsed / DAY)}d ago`
 }
 
 export function formatDuration(ms: number): string {

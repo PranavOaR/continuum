@@ -1,7 +1,7 @@
 import { scanRepository } from '@continuum/capture'
 import { formatChange, plural } from '../format'
 import { EXIT_OK, type Io } from '../io'
-import { openWorkspace } from '../workspace'
+import { openWorkspace } from '@continuum/capture'
 
 /** Longest change list printed in full; the rest is summarized. */
 export const MAX_LISTED_CHANGES = 20

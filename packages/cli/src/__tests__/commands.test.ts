@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EXIT_NOT_FOUND, EXIT_USAGE } from '../io'
+import { handlesInterrupts } from '../main'
 import { cli } from './harness'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 
@@ -62,6 +63,16 @@ describe('continuum (global)', () => {
     const result = await cli('/', ['-C', repo.root, 'init'])
     expect(result.code).toBe(0)
     expect(existsSync(join(repo.root, '.continuum/context.db'))).toBe(true)
+  })
+})
+
+describe('handlesInterrupts', () => {
+  it('is true only for start and run', () => {
+    expect(handlesInterrupts(['start'])).toBe(true)
+    expect(handlesInterrupts(['-C', '/x', 'run', '--', 'npm', 'test'])).toBe(true)
+    expect(handlesInterrupts(['ingest'])).toBe(false)
+    expect(handlesInterrupts(['mcp'])).toBe(false)
+    expect(handlesInterrupts(['--bogus'])).toBe(false)
   })
 })
 

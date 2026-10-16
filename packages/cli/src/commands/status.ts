@@ -1,17 +1,11 @@
 import { relative } from 'node:path'
-import { diffSnapshots, readWorkingTree, recordedFiles, type WorkingTree } from '@continuum/capture'
+import { diffSnapshots, readWorkingTree, recordedFiles } from '@continuum/capture'
+import { liveHashes } from '@continuum/context'
 import { checkStatus, type CheckStatus, type CurrentHashes } from '@continuum/core'
-import { keys, type ContextStore } from '@continuum/store'
+import type { ContextStore } from '@continuum/store'
 import { CHECK_LABELS, columns, formatAgo, plural } from '../format'
 import { EXIT_OK, type Io } from '../io'
-import { openWorkspace } from '../workspace'
-
-/** Graph hashes with file hashes replaced by the live working tree, so status is exact without writing anything. */
-function liveHashes(store: ContextStore, tree: WorkingTree): CurrentHashes {
-  const nonFiles = [...store.graph.currentHashes()].filter(([key]) => !key.startsWith('file:'))
-  const files = [...tree.files].map(([path, hash]) => [keys.file(path), hash] as const)
-  return new Map([...nonFiles, ...files])
-}
+import { openWorkspace } from '@continuum/capture'
 
 function checkDetail(status: CheckStatus, changedCount: number, ranAt: unknown, now: Date): string {
   if (status === 'out-of-date') return `${plural(changedCount, 'file')} changed since it ran`

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
-import { lstat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { lstat, realpath } from 'node:fs/promises'
+import { join, sep } from 'node:path'
 import type { ContentHash } from '@continuum/core'
 import { normalizePath } from '@continuum/store'
 
@@ -95,6 +95,44 @@ async function listFiles(root: string): Promise<string[]> {
   const unique = [...new Set(listed.map(normalizePath))].filter(isCapturable)
   const present = await Promise.all(unique.map(async (path) => ((await isRegularFile(root, path)) ? path : null)))
   return present.filter((path): path is string => path !== null)
+}
+
+/** Whether git ignores a repository-relative path, matching what scans capture: tracked files are never ignored. `.continuum/` always is. */
+export async function isIgnored(root: string, path: string): Promise<boolean> {
+  if (!isCapturable(path)) return true
+  try {
+    await git(root, ['check-ignore', '--quiet', '--', path])
+    return true
+  } catch (error) {
+    if (error instanceof GitCommandError && error.exitCode === 1) return false
+    throw error
+  }
+}
+
+/**
+ * Whether a repository-relative path is a regular file physically inside the
+ * repository: not a symlink, and not reached through a symlinked directory.
+ * Scans never follow symlinks, so agent-reported paths must not either.
+ */
+export async function isRegularFileInRepo(root: string, path: string): Promise<boolean> {
+  try {
+    const absolute = join(root, path)
+    const [stats, resolved, resolvedRoot] = await Promise.all([lstat(absolute), realpath(absolute), realpath(root)])
+    return stats.isFile() && resolved.startsWith(resolvedRoot + sep)
+  } catch {
+    return false
+  }
+}
+
+/** Whether git tracks a repository-relative path (it is in the index). */
+export async function isTracked(root: string, path: string): Promise<boolean> {
+  try {
+    await git(root, ['ls-files', '--error-unmatch', '--', path])
+    return true
+  } catch (error) {
+    if (error instanceof GitCommandError && error.exitCode === 1) return false
+    throw error
+  }
 }
 
 async function hashBatch(root: string, paths: readonly string[]): Promise<Map<string, ContentHash>> {

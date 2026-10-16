@@ -1,7 +1,7 @@
 import { CheckInterruptedError, runCheck } from '@continuum/capture'
 import { CHECK_LABELS, formatDuration } from '../format'
 import { EXIT_USAGE, type Io } from '../io'
-import { openWorkspace } from '../workspace'
+import { openWorkspace } from '@continuum/capture'
 
 export const RUN_USAGE = 'Usage: continuum run [--name <check>] -- <command> [args...]'
 
