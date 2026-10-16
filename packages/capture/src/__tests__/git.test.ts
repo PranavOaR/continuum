@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findRepoRoot, headRevision, NotAGitRepositoryError, readWorkingTree } from '../git'
+import { findRepoRoot, hashFiles, headRevision, NotAGitRepositoryError, readWorkingTree } from '../git'
 import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
@@ -93,5 +93,14 @@ describe('readWorkingTree', () => {
     const tree = await readWorkingTree(repo.root)
     expect(tree.files.size).toBe(0)
     expect(tree.revision).toBeNull()
+  })
+})
+
+describe('hashFiles', () => {
+  it('skips a file that vanished between listing and hashing instead of failing', async () => {
+    const repo = sandbox({ 'a.ts': 'a', 'b.ts': 'b' })
+    const hashes = await hashFiles(repo.root, ['a.ts', 'gone.ts', 'b.ts'])
+    expect([...hashes.keys()]).toEqual(['a.ts', 'b.ts'])
+    expect(hashes.get('b.ts')).toBe(blobHash(repo.root, 'b.ts'))
   })
 })

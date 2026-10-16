@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it } from 'vitest'
 import { diffSnapshots, recordedFiles, scanRepository } from '../scan'
@@ -97,6 +100,24 @@ describe('scanRepository', () => {
     expect((await scanRepository(store, repo.root)).changes).toEqual([
       expect.objectContaining({ path: 'a.ts', changeType: 'added' }),
     ])
+  })
+
+  it('does not re-record changes another process already recorded', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    const dir = mkdtempSync(join(tmpdir(), 'continuum-shared-'))
+    const watcher = ContextStore.open(join(dir, 'context.db'))
+    const cli = ContextStore.open(join(dir, 'context.db'))
+    stores.push(watcher, cli)
+    try {
+      await scanRepository(watcher, repo.root)
+      repo.write('a.ts', 'a2')
+      expect((await scanRepository(cli, repo.root)).changes).toHaveLength(1)
+      expect((await scanRepository(watcher, repo.root)).changes).toEqual([])
+      expect(watcher.eventCount()).toBe(2)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('makes recorded check runs go out of date when a covered file changes', async () => {

@@ -92,11 +92,38 @@ async function listFiles(root: string): Promise<string[]> {
   return present.filter((path): path is string => path !== null)
 }
 
-/** Hashes every capturable file exactly as `git add` would, in one batched git call. */
-export async function readWorkingTree(root: string): Promise<WorkingTree> {
-  const [paths, revision] = await Promise.all([listFiles(root), headRevision(root)])
-  if (paths.length === 0) return { root, revision, files: new Map() }
+async function hashBatch(root: string, paths: readonly string[]): Promise<Map<string, ContentHash>> {
   const hashes = (await git(root, ['hash-object', '--stdin-paths'], `${paths.join('\n')}\n`)).trim().split('\n')
   if (hashes.length !== paths.length) throw new Error(`git hash-object returned ${hashes.length} hashes for ${paths.length} files`)
-  return { root, revision, files: new Map(paths.map((path, index) => [path, hashes[index]])) }
+  return new Map(paths.map((path, index) => [path, hashes[index]]))
+}
+
+async function hashOne(root: string, path: string): Promise<ContentHash | null> {
+  try {
+    return (await git(root, ['hash-object', '--', path])).trim()
+  } catch (error) {
+    if (error instanceof GitCommandError && !(await isRegularFile(root, path))) return null // vanished meanwhile
+    throw error
+  }
+}
+
+/**
+ * Hashes files exactly as `git add` would: one batched call, falling back to
+ * per-file hashing when a file disappears between listing and hashing
+ * (editor swap files, build output), so one vanished file never fails a scan.
+ */
+export async function hashFiles(root: string, paths: readonly string[]): Promise<Map<string, ContentHash>> {
+  if (paths.length === 0) return new Map()
+  try {
+    return await hashBatch(root, paths)
+  } catch (error) {
+    if (!(error instanceof GitCommandError)) throw error
+    const hashed = await Promise.all(paths.map(async (path) => [path, await hashOne(root, path)] as const))
+    return new Map(hashed.filter((entry): entry is readonly [string, ContentHash] => entry[1] !== null))
+  }
+}
+
+export async function readWorkingTree(root: string): Promise<WorkingTree> {
+  const [paths, revision] = await Promise.all([listFiles(root), headRevision(root)])
+  return { root, revision, files: await hashFiles(root, paths) }
 }

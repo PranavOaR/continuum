@@ -60,10 +60,12 @@ function toEvent(change: FileChange, occurredAt: string, revision: string | null
  */
 export async function scanRepository(store: ContextStore, root: string, options: ScanOptions = {}): Promise<ScanResult> {
   const tree = await readWorkingTree(root)
-  const changes = diffSnapshots(recordedFiles(store), tree.files)
-  if (changes.length > 0) {
-    const occurredAt = (options.now ?? (() => new Date()))().toISOString()
-    store.recordAll(changes.map((change) => toEvent(change, occurredAt, tree.revision)))
-  }
+  const occurredAt = (options.now ?? (() => new Date()))().toISOString()
+  let changes: FileChange[] = []
+  // Diff inside the transaction: another process may have recorded some of these changes already.
+  store.transact(() => {
+    changes = diffSnapshots(recordedFiles(store), tree.files)
+    return changes.map((change) => toEvent(change, occurredAt, tree.revision))
+  })
   return { changes, tree }
 }
