@@ -68,7 +68,7 @@ npm run continuum -- serve ~/code/my-app ~/code/api    # prints http://127.0.0.1
 
 It listens on 127.0.0.1 only and accepts requests only from its own origin. It also requires the access token in the printed link, which changes on every run, so other users on the machine cannot read it. *Prepare handoff* shows the exact briefing a new agent session receives. Some data is not captured yet: line-level diffs and tasks. Screens say so rather than showing placeholders.
 
-To work on the UI against live data, run `continuum serve`, open its link once in the browser to set the access cookie, and then run `CONTINUUM_API=http://127.0.0.1:4747 VITE_CONTINUUM_DATA=local npm run dev`.
+To work on the UI against live data, run `continuum serve`, then `CONTINUUM_API='<the printed link>' VITE_CONTINUUM_DATA=local npm run dev`. The dev server forwards `/api` to the daemon with the link's token.
 
 Every item in a handoff is labelled with its evidence:
 
