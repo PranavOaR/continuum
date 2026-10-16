@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { findRepoRoot, headRevision, NotAGitRepositoryError, readWorkingTree } from '../git'
-import { createSandbox, type Sandbox } from './sandbox'
+import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
 function sandbox(files?: Record<string, string>) {

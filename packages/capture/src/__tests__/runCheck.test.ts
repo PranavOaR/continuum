@@ -2,7 +2,7 @@ import { Writable } from 'node:stream'
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CommandNotFoundError, runCheck } from '../runCheck'
-import { createSandbox, type Sandbox } from './sandbox'
+import { createSandbox, type Sandbox } from '../testing'
 
 const NODE = process.execPath
 const sandboxes: Sandbox[] = []

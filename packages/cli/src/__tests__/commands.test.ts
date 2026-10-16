@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EXIT_NOT_FOUND, EXIT_USAGE } from '../io'
 import { cli } from './harness'
-import { createSandbox, type Sandbox } from './sandbox'
+import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 
 const NODE = process.execPath
 const sandboxes: Sandbox[] = []

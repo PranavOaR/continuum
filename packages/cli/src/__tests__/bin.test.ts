@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createSandbox, type Sandbox } from './sandbox'
+import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 
 const BIN = fileURLToPath(new URL('../bin.ts', import.meta.url))
 /** Absolute loader URL, because `--import tsx` would resolve from the sandbox's cwd. */

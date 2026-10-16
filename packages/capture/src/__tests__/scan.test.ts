@@ -1,7 +1,7 @@
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it } from 'vitest'
 import { diffSnapshots, recordedFiles, scanRepository } from '../scan'
-import { createSandbox, type Sandbox } from './sandbox'
+import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
 const stores: ContextStore[] = []

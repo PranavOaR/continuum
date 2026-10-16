@@ -2,7 +2,7 @@ import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isIgnoredPath, startCapture, type CaptureHandle } from '../watch'
 import type { FileChange } from '../scan'
-import { createSandbox, type Sandbox } from './sandbox'
+import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
 const stores: ContextStore[] = []

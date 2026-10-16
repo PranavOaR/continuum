@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 
 const GIT_IDENTITY = ['-c', 'user.name=Continuum Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false']
 
-/** A throwaway git repository for tests. Never touches the developer's own repositories. */
+/** A throwaway git repository for tests (exported as `@continuum/capture/testing`). Never touches the developer's own repositories. */
 export interface Sandbox {
   root: string
   write(path: string, content: string): void
