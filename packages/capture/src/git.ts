@@ -52,6 +52,9 @@ function git(cwd: string, args: readonly string[], input?: string): Promise<stri
   })
 }
 
+/** Runs a git command in `cwd` and returns its stdout; rejects with GitCommandError on a non-zero exit. */
+export const gitOutput = git
+
 export async function findRepoRoot(cwd: string): Promise<string> {
   try {
     return (await git(cwd, ['rev-parse', '--show-toplevel'])).trim()

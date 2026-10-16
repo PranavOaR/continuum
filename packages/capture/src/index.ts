@@ -4,3 +4,4 @@ export { CheckInterruptedError, CommandNotFoundError, finalizeTail, MAX_OUTPUT_T
 export { DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_WAIT_MS, DEFAULT_POLL_MS, DEFAULT_RECONCILE_MS, isIgnoredPath, startCapture, WatchUnavailableError, type CaptureHandle, type CaptureMode, type CaptureOptions } from './watch'
 export { REDACTED, redactSecrets } from './redact'
 export { addGitExclude, excludeFromGit, includeInGit, initWorkspace, isInitialized, locateWorkspace, NotInitializedError, openWorkspace, removeGitExclude, STORE_FILE, type Workspace } from './workspace'
+export { MAX_EXCERPT_LINES, MAX_PATCH_LINES, uncommittedChanges, type UncommittedDiff } from './diff'

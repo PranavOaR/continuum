@@ -117,7 +117,8 @@ test('shows the repository, its session, changed file and verified check', async
   await page.getByText('src/app.ts').first().click()
   const drawer = page.getByRole('dialog')
   await expect(drawer.getByText('Modified by Claude Code.')).toBeVisible()
-  await expect(drawer.getByText('Line-level diffs are not captured yet', { exact: false })).toBeVisible()
+  await expect(drawer.getByText('Uncommitted changes (against the last commit)')).toBeVisible()
+  await expect(drawer.getByText('export const app = 2')).toBeVisible()
   await expect(drawer.getByText('Mock excerpt')).toHaveCount(0)
 })
 

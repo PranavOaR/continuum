@@ -15,9 +15,15 @@ interface FileDetailDrawerProps {
   onSelectTask: (taskId: string) => void
 }
 
-/** Line counts of zero with no diff mean the counts were never captured. */
+/** Whether there are line counts to show: demo data, or a live uncommitted change. */
 export function hasLineDetail(file: ProjectFile): boolean {
-  return file.additions > 0 || file.deletions > 0 || file.diff.length > 0
+  return file.diffSource !== 'none' && (file.additions > 0 || file.deletions > 0 || file.diff.length > 0)
+}
+
+const DIFF_TITLE: Record<ProjectFile['diffSource'], string> = {
+  illustrative: 'Illustrative diff excerpt',
+  uncommitted: 'Uncommitted changes (against the last commit)',
+  none: 'Diff',
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -66,14 +72,14 @@ export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask 
                 <dd className="text-fg">{format(file.updatedAt)}</dd>
               </div>
               <div>
-                <dt className="label-mono text-subtle">Lines</dt>
+                <dt className="label-mono text-subtle">{file.diffSource === 'uncommitted' ? 'Lines since last commit' : 'Lines'}</dt>
                 <dd>
                   {hasLineDetail(file) ? (
                     <>
                       <span className="text-success">+{file.additions}</span> <span className="text-danger">−{file.deletions}</span>
                     </>
                   ) : (
-                    <span className="text-subtle">Not captured yet</span>
+                    <span className="text-subtle">{isLive ? 'No uncommitted change' : 'Not captured yet'}</span>
                   )}
                 </dd>
               </div>
@@ -127,10 +133,14 @@ export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask 
 
           {file.diff.length === 0 ? (
             <Section title="Diff">
-              <p className="text-[12.5px] text-muted">Line-level diffs are not captured yet. The change is recorded by its content hash; run git diff to see it.</p>
+              <p className="text-[12.5px] text-muted">
+                {isLive
+                  ? 'No uncommitted change in this file: it matches the last commit. Continuum records changes by content hash and does not store file contents, so earlier versions are in your git history.'
+                  : 'Line-level diffs are not captured yet. The change is recorded by its content hash; run git diff to see it.'}
+              </p>
             </Section>
           ) : (
-          <Section title={isLive ? 'Diff excerpt' : 'Illustrative diff excerpt'}>
+          <Section title={DIFF_TITLE[file.diffSource]}>
             <pre className="overflow-x-auto rounded-md border border-line bg-bg py-2 font-mono text-[11.5px] leading-relaxed">
               {file.diff.map((line, index) => (
                 <div key={index} className={cn('px-3 whitespace-pre', DIFF_STYLE[line.kind].row)}>
@@ -141,7 +151,8 @@ export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask 
                 </div>
               ))}
             </pre>
-            {!isLive && <p className="mt-2 text-[11px] text-subtle">Mock excerpt for demonstration. Not read from a live repository.</p>}
+            {file.diffTruncated && <p className="mt-2 text-[11px] text-subtle">Excerpt shortened; run git diff for the full change.</p>}
+            {file.diffSource === 'illustrative' && <p className="mt-2 text-[11px] text-subtle">Mock excerpt for demonstration. Not read from a live repository.</p>}
           </Section>
           )}
         </>

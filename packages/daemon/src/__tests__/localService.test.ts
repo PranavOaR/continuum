@@ -42,9 +42,10 @@ describe('LocalContinuumService', () => {
       status: 'verified',
       evidenceType: 'verified',
       summary: 'Modified by Claude Code.',
-      additions: 0,
-      diff: [],
+      diffSource: 'uncommitted',
+      additions: 1,
     })
+    expect(files[0].diff).toContainEqual({ kind: 'add', text: expect.stringContaining('auth') })
     expect(files[0].relevance).toContain('Covered by passing check unit')
   })
 
