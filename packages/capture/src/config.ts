@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CONTINUUM_DIR } from './git'
+import { setCustomRedactions } from './redact'
 
 export const CONFIG_FILE = 'config.json'
 
@@ -11,9 +12,11 @@ export interface ContinuumConfig {
   agentChecks: boolean
   /** Record the prompts you type to agents, redacted. Off unless you turn it on. */
   capturePrompts: boolean
+  /** Extra regular expressions to mask before anything is stored, e.g. internal ticket or customer ids. */
+  redactPatterns: string[]
 }
 
-export const DEFAULT_CONFIG: Readonly<ContinuumConfig> = { agentChecks: true, capturePrompts: false }
+export const DEFAULT_CONFIG: Readonly<ContinuumConfig> = { agentChecks: true, capturePrompts: false, redactPatterns: [] }
 
 const configPath = (root: string) => join(root, CONTINUUM_DIR, CONFIG_FILE)
 
@@ -24,11 +27,17 @@ export async function readConfig(root: string): Promise<ContinuumConfig> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
     const values = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
-    const flag = (key: keyof ContinuumConfig) => (typeof values[key] === 'boolean' ? (values[key] as boolean) : DEFAULT_CONFIG[key])
-    return { agentChecks: flag('agentChecks'), capturePrompts: flag('capturePrompts') }
+    const flag = (key: 'agentChecks' | 'capturePrompts') => (typeof values[key] === 'boolean' ? (values[key] as boolean) : DEFAULT_CONFIG[key])
+    const patterns = Array.isArray(values.redactPatterns) ? values.redactPatterns.filter((pattern): pattern is string => typeof pattern === 'string') : []
+    return { agentChecks: flag('agentChecks'), capturePrompts: flag('capturePrompts'), redactPatterns: patterns }
   } catch {
     return { ...DEFAULT_CONFIG }
   }
+}
+
+/** Applies the repository's own redaction patterns to everything this process stores from now on. */
+export async function applyRepositoryRedactions(root: string): Promise<void> {
+  setCustomRedactions((await readConfig(root)).redactPatterns)
 }
 
 export async function updateConfig(root: string, change: Partial<ContinuumConfig>): Promise<ContinuumConfig> {
