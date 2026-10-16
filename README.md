@@ -67,6 +67,8 @@ npm run build && npm run bundle    # dist/release: one ESM file plus the dashboa
 npm run smoke:release              # packs, installs and drives the real binary in a scratch repo
 ```
 
+`continuum compact` folds events older than 30 days (`--keep-days <n>`) into a gzipped checkpoint of the graph and removes them from the log. Tasks, checks and decisions are unchanged; older activity leaves the feed. On a simulated 100-session history of a 2,000-file repository, the store went from 3.5 MB to 1.4 MB.
+
 `CONTINUUM_PACKAGE_NAME` sets the npm name stamped into the bundle. The store records its schema version; migrations apply forward on open, and a store written by a newer Continuum is refused rather than changed.
 
 ## Dashboard

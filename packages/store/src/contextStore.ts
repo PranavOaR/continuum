@@ -1,5 +1,6 @@
 import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { gunzipSync, gzipSync } from 'node:zlib'
 import {
   anchorStatus,
   checkStatus,
@@ -10,6 +11,7 @@ import {
   type IdentityKey,
   type RecordedRun,
 } from '@continuum/core'
+import { mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState } from './checkpoint'
 import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
@@ -136,8 +138,11 @@ export class ContextStore implements Mutations {
     return row.count
   }
 
-  /** The oldest event in the log, optionally the oldest from one source and of one type. */
+  /** The oldest event ever recorded, optionally the oldest from one source and of one type, including events compacted away. */
   firstEvent(filter: { source?: string; type?: ContinuumEvent['type'] } = {}): ContinuumEvent | undefined {
+    const matches = (event: ContinuumEvent) => (filter.source === undefined || event.source === filter.source) && (filter.type === undefined || event.type === filter.type)
+    const compacted = this.checkpoint()?.firstEvents.find((entry) => matches(entry.event))
+    if (compacted) return compacted.event
     const row = this.db
       .prepare(
         // Plain placeholders: node:sqlite before 22.14 cannot bind a numbered one (?1) used twice.
@@ -160,14 +165,76 @@ export class ContextStore implements Mutations {
     for (const row of rows) yield toEvent(row)
   }
 
-  /** Discards all projections and replays the event log. */
+  /** Discards all projections and replays the event log, starting from the compaction checkpoint if there is one. */
   rebuild(): void {
-    const events = [...this.events()]
     this.transaction(() => {
-      this.db.exec('DELETE FROM edges; DELETE FROM node_history; DELETE FROM nodes;')
-      this.graphIndex = new GraphIndex()
-      for (const event of events) project(this, event)
+      this.writeState(this.checkpoint()?.state ?? { nodes: [], edges: [] })
+      for (const event of this.events()) project(this, event)
     })
+  }
+
+  /**
+   * Returns freed pages to the file system after a compaction. Needs a moment
+   * with no other connection reading; returns false if one was, and SQLite
+   * reuses the space instead.
+   */
+  vacuum(): boolean {
+    try {
+      this.db.exec('VACUUM')
+      this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** The latest compaction checkpoint, if the log was ever compacted. */
+  checkpoint(): Checkpoint | undefined {
+    const row = this.db.prepare('SELECT seq, created_at, state, first_events FROM checkpoints WHERE id = 1').get() as
+      | { seq: number; created_at: string; state: Uint8Array; first_events: string }
+      | undefined
+    if (!row) return undefined
+    return { seq: row.seq, createdAt: row.created_at, state: JSON.parse(gunzipSync(row.state).toString('utf8')), firstEvents: JSON.parse(row.first_events) }
+  }
+
+  /**
+   * Folds every event that occurred before `before` into a checkpoint of the
+   * graph state and removes them from the log, so the store stops growing
+   * with old history. Replaying the checkpoint plus the remaining events gives
+   * exactly the current graph. The replay runs outside the write lock, so hooks
+   * and watchers are never kept waiting; only the swap is transactional.
+   */
+  compact(before: Date, at: Date = new Date()): CompactionResult {
+    const previous = this.checkpoint()
+    const fromSeq = previous?.seq ?? 0
+    const { cutoff } = this.db.prepare('SELECT MAX(seq) AS cutoff FROM events WHERE occurred_at < ?').get(before.toISOString()) as { cutoff: number | null }
+    if (cutoff === null || cutoff <= fromSeq) return { removedEvents: 0, checkpointSeq: previous?.seq ?? null }
+
+    const rows = this.db
+      .prepare('SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events WHERE seq > ? AND seq <= ? ORDER BY seq')
+      .all(fromSeq, cutoff) as unknown as (EventRow & { seq: number })[]
+    const folded = rows.map((row) => ({ seq: row.seq, event: toEvent(row) }))
+    const scratch = ContextStore.open(':memory:')
+    let state: GraphState
+    try {
+      scratch.transaction(() => scratch.writeState(previous?.state ?? { nodes: [], edges: [] }))
+      scratch.recordAll(folded.map(({ event }) => this.selfContained(event)))
+      state = scratch.captureState()
+    } finally {
+      scratch.close()
+    }
+    const firstEvents: FirstEvent[] = mergeFirstEvents(previous?.firstEvents ?? [], folded)
+
+    let removedEvents = 0
+    this.transaction(() => {
+      // Another process compacted meanwhile: its checkpoint wins and this one is discarded.
+      if ((this.checkpoint()?.seq ?? 0) !== fromSeq) return
+      this.db
+        .prepare('INSERT OR REPLACE INTO checkpoints (id, seq, created_at, state, first_events) VALUES (1, ?, ?, ?, ?)')
+        .run(cutoff, at.toISOString(), gzipSync(JSON.stringify(state)), JSON.stringify(firstEvents))
+      removedEvents = Number(this.db.prepare('DELETE FROM events WHERE seq <= ?').run(cutoff).changes)
+    })
+    return { removedEvents, checkpointSeq: removedEvents > 0 ? cutoff : (this.checkpoint()?.seq ?? null) }
   }
 
   // ── Layer 1: content-addressed objects ─────────────────────────
@@ -278,6 +345,24 @@ export class ContextStore implements Mutations {
       this.loadGraph()
       throw error
     }
+  }
+
+  private captureState(): GraphState {
+    return { nodes: sortedNodes(this.graphIndex), edges: this.graphIndex.allEdges().map(({ from, type, to }) => ({ from, type, to })) }
+  }
+
+  /** Replaces every projection with `state`. Call inside a transaction. */
+  private writeState(state: GraphState): void {
+    this.db.exec('DELETE FROM edges; DELETE FROM node_history; DELETE FROM nodes;')
+    const insertNode = this.db.prepare('INSERT INTO nodes (key, kind, hash, props, updated_at) VALUES (?, ?, ?, ?, ?)')
+    const insertHistory = this.db.prepare('INSERT INTO node_history (key, seq, hash) VALUES (?, ?, ?)')
+    const insertEdge = this.db.prepare('INSERT INTO edges (from_key, type, to_key) VALUES (?, ?, ?)')
+    for (const node of state.nodes) {
+      insertNode.run(node.key, node.kind, node.hash, canonicalJson(node.props), node.updatedAt)
+      node.history.forEach((hash, index) => insertHistory.run(node.key, index, hash))
+    }
+    for (const edge of state.edges) insertEdge.run(edge.from, edge.type, edge.to)
+    this.loadGraph()
   }
 
   private loadGraph(): void {
