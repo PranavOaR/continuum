@@ -1,6 +1,6 @@
 # Continuum — Build Plan (prototype → working product)
 
-**Status:** draft for review · **Owner:** Pranav · **Last updated:** 2026-10-16
+**Status:** draft for review · **Owner:** Pranav · **Last updated:** 2026-10-16 · **See also:** [`ARCHITECTURE.md`](./ARCHITECTURE.md) for integration and the Context Store design
 
 The frontend prototype proves the experience. This plan turns it into a working, local-first product: something that observes real agent sessions and repositories, maintains an evidence-backed project state, and prepares handoffs from it.
 
