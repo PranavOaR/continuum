@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@continuum/capture": "*",
+    "@continuum/context": "*",
     "@continuum/core": "*",
     "@continuum/store": "*"
   },

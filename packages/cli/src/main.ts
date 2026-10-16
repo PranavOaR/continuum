@@ -6,7 +6,7 @@ import { scanCommand } from './commands/scan'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
 import { EXIT_FAILURE, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE, type Io } from './io'
-import { NotInitializedError } from './workspace'
+import { NotInitializedError } from '@continuum/capture'
 
 export const VERSION = '0.0.0'
 

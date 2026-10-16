@@ -3,3 +3,4 @@ export { diffSnapshots, recordedFiles, SCAN_SOURCE, scanRepository, type FileCha
 export { CheckInterruptedError, CommandNotFoundError, finalizeTail, MAX_OUTPUT_TAIL_CHARS, RUN_SOURCE, runCheck, type RunCheckOptions, type RunCheckResult } from './runCheck'
 export { DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_WAIT_MS, DEFAULT_RECONCILE_MS, isIgnoredPath, startCapture, WatchUnavailableError, type CaptureHandle, type CaptureOptions } from './watch'
 export { REDACTED, redactSecrets } from './redact'
+export { excludeFromGit, initWorkspace, isInitialized, locateWorkspace, NotInitializedError, openWorkspace, STORE_FILE, type Workspace } from './workspace'

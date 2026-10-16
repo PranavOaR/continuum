@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { appendFile, mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { CONTINUUM_DIR, findRepoRoot, gitPath } from '@continuum/capture'
+import { CONTINUUM_DIR, findRepoRoot, gitPath } from './git'
 import { ContextStore } from '@continuum/store'
 
 export const STORE_FILE = 'context.db'

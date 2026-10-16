@@ -1,7 +1,7 @@
 import { startCapture } from '@continuum/capture'
 import { formatChange } from '../format'
 import { EXIT_OK, type Io } from '../io'
-import { openWorkspace } from '../workspace'
+import { openWorkspace } from '@continuum/capture'
 import { listChanges } from './scan'
 
 function untilAborted(signal: AbortSignal): Promise<void> {

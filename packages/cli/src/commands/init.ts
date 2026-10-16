@@ -2,7 +2,7 @@ import { relative } from 'node:path'
 import { scanRepository } from '@continuum/capture'
 import { plural } from '../format'
 import { EXIT_OK, type Io } from '../io'
-import { initWorkspace } from '../workspace'
+import { initWorkspace } from '@continuum/capture'
 
 export async function initCommand(io: Io): Promise<number> {
   const { workspace, store, created } = await initWorkspace(io.cwd)
