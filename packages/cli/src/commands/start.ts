@@ -1,0 +1,41 @@
+import { startCapture } from '@continuum/capture'
+import { formatChange } from '../format'
+import { EXIT_OK, type Io } from '../io'
+import { openWorkspace } from '../workspace'
+import { listChanges } from './scan'
+
+function untilAborted(signal: AbortSignal | undefined): Promise<void> {
+  return new Promise((resolve) => {
+    if (!signal) return
+    if (signal.aborted) resolve()
+    else signal.addEventListener('abort', () => resolve(), { once: true })
+  })
+}
+
+/** Captures repository changes in the foreground until interrupted. */
+export async function startCommand(io: Io): Promise<number> {
+  const { workspace, store } = await openWorkspace(io.cwd)
+  let initial = true
+  try {
+    const capture = await startCapture(store, workspace.root, {
+      onChanges: (changes) => {
+        if (initial) {
+          io.out(`Caught up on ${changes.length} change${changes.length === 1 ? '' : 's'} since the last scan:`)
+          listChanges(io, changes)
+          return
+        }
+        const time = io.now().toTimeString().slice(0, 8)
+        for (const change of changes) io.out(`${time}  ${formatChange(change)}`)
+      },
+      onError: (error) => io.err(`continuum: scan failed: ${error instanceof Error ? error.message : String(error)}`),
+    })
+    initial = false
+    io.out(`Watching ${workspace.root} — press Ctrl-C to stop.`)
+    await untilAborted(io.signal)
+    await capture.close()
+    io.out('Stopped.')
+    return EXIT_OK
+  } finally {
+    store.close()
+  }
+}

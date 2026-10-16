@@ -1,0 +1,55 @@
+import { relative } from 'node:path'
+import { diffSnapshots, readWorkingTree, recordedFiles, type WorkingTree } from '@continuum/capture'
+import { checkStatus, type CurrentHashes } from '@continuum/core'
+import { keys, type ContextStore } from '@continuum/store'
+import { CHECK_LABELS, columns, formatAgo, plural } from '../format'
+import { EXIT_OK, type Io } from '../io'
+import { openWorkspace } from '../workspace'
+
+/** Graph hashes with file hashes replaced by the live working tree, so status is exact without writing anything. */
+function liveHashes(store: ContextStore, tree: WorkingTree): CurrentHashes {
+  const nonFiles = [...store.graph.currentHashes()].filter(([key]) => !key.startsWith('file:'))
+  const files = [...tree.files].map(([path, hash]) => [keys.file(path), hash] as const)
+  return new Map([...nonFiles, ...files])
+}
+
+function checkRows(store: ContextStore, current: CurrentHashes, now: Date): string[][] {
+  return store.graph
+    .keysOfKind('check')
+    .map((key) => store.graph.get(key))
+    .filter((node) => node !== undefined)
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((node) => {
+      const name = String(node.props.name)
+      const { status, changed } = checkStatus(store.checkRun(name), current)
+      const detail = status === 'out-of-date' ? `${plural(changed.length, 'file')} changed since it ran` : `ran ${formatAgo(new Date(String(node.props.ranAt)), now)}`
+      return [CHECK_LABELS[status], name, detail]
+    })
+}
+
+export async function statusCommand(io: Io): Promise<number> {
+  const { workspace, store } = await openWorkspace(io.cwd)
+  try {
+    const tree = await readWorkingTree(workspace.root)
+    const pending = diffSnapshots(recordedFiles(store), tree.files).length
+    const pendingNote = pending === 0 ? 'all recorded' : `${plural(pending, 'unrecorded change')} (run \`continuum scan\` or \`continuum start\`)`
+    const summary = columns([
+      ['Workspace', workspace.root],
+      ['Revision', tree.revision ?? 'no commits yet'],
+      ['Store', `${relative(workspace.root, workspace.storePath)} · ${plural(store.eventCount(), 'event')}`],
+      ['Files', `${plural(tree.files.size, 'tracked file')} · ${pendingNote}`],
+    ])
+    for (const line of summary) io.out(line)
+    const rows = checkRows(store, liveHashes(store, tree), io.now())
+    io.out('')
+    if (rows.length === 0) {
+      io.out('Checks    none recorded yet. Try `continuum run -- npm test`.')
+      return EXIT_OK
+    }
+    io.out('Checks')
+    for (const line of columns(rows)) io.out(`  ${line}`)
+    return EXIT_OK
+  } finally {
+    store.close()
+  }
+}
