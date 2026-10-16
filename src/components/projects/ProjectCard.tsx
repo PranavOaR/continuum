@@ -18,7 +18,7 @@ export function ProgressBar({ done, total, label }: { done: number; total: numbe
       </div>
       <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done} className="flex gap-0.5">
         {Array.from({ length: total }, (_, index) => (
-          <span key={index} className={cn('h-2 flex-1', index < done ? 'bg-accent' : 'bg-surface-3')} />
+          <span key={index} className={cn('h-1.5 flex-1 rounded-full', index < done ? 'bg-accent' : 'bg-surface-3')} />
         ))}
       </div>
     </div>
@@ -32,7 +32,7 @@ export function ProjectCard({ summary }: { summary: ProjectSummary }) {
   return (
     <Link
       to={`/app/projects/${project.id}`}
-      className="cn-ticks group flex h-full flex-col border border-line bg-surface p-5 transition-colors hover:border-line-strong"
+      className="cn-thread group flex h-full flex-col rounded-lg border border-line bg-surface p-5 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-line-strong"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
