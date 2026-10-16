@@ -3,3 +3,4 @@ export { EDGE_TYPES, GraphIndex, type Direction, type Edge, type EdgeType, type 
 export { canonicalJson, hashContent, hashRecord } from './hash'
 export { NODE_KINDS, keys, kindOf, normalizePath, type NodeKind } from './keys'
 export { project, type Mutations } from './projector'
+export { LATEST_SCHEMA_VERSION, migrate, MIGRATIONS, readSchemaVersion, StoreVersionError, type Migration } from './migrations'

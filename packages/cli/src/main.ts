@@ -15,6 +15,7 @@ import { statusCommand } from './commands/status'
 import { selfInvocation } from './invocation'
 import { EXIT_FAILURE, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE, type Io } from './io'
 import { NotInitializedError } from '@continuum/capture'
+import { StoreVersionError } from '@continuum/store'
 
 export const VERSION = '0.0.0'
 
@@ -108,7 +109,8 @@ function isExpected(error: unknown): error is Error {
     error instanceof WatchUnavailableError ||
     error instanceof SetupError ||
     error instanceof PortInUseError ||
-    error instanceof InvalidHookPayloadError
+    error instanceof InvalidHookPayloadError ||
+    error instanceof StoreVersionError
   )
 }
 

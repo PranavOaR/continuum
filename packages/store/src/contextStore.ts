@@ -15,6 +15,7 @@ import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './g
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
 import { project, type Mutations } from './projector'
+import { migrate, readSchemaVersion } from './migrations'
 import { SCHEMA } from './schema'
 
 const PRIVATE_DIR_MODE = 0o700
@@ -58,7 +59,13 @@ export class ContextStore implements Mutations {
 
   private constructor(db: DatabaseSync) {
     this.db = db
-    db.exec(SCHEMA)
+    try {
+      db.exec(SCHEMA)
+      migrate(db)
+    } catch (error) {
+      db.close()
+      throw error
+    }
     this.loadGraph()
   }
 
@@ -78,6 +85,10 @@ export class ContextStore implements Mutations {
 
   close(): void {
     this.db.close()
+  }
+
+  schemaVersion(): number {
+    return readSchemaVersion(this.db)
   }
 
   /** Appends an event and projects it, atomically. On failure nothing is persisted and memory is restored. */
