@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -114,6 +114,43 @@ describe('ContextStore persistence', () => {
     expect(reopened.snapshot()).toEqual(before)
     expect(reopened.checkStatus('npm test').status).toBe('out-of-date')
     reopened.close()
+  })
+
+  it('sees events written by another connection before building a transaction', () => {
+    const path = tempDb()
+    const watcher = ContextStore.open(path)
+    const other = ContextStore.open(path)
+    watcher.record(ev.file('a.ts', 'h1'))
+    other.record(ev.file('a.ts', 'h2'))
+    expect(watcher.graph.get('file:a.ts')?.hash).toBe('h1')
+    const seen = watcher.transact(() => {
+      expect(watcher.graph.get('file:a.ts')?.hash).toBe('h2')
+      return []
+    })
+    expect(seen).toEqual([])
+    expect(watcher.refresh()).toBe(false)
+    other.close()
+    watcher.close()
+  })
+
+  it('reports whether a refresh reloaded anything', () => {
+    const path = tempDb()
+    const first = ContextStore.open(path)
+    const second = ContextStore.open(path)
+    expect(first.refresh()).toBe(false)
+    second.record(ev.task('t'))
+    expect(first.refresh()).toBe(true)
+    expect(first.graph.has('task:t')).toBe(true)
+    first.record(ev.task('u'))
+    expect(first.refresh()).toBe(false)
+    second.close()
+    first.close()
+  })
+
+  it('creates the database readable only by its owner', () => {
+    const path = tempDb()
+    ContextStore.open(path).close()
+    expect(statSync(path).mode & 0o777).toBe(0o600)
   })
 
   it('replays the event log into the same state', () => {
