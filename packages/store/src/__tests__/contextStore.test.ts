@@ -179,6 +179,8 @@ describe('ContextStore persistence', () => {
     expect(recent[0].event.type).toBe('session.ended')
     expect(store.recentEvents(100)).toHaveLength(7)
     expect(store.firstEvent()?.type).toBe('task.upserted')
+    expect(store.firstEvent({ type: 'file.changed' })?.payload).toMatchObject({ path: 'src/auth/login.ts' })
+    expect(store.firstEvent({ source: 'nowhere' })).toBeUndefined()
     expect(ContextStore.open(':memory:').firstEvent()).toBeUndefined()
     store.close()
   })
