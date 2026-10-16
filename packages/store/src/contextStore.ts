@@ -121,6 +121,12 @@ export class ContextStore implements Mutations {
     return row.count
   }
 
+  /** The oldest event in the log, if any. */
+  firstEvent(): ContinuumEvent | undefined {
+    const row = this.db.prepare('SELECT type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq LIMIT 1').get() as EventRow | undefined
+    return row ? toEvent(row) : undefined
+  }
+
   /** The newest events first, with their log sequence numbers (stable ids). */
   recentEvents(limit: number): { seq: number; event: ContinuumEvent }[] {
     const rows = this.db

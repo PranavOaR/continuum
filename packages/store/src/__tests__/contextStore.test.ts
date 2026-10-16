@@ -178,6 +178,8 @@ describe('ContextStore persistence', () => {
     expect(recent.map((entry) => entry.seq)).toEqual([7, 6])
     expect(recent[0].event.type).toBe('session.ended')
     expect(store.recentEvents(100)).toHaveLength(7)
+    expect(store.firstEvent()?.type).toBe('task.upserted')
+    expect(ContextStore.open(':memory:').firstEvent()).toBeUndefined()
     store.close()
   })
 
