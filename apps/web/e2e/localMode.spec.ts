@@ -203,3 +203,39 @@ test('a new project shows a getting-started checklist that ticks itself off live
   await expect(page.getByRole('heading', { name: 'Where we left off' })).toBeVisible()
   await expect(page.locator('#getting-started')).toHaveCount(0)
 })
+
+test.describe('accessibility of live screens', () => {
+  const pages = () => {
+    const slug = (path: string) => (path.split('/').at(-1) as string).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    return [
+      ['overview', '/app'],
+      ['project with a task', `/app/projects/${slug(repo)}`],
+      ['project without tasks', `/app/projects/${slug(emptyRepo)}`],
+      ['activity', '/app/activity'],
+      ['memory', '/app/memory'],
+      ['settings', '/app/settings'],
+    ] as const
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`has no serious or critical axe violations in the ${theme} theme`, async ({ page }) => {
+      const { default: AxeBuilder } = await import('@axe-core/playwright')
+      const failures: string[] = []
+      // Measure settled colours, not elements caught halfway through a fade-in.
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      for (const [name, path] of pages()) {
+        await page.goto(`${url}${path}`)
+        await expect(page.getByRole('main')).toBeVisible()
+        // Switch instantly: a colour transition would be measured halfway between themes.
+        await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' })
+        await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme)
+        const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+        for (const violation of violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')) {
+          const where = violation.nodes.map((node) => `${node.html.slice(0, 100)} [${node.any.map((check) => check.message).join('; ')}]`)
+          failures.push(`${name}: ${violation.id} (${violation.impact}) on ${where.slice(0, 3).join(' | ')}`)
+        }
+      }
+      expect(failures).toEqual([])
+    })
+  }
+})
