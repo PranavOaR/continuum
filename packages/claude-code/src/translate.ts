@@ -21,6 +21,8 @@ export interface TranslateContext {
   knownSession: boolean
   /** Set when the payload is a file edit inside the repository that scans capture. */
   edit?: FileEdit
+  /** The task currently being worked on, if one is recorded. */
+  taskId?: string
 }
 
 function changeTypeOf(payload: Extract<HookPayload, { hook_event_name: 'PostToolUse' }>, edit: FileEdit): ChangeType {
@@ -41,7 +43,8 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
     case 'SessionStart': {
       const isFresh = payload.source === undefined || FRESH_SESSION_SOURCES.has(payload.source)
       if (!isFresh && context.knownSession) return []
-      return [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent: 'claude-code' } }]
+      const task = context.taskId ? { taskId: context.taskId } : {}
+      return [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent: 'claude-code', ...task } }]
     }
     case 'SessionEnd':
       return [{ ...base, type: 'session.ended', evidence: 'observed', payload: { sessionId } }]
@@ -58,7 +61,7 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
           ...base,
           type: 'file.changed',
           evidence: 'observed',
-          payload: { path: edit.path, contentHash: edit.contentHash, changeType: changeTypeOf(payload, edit), sessionId },
+          payload: { path: edit.path, contentHash: edit.contentHash, changeType: changeTypeOf(payload, edit), sessionId, ...(context.taskId ? { taskId: context.taskId } : {}) },
         },
       ]
     }

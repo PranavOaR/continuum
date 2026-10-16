@@ -75,6 +75,13 @@ describe('translateHook', () => {
     expect(translateHook(payload({ hook_event_name: 'Stop', last_assistant_message: '   ' }), context())).toEqual([])
   })
 
+  it('attributes sessions and edits to the current task', () => {
+    const [started] = translateHook(payload({ hook_event_name: 'SessionStart', source: 'startup' }), context({ taskId: 'oauth' }))
+    expect(started).toMatchObject({ payload: { taskId: 'oauth' } })
+    const edit = payload({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: '/work/app/a.ts' } })
+    expect(translateHook(edit, context({ taskId: 'oauth', edit: { path: 'a.ts', contentHash: 'h' } }))[0]).toMatchObject({ payload: { taskId: 'oauth', sessionId: 'sess-1' } })
+  })
+
   it('attributes file edits to the session', () => {
     const write = payload({ hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: '/work/app/src/a.ts' }, tool_response: { type: 'create' } })
     expect(translateHook(write, context({ edit: { path: 'src/a.ts', contentHash: 'h1' } }))[0]).toMatchObject({
