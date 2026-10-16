@@ -67,7 +67,7 @@ function recent(label: string, steps: readonly string[]): string[] {
 }
 
 function describeTask(task: TaskSummary): string[] {
-  const lines = [`[agent-reported] ${quote(task.title, 200)} (${task.status})`]
+  const lines = [`${task.reportedBy === 'user-reported' ? '[set by you]' : '[agent-reported]'} ${quote(task.title, 200)} (${task.status})`]
   if (task.objective) lines.push(`Objective: ${quote(task.objective)}`)
   if (task.nextAction) lines.push(`Next action: ${quote(task.nextAction)}`)
   if (task.acceptanceCriteria.length > 0) {
@@ -190,7 +190,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
   const header = [
     `# Continuum handoff: ${basename(state.root)}`,
     `Generated ${state.generatedAt}, revision ${state.revision ?? 'none (no commits yet)'}, ${state.files.tracked} tracked files.`,
-    'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof.',
+    'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.',
   ]
   return fit(
     [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],

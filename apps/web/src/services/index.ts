@@ -19,6 +19,7 @@ export const continuumService: ContinuumService = {
   getMemoryGraph: (projectId) => active().getMemoryGraph(projectId),
   search: (query) => active().search(query),
   getBriefing: (projectId) => active().getBriefing(projectId),
+  updateTask: (projectId, taskId, change) => active().updateTask(projectId, taskId, change),
 }
 
 export { dataMode, type DataMode } from './dataMode'

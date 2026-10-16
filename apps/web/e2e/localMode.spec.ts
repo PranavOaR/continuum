@@ -151,3 +151,18 @@ test('updates without a reload when something new is recorded', async ({ page })
   // Pushed by the daemon's change stream: nothing in the page reloads or navigates.
   await expect(page.locator('#verification').getByText('typecheck')).toBeVisible({ timeout: 4_000 })
 })
+
+test('edits a task from the dashboard and records it as set by you', async ({ page }) => {
+  const name = repo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  const panel = page.locator('#task')
+  await panel.getByRole('button', { name: 'Mark "Validate" as done' }).click()
+  await expect(panel.getByRole('button', { name: 'Mark "Validate" as not done' })).toBeVisible()
+  await panel.getByLabel('Status').selectOption('blocked')
+  await expect(panel.getByText('Set by you', { exact: true })).toBeVisible()
+
+  // Saved in the repository's store, not just on screen.
+  await page.reload()
+  await expect(page.locator('#task').getByLabel('Status')).toHaveValue('blocked')
+  expect(continuum(['handoff'])).toContain('[set by you] "Load config from env" (blocked)')
+})

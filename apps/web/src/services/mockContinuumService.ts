@@ -190,6 +190,9 @@ export const mockContinuumService: ContinuumService = {
   search(query) {
     return respond(searchAll(query))
   },
+  updateTask() {
+    return Promise.reject(new Error('The demo is read-only. Run `continuum serve` to edit your own tasks.'))
+  },
   getBriefing(projectId) {
     try {
       const { project, tasks } = buildWorkspace(projectId)

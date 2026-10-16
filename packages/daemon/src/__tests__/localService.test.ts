@@ -258,3 +258,43 @@ describe('LocalContinuumService tasks', () => {
     expect(await local.listTasks()).toHaveLength(1)
   })
 })
+
+describe('LocalContinuumService task edits', () => {
+  async function withTask() {
+    const { repo, storePath } = await seededRepo()
+    sandboxes.push(repo)
+    const store = openStore(storePath)
+    store.record({
+      type: 'task.upserted',
+      payload: { id: 'auth-1', title: 'Auth', status: 'in-progress', nextAction: 'Write tests', acceptanceCriteria: [{ text: 'Logs in', met: false }], completedSteps: ['Plan'], remainingSteps: ['Build', 'Test'] },
+      evidence: 'agent-reported',
+      source: 'mcp',
+      occurredAt: NOW.toISOString(),
+    })
+    store.close()
+    return { storePath, local: new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 60_000 }) }
+  }
+
+  it('records each edit as yours and shows it straight away', async () => {
+    const { storePath, local } = await withTask()
+    await local.getWorkspace('acme') // warm the cache: the edit must not be hidden behind it
+    expect(await local.updateTask('acme', 'auth-1', { kind: 'step', step: 'Build', done: true })).toMatchObject({ completedSteps: ['Plan', 'Build'], remainingSteps: ['Test'], reportedBy: 'user-reported' })
+    await local.updateTask('acme', 'auth-1', { kind: 'criterion', index: 0, met: true })
+    await local.updateTask('acme', 'auth-1', { kind: 'next-action', nextAction: 'Ship it' })
+    const task = await local.updateTask('acme', 'auth-1', { kind: 'status', status: 'blocked' })
+    expect(task).toMatchObject({ status: 'blocked', nextAction: 'Ship it', acceptanceCriteria: [{ status: 'complete', evidence: 'Set by you in the dashboard; not verified.' }] })
+
+    const store = openStore(storePath)
+    const last = store.recentEvents(1)[0].event
+    store.close()
+    expect(last).toMatchObject({ type: 'task.upserted', evidence: 'user-reported', source: 'dashboard' })
+    expect(await local.getBriefing('acme')).toContain('[set by you] "Auth" (blocked)')
+  })
+
+  it('rejects edits to steps or tasks that do not exist', async () => {
+    const { local } = await withTask()
+    await expect(local.updateTask('acme', 'auth-1', { kind: 'step', step: 'Invented', done: true })).rejects.toThrow(/not a step/)
+    await expect(local.updateTask('acme', 'nope', { kind: 'status', status: 'completed' })).rejects.toBeInstanceOf(NotFoundError)
+    await expect(local.updateTask('elsewhere', 'auth-1', { kind: 'status', status: 'completed' })).rejects.toBeInstanceOf(NotFoundError)
+  })
+})

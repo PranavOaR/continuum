@@ -5,7 +5,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
 import { pipeline } from 'node:stream'
-import { NotFoundError, type ContinuumService } from '@continuum/core'
+import { NotFoundError, type ContinuumService, type TaskChange } from '@continuum/core'
+import { InvalidTaskChangeError } from '@continuum/context'
 import type { ChangeFeed } from './changeFeed'
 import { ProjectUnavailableError } from './localService'
 
@@ -15,6 +16,11 @@ const MAX_QUERY_CHARS = 200
 const TOKEN_BYTES = 24
 const TOKEN_PARAM = 'token'
 const EVENTS_PATH = '/api/events'
+/** Header carrying the per-run CSRF token on writes from the dashboard. */
+export const CSRF_HEADER = 'x-continuum-csrf'
+/** Task edits are a few hundred bytes; anything bigger is refused unread. */
+const MAX_BODY_BYTES = 16 * 1024
+const TASK_ROUTE = /^\/api\/projects\/(?<project>[^/]+)\/tasks\/(?<task>[^/]+)$/
 /** A comment line now and then keeps idle connections (and proxies) from timing out. */
 const HEARTBEAT_MS = 25_000
 
@@ -48,6 +54,8 @@ export interface DaemonOptions {
   version: string
   /** Required on every request: as a cookie set from the launch link, or as a bearer token. */
   token: string
+  /** Required on writes made with the cookie, in the x-continuum-csrf header; the page receives it in a meta tag. */
+  csrfToken?: string
   /** Built web app to serve; without it only the API is available. */
   staticDir?: string
   port?: number
@@ -109,7 +117,8 @@ function cookie(request: IncomingMessage, name: string): string | undefined {
   return undefined
 }
 
-type Access = 'granted' | 'denied' | 'redirected'
+/** `cookie` is an ambient credential a browser attaches by itself, so writes made with it also need the CSRF token. */
+type Access = 'cookie' | 'bearer' | 'denied' | 'redirected'
 
 /**
  * Checks the access token. The launch link's ?token= is exchanged for an
@@ -119,7 +128,8 @@ function authorize(request: IncomingMessage, response: ServerResponse, url: URL,
   // A token in the address bar is always swapped for the cookie and stripped, even when already signed in.
   if (!sameSecret(url.searchParams.get(TOKEN_PARAM) ?? undefined, token)) {
     const bearer = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
-    return sameSecret(bearer, token) || sameSecret(cookie(request, cookieName(port)), token) ? 'granted' : 'denied'
+    if (sameSecret(bearer, token)) return 'bearer'
+    return sameSecret(cookie(request, cookieName(port)), token) ? 'cookie' : 'denied'
   }
   url.searchParams.delete(TOKEN_PARAM)
   response.writeHead(302, {
@@ -200,11 +210,81 @@ async function fileAt(root: string, pathname: string): Promise<string | null> {
 /** Tells the web app it is served by a daemon, so it reads live data instead of the demo dataset. */
 export const DATA_MODE_TAG = '<meta name="continuum-data" content="local">'
 
-function markAsLocal(html: string): string {
-  return html.includes('</head>') ? html.replace('</head>', `${DATA_MODE_TAG}</head>`) : `${DATA_MODE_TAG}${html}`
+function markAsLocal(html: string, csrfToken: string): string {
+  const tags = `${DATA_MODE_TAG}<meta name="continuum-csrf" content="${csrfToken}">`
+  return html.includes('</head>') ? html.replace('</head>', `${tags}</head>`) : `${tags}${html}`
 }
 
-async function handleStatic(root: string, url: URL, response: ServerResponse): Promise<void> {
+class BodyError extends Error {
+  readonly status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+  if (!(request.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) throw new BodyError(415, 'Send JSON.')
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of request) {
+    size += (chunk as Buffer).length
+    if (size > MAX_BODY_BYTES) throw new BodyError(413, 'Request too large.')
+    chunks.push(chunk as Buffer)
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  } catch {
+    throw new BodyError(400, 'Malformed JSON.')
+  }
+}
+
+const TASK_STATUSES = new Set(['planned', 'in-progress', 'blocked', 'completed'])
+
+/** The edit as the API accepts it; anything else is rejected before it reaches the store. */
+function parseTaskChange(body: unknown): TaskChange | null {
+  if (typeof body !== 'object' || body === null) return null
+  const value = body as Record<string, unknown>
+  switch (value.kind) {
+    case 'status':
+      return typeof value.status === 'string' && TASK_STATUSES.has(value.status) ? { kind: 'status', status: value.status as Extract<TaskChange, { kind: 'status' }>['status'] } : null
+    case 'next-action':
+      return value.nextAction === null || typeof value.nextAction === 'string' ? { kind: 'next-action', nextAction: value.nextAction } : null
+    case 'step':
+      return typeof value.step === 'string' && typeof value.done === 'boolean' ? { kind: 'step', step: value.step, done: value.done } : null
+    case 'criterion':
+      return Number.isInteger(value.index) && typeof value.met === 'boolean' ? { kind: 'criterion', index: value.index as number, met: value.met } : null
+    default:
+      return null
+  }
+}
+
+/** POST /api/projects/:id/tasks/:taskId with one TaskChange: the dashboard's only write. */
+async function handleTaskEdit(service: ContinuumService, url: URL, request: IncomingMessage, response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
+  const match = TASK_ROUTE.exec(url.pathname)
+  const projectId = match?.groups ? safeDecode(match.groups.project) : null
+  const taskId = match?.groups ? safeDecode(match.groups.task) : null
+  if (!projectId || !taskId) return fail(response, 404, 'not-found', `No API route ${url.pathname}`)
+  let change: TaskChange | null
+  try {
+    change = parseTaskChange(await readJsonBody(request))
+  } catch (error) {
+    if (error instanceof BodyError) return fail(response, error.status, 'bad-request', error.message)
+    throw error
+  }
+  if (!change) return fail(response, 400, 'bad-request', 'Unrecognized task change.')
+  try {
+    return send(response, 200, { data: await service.updateTask(projectId, taskId, change) })
+  } catch (error) {
+    if (error instanceof NotFoundError) return fail(response, 404, 'not-found', error.message)
+    if (error instanceof InvalidTaskChangeError) return fail(response, 400, 'bad-request', error.message)
+    if (error instanceof ProjectUnavailableError) return fail(response, 503, 'unavailable', error.message)
+    onError?.(error)
+    return fail(response, 500, 'internal', 'Continuum could not record the change. See the terminal running `continuum serve` for details.')
+  }
+}
+
+async function handleStatic(root: string, url: URL, response: ServerResponse, csrfToken: string): Promise<void> {
   // Client-side routes fall back to the app shell; real files are served as-is.
   const file = (await fileAt(root, url.pathname)) ?? (extname(url.pathname) === '' ? join(root, 'index.html') : null)
   if (!file) {
@@ -214,7 +294,7 @@ async function handleStatic(root: string, url: URL, response: ServerResponse): P
   }
   if (extname(file) === '.html') {
     response.writeHead(200, { 'Content-Type': CONTENT_TYPES['.html'], 'Cache-Control': 'no-cache', ...SECURITY_HEADERS })
-    response.end(markAsLocal(await readFile(file, 'utf8')))
+    response.end(markAsLocal(await readFile(file, 'utf8'), csrfToken))
     return
   }
   const isHashedAsset = url.pathname.startsWith('/assets/')
@@ -231,19 +311,27 @@ async function handleStatic(root: string, url: URL, response: ServerResponse): P
 
 export function createDaemonServer(options: DaemonOptions, port: () => number): Server {
   const staticRoot = options.staticDir ? resolve(options.staticDir) : null
+  const csrfToken = options.csrfToken ?? createAccessToken()
   return createServer((request, response) => {
     void (async () => {
       if (!isTrustedRequest(request, port())) return fail(response, 403, 'forbidden', 'Requests must come from the Continuum dashboard on this machine.')
-      if (request.method !== 'GET' && request.method !== 'HEAD') return fail(response, 405, 'method-not-allowed', 'The local API is read-only.')
       const url = new URL(request.url ?? '/', `http://${LOOPBACK}`)
+      const isWrite = request.method === 'POST' && TASK_ROUTE.test(url.pathname)
+      if (request.method !== 'GET' && request.method !== 'HEAD' && !isWrite) return fail(response, 405, 'method-not-allowed', 'Only task edits can be written; everything else is read-only.')
       const isApi = url.pathname === '/api' || url.pathname.startsWith('/api/')
       const access = authorize(request, response, url, options.token, port())
       if (access === 'redirected') return
       if (access === 'denied') return deny(response, isApi)
+      if (isWrite) {
+        // A browser write must name its origin (checked above) and carry the page's CSRF token.
+        const csrfOk = access === 'bearer' || (request.headers.origin !== undefined && sameSecret(String(request.headers[CSRF_HEADER] ?? ''), csrfToken))
+        if (!csrfOk) return fail(response, 403, 'forbidden', 'Edits must come from the dashboard page itself.')
+        return handleTaskEdit(options.service, url, request, response, options.onError)
+      }
       if (url.pathname === EVENTS_PATH) return handleEvents(request, response, options.changes)
       if (isApi) return handleApi(options.service, url, response, options.onError)
       if (!staticRoot) return fail(response, 404, 'not-found', 'The dashboard is not built. Run `npm run build` in the Continuum checkout.')
-      return handleStatic(staticRoot, url, response)
+      return handleStatic(staticRoot, url, response, csrfToken)
     })().catch((error: unknown) => {
       options.onError?.(error)
       if (!response.headersSent) fail(response, 500, 'internal', 'Unexpected error.')

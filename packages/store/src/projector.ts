@@ -49,6 +49,8 @@ export function project(store: Mutations, event: ContinuumEvent): void {
         acceptanceCriteria: acceptanceCriteria ?? [],
         completedSteps: completedSteps ?? [],
         remainingSteps: remainingSteps ?? [],
+        // Who set this state: an agent (MCP) or the person (dashboard).
+        reportedBy: event.evidence,
       }
       store.upsertNode(keys.task(id), { hash: hashRecord('task', event.payload), props, at })
       return

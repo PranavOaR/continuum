@@ -27,7 +27,13 @@ const fakeService: ContinuumService = {
   getMemoryGraph: async (id) => ({ projectId: id, nodes: [], edges: [] }),
   getBriefing: async (id) => `# Continuum handoff: ${id}`,
   search: async (query) => [{ id: query, kind: 'project', title: query, subtitle: '', to: '/' }],
+  updateTask: async (projectId, taskId, change) => {
+    if (taskId === 'missing') throw new NotFoundError('Task', taskId)
+    edits.push({ projectId, taskId, change })
+    return { id: taskId, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', reportedBy: 'user-reported' }
+  },
 }
+const edits: unknown[] = []
 
 function webBuild() {
   const dir = mkdtempSync(join(tmpdir(), 'continuum-web-'))
@@ -137,7 +143,7 @@ describe('daemon static files', () => {
     expect(shell.status).toBe(200)
     expect(shell.body).toContain('<title>Continuum</title>')
     expect(shell.headers['content-security-policy']).toContain("default-src 'self'")
-    expect(shell.body).toContain('<meta name="continuum-data" content="local"></head>')
+    expect(shell.body).toMatch(/<meta name="continuum-data" content="local"><meta name="continuum-csrf" content="[\w-]+"><\/head>/)
     const asset = await raw(daemon, '/assets/app-123.js')
     expect(asset.headers['content-type']).toContain('text/javascript')
     expect(asset.headers['cache-control']).toContain('immutable')
@@ -171,5 +177,81 @@ describe('daemon static files', () => {
     const response = await raw(daemon, '/')
     expect(response.status).toBe(404)
     expect(response.body).toContain('npm run build')
+  })
+})
+
+describe('task edits', () => {
+  const CSRF = 'csrf-token-for-tests-0123456789'
+  async function startWithCsrf() {
+    const daemon = await startDaemon({ service: fakeService, version: 'test', token: TOKEN, csrfToken: CSRF, port: 0, staticDir: webBuild() })
+    running.push(daemon)
+    return daemon
+  }
+
+  /** A write as the dashboard page makes it: the cookie, its own origin, the CSRF header and JSON. */
+  function post(daemon: RunningDaemon, path: string, body: string, headers: Record<string, string | undefined>) {
+    return new Promise<{ status: number; body: string }>((resolve, reject) => {
+      const defined = Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== undefined)) as Record<string, string>
+      const req = request({ host: '127.0.0.1', port: daemon.port, path, method: 'POST', headers: { host: `127.0.0.1:${daemon.port}`, ...defined } }, (res) => {
+        let text = ''
+        res.on('data', (chunk) => (text += chunk))
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: text }))
+      })
+      req.on('error', reject)
+      req.end(body)
+    })
+  }
+
+  const browser = (daemon: RunningDaemon, extra: Record<string, string | undefined> = {}) => ({
+    cookie: `continuum_${daemon.port}=${TOKEN}`,
+    origin: `http://127.0.0.1:${daemon.port}`,
+    'content-type': 'application/json',
+    'x-continuum-csrf': CSRF,
+    ...extra,
+  })
+  const path = '/api/projects/acme/tasks/auth-1'
+  const blocked = JSON.stringify({ kind: 'status', status: 'blocked' })
+
+  it('accepts an edit from the dashboard page and returns the task', async () => {
+    const daemon = await startWithCsrf()
+    edits.length = 0
+    const result = await post(daemon, path, blocked, browser(daemon))
+    expect(result.status).toBe(200)
+    expect(JSON.parse(result.body).data.reportedBy).toBe('user-reported')
+    expect(edits).toEqual([{ projectId: 'acme', taskId: 'auth-1', change: { kind: 'status', status: 'blocked' } }])
+  })
+
+  it('gives the page its CSRF token in a meta tag', async () => {
+    const daemon = await startWithCsrf()
+    const page = await raw(daemon, '/app')
+    expect(page.body).toContain(`<meta name="continuum-csrf" content="${CSRF}">`)
+  })
+
+  it.each([
+    ['no CSRF token', { 'x-continuum-csrf': undefined }, 403],
+    ['a wrong CSRF token', { 'x-continuum-csrf': 'guess' }, 403],
+    ['no Origin header', { origin: undefined }, 403],
+    ['another origin', { origin: 'http://evil.example' }, 403],
+    ['no access cookie', { cookie: undefined }, 401],
+    ['a form content type', { 'content-type': 'application/x-www-form-urlencoded' }, 415],
+  ])('refuses a write with %s', async (_name, extra, status) => {
+    const daemon = await startWithCsrf()
+    edits.length = 0
+    expect((await post(daemon, path, blocked, browser(daemon, extra))).status).toBe(status)
+    expect(edits).toEqual([])
+  })
+
+  it('rejects unknown changes, oversized bodies and missing tasks', async () => {
+    const daemon = await startWithCsrf()
+    expect((await post(daemon, path, JSON.stringify({ kind: 'delete-everything' }), browser(daemon))).status).toBe(400)
+    expect((await post(daemon, path, JSON.stringify({ kind: 'status', status: 'done-ish' }), browser(daemon))).status).toBe(400)
+    expect((await post(daemon, path, 'x'.repeat(20_000), browser(daemon))).status).toBe(413)
+    expect((await post(daemon, '/api/projects/acme/tasks/missing', blocked, browser(daemon))).status).toBe(404)
+  })
+
+  it('lets a bearer-authenticated client (the dev proxy) write without the page token', async () => {
+    const daemon = await startWithCsrf()
+    const headers = { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }
+    expect((await post(daemon, path, blocked, headers)).status).toBe(200)
   })
 })

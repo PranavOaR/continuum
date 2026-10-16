@@ -16,6 +16,9 @@ const MIN_VALUE_LENGTH = 6
 /** Type names and literals that follow `token:` in code rather than a credential. */
 const CODE_WORDS = 'string|number|boolean|unknown|undefined|null|true|false|never|any|void|object|bigint|symbol|readonly'
 
+/** `options.token`, `process.env.API_KEY`: code that refers to a secret, not the secret. */
+const PROPERTY_PATH = String.raw`[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?![\w$.-])`
+
 /** Random-looking strings at least this long are treated as secrets. */
 const MIN_ENTROPY_LENGTH = 32
 /** Bits per character above which a mixed-case alphanumeric string is too random to be a word, path or identifier. */
@@ -45,10 +48,11 @@ const RULES: readonly (readonly [RegExp, string])[] = [
   // NAME="value" and name: 'value' in configs and shells
   [new RegExp(String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(["'])(?!\[redacted\])[^"'\n]{${MIN_VALUE_LENGTH},}\3`, 'gi'), `$1$2$3${REDACTED}$3`],
   // NAME=value and name: value, unquoted. Code is left alone: comparisons (===), type annotations
-  // (token: string), short values (TOKEN_BYTES = 24) and expressions (apiToken = link.get('token')).
+  // (token: string), short values (TOKEN_BYTES = 24), calls (apiToken = link.get('token')) and
+  // property paths (password = process.env.DB_PASSWORD).
   [
     new RegExp(
-      String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(?!\[redacted\])(?!(?:${CODE_WORDS})\b)[^\s"'()\[\]{},;<>]{${MIN_VALUE_LENGTH},}(?![^\s"'()\[\]{},;<>]*\()`,
+      String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(?!\[redacted\])(?!(?:${CODE_WORDS})\b)(?!${PROPERTY_PATH})[^\s"'()\[\]{},;<>]{${MIN_VALUE_LENGTH},}(?![^\s"'()\[\]{},;<>]*\()`,
       'gi',
     ),
     `$1$2${REDACTED}`,

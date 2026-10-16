@@ -1,4 +1,4 @@
-import type { RecordedCriterion } from '@continuum/core'
+import type { RecordedCriterion, TaskChange, TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore, GraphNode } from '@continuum/store'
 
 export type TaskStatus = 'planned' | 'in-progress' | 'blocked' | 'completed'
@@ -19,6 +19,8 @@ export interface TaskSummary {
   /** Repository-relative paths edited while this task was current. */
   files: string[]
   updatedAt: string
+  /** Who set the current state: an agent through MCP, or the person in the dashboard. */
+  reportedBy: 'agent-reported' | 'user-reported'
 }
 
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [])
@@ -80,6 +82,55 @@ export function summarizeTask(store: ContextStore, node: GraphNode): TaskSummary
       .map((key) => key.slice('file:'.length))
       .sort(),
     updatedAt: node.updatedAt,
+    reportedBy: node.props.reportedBy === 'user-reported' ? 'user-reported' : 'agent-reported',
+  }
+}
+
+/** Longest next action accepted from the dashboard; agents are held to the same limit through MCP. */
+export const MAX_NEXT_ACTION_CHARS = 500
+
+export class InvalidTaskChangeError extends Error {
+  constructor(reason: string) {
+    super(reason)
+    this.name = 'InvalidTaskChangeError'
+  }
+}
+
+/** The task snapshot after one dashboard edit: every field, since each task.upserted replaces the last. */
+export function applyTaskChange(task: TaskSummary, change: TaskChange): TaskUpsertedEvent['payload'] {
+  const base: TaskUpsertedEvent['payload'] = {
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    ...(task.objective ? { objective: task.objective } : {}),
+    ...(task.nextAction ? { nextAction: task.nextAction } : {}),
+    acceptanceCriteria: task.acceptanceCriteria,
+    completedSteps: task.completedSteps,
+    remainingSteps: task.remainingSteps,
+  }
+  switch (change.kind) {
+    case 'status':
+      if (!STATUSES.has(change.status)) throw new InvalidTaskChangeError(`Unknown status "${String(change.status)}".`)
+      return { ...base, status: change.status }
+    case 'next-action': {
+      const next = change.nextAction?.trim() ?? ''
+      if (next.length > MAX_NEXT_ACTION_CHARS) throw new InvalidTaskChangeError(`The next action is longer than ${MAX_NEXT_ACTION_CHARS} characters.`)
+      const { nextAction: _previous, ...rest } = base
+      return next === '' ? rest : { ...rest, nextAction: next }
+    }
+    case 'step': {
+      const known = task.completedSteps.includes(change.step) || task.remainingSteps.includes(change.step)
+      if (!known) throw new InvalidTaskChangeError(`"${change.step}" is not a step of this task.`)
+      const completed = task.completedSteps.filter((step) => step !== change.step)
+      const remaining = task.remainingSteps.filter((step) => step !== change.step)
+      return change.done
+        ? { ...base, completedSteps: [...completed, change.step], remainingSteps: remaining }
+        : { ...base, completedSteps: completed, remainingSteps: [...remaining, change.step] }
+    }
+    case 'criterion': {
+      if (!Number.isInteger(change.index) || !task.acceptanceCriteria[change.index]) throw new InvalidTaskChangeError('No such acceptance criterion.')
+      return { ...base, acceptanceCriteria: task.acceptanceCriteria.map((criterion, index) => (index === change.index ? { ...criterion, met: change.met } : criterion)) }
+    }
   }
 }
 

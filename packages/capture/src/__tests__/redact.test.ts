@@ -66,6 +66,8 @@ describe('redactSecrets, stronger rules', () => {
       'const handleMultipleSelectionChangeEventForDropdown = () => {}',
       'id 123e4567-e89b-12d3-a456-426614174000',
       'https://github.com/PranavOaR/continuum/pull/12',
+      'const csrfToken = options.csrfToken ?? createAccessToken()',
+      'password = process.env.DB_PASSWORD',
     ].join('\n')
     expect(redactSecrets(ordinary)).toBe(ordinary)
   })

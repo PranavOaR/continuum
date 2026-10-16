@@ -7,6 +7,7 @@ import type {
   ProjectFile,
   ProjectStatus,
   ProjectTask,
+  TaskChange,
   VerificationRecord,
 } from './types'
 
@@ -73,6 +74,8 @@ export interface ContinuumService {
   search(query: string): Promise<SearchResult[]>
   /** The plain-text handoff briefing a new agent session receives for this project. */
   getBriefing(projectId: string): Promise<string>
+  /** Applies one edit you made to a task and returns the task as it now stands. */
+  updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask>
 }
 
 export class NotFoundError extends Error {

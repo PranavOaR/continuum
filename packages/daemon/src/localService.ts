@@ -9,8 +9,11 @@ import {
   type ProjectTask,
   type ProjectWorkspace,
   type SearchResult,
+  type TaskChange,
 } from '@continuum/core'
-import { renderHandoff } from '@continuum/context'
+import { openWorkspace } from '@continuum/capture'
+import { applyTaskChange, renderHandoff, summarizeTask } from '@continuum/context'
+import { keys } from '@continuum/store'
 import { toActivity } from './mapActivity'
 import { toGraph } from './mapGraph'
 import { allChangedFileNodes, toFiles, toProject } from './mapProject'
@@ -100,9 +103,13 @@ function summarize(snapshot: RepoSnapshot): ProjectSummary {
 
 const newestFirst = (a: ActivityEvent, b: ActivityEvent) => b.timestamp.localeCompare(a.timestamp)
 
+/** Where dashboard edits come from in the event log. */
+export const DASHBOARD_SOURCE = 'dashboard'
+
 /**
  * ContinuumService backed by real repositories' context stores. Everything is
- * read-only and derived from recorded evidence; tasks appear once agents record them.
+ * derived from recorded evidence; the only write is a task edit you make in
+ * the dashboard, recorded as user-reported.
  */
 export class LocalContinuumService implements ContinuumService {
   private readonly repositories: readonly Repository[]
@@ -197,6 +204,26 @@ export class LocalContinuumService implements ContinuumService {
 
   async getMemoryGraph(projectId: string): Promise<MemoryGraph> {
     return toGraph(await this.snapshot(projectId))
+  }
+
+  async updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask> {
+    const repository = this.repositories.find((candidate) => candidate.projectId === projectId)
+    if (!repository) throw new NotFoundError('Project', projectId)
+    const { store } = await openWorkspace(repository.cwd)
+    try {
+      store.transact(() => {
+        const node = store.graph.get(keys.task(taskId))
+        if (!node || node.kind !== 'task') throw new NotFoundError('Task', taskId)
+        const payload = applyTaskChange(summarizeTask(store, node), change)
+        return [{ type: 'task.upserted', payload, evidence: 'user-reported', source: DASHBOARD_SOURCE, occurredAt: this.now().toISOString() }]
+      })
+    } finally {
+      store.close()
+    }
+    this.invalidate()
+    const task = (await this.getWorkspace(projectId)).tasks.find((candidate) => candidate.id === taskId)
+    if (!task) throw new NotFoundError('Task', taskId)
+    return task
   }
 
   async getBriefing(projectId: string): Promise<string> {
