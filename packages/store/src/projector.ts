@@ -9,6 +9,16 @@ export interface Mutations {
   upsertNode(key: IdentityKey, input: UpsertInput): void
   link(from: IdentityKey, type: EdgeType, to: IdentityKey): void
   putObject(kind: string, value: unknown): ContentHash
+  getObject(hash: ContentHash): { kind: string; value: unknown } | undefined
+}
+
+/** Object kind of a check's coverage manifest: identity → content hash of everything it ran against. */
+export const COVERAGE_KIND = 'coverage'
+
+function coverageManifest(store: Mutations, hash: ContentHash): Record<IdentityKey, ContentHash> {
+  const object = store.getObject(hash)
+  if (object?.kind !== COVERAGE_KIND) throw new Error(`Coverage manifest ${hash} is missing from the store.`)
+  return object.value as Record<IdentityKey, ContentHash>
 }
 
 /** Creates a node only if it does not exist yet, e.g. a task referenced before it was described. */
@@ -81,13 +91,16 @@ export function project(store: Mutations, event: ContinuumEvent): void {
     }
     case 'check.recorded': {
       const check = keys.check(event.payload.name)
-      const runHash = store.putObject('check-run', { ...event.payload, ranAt: at, revision: event.revision })
+      const { ranAgainst: inline, coverage, ...run } = event.payload
+      const ranAgainst = inline ?? (coverage ? coverageManifest(store, coverage) : {})
+      const coverageHash = coverage ?? store.putObject(COVERAGE_KIND, ranAgainst)
+      const runHash = store.putObject('check-run', { ...run, coverage: coverageHash, ranAt: at, revision: event.revision })
       store.upsertNode(check, {
         hash: runHash,
         props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at },
         at,
       })
-      for (const covered of ensureAnchors(store, event.payload.ranAgainst, at)) store.link(check, 'ran_against', covered)
+      for (const covered of ensureAnchors(store, ranAgainst, at)) store.link(check, 'ran_against', covered)
       return
     }
     case 'memory.recorded': {

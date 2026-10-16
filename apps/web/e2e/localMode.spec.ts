@@ -140,3 +140,13 @@ test('memory graph comes from the local context graph', async ({ page }) => {
   await page.goto(`${url}/app/memory`)
   await expect(page.getByText('straight from the local context graph')).toBeVisible()
 })
+
+test('updates without a reload when something new is recorded', async ({ page }) => {
+  const name = repo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  await expect(page.locator('#verification').getByText('unit')).toBeVisible()
+  await expect(page.locator('#verification').getByText('typecheck')).toHaveCount(0)
+  continuum(['run', '--name', 'typecheck', '--', process.execPath, '-e', '0'])
+  // Pushed by the daemon's change stream: nothing in the page reloads or navigates.
+  await expect(page.locator('#verification').getByText('typecheck')).toBeVisible({ timeout: 4_000 })
+})

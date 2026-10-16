@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { NotFoundError } from '@continuum/core'
 import { QueryCache } from '../services/queryCache'
 
@@ -8,8 +8,10 @@ export interface QueryState<T> {
   isLoading: boolean
 }
 
-/** Live local data goes stale after this long and is refreshed on the next visit. */
+/** Live local data goes stale after this long when the daemon cannot push changes. */
 export const LIVE_CACHE_TTL_MS = 5_000
+/** With pushed changes, a timer refresh is only a safety net (e.g. for edits nothing recorded yet). */
+export const PUSHED_CACHE_TTL_MS = 60_000
 const MAX_CACHED_QUERIES = 100
 
 // The demo dataset is static, so by default results stay fresh for the whole session.
@@ -18,6 +20,23 @@ const cache = new QueryCache({ ttlMs: Number.POSITIVE_INFINITY, maxEntries: MAX_
 export function setQueryCacheTtl(ttlMs: number): void {
   cache.setTtl(ttlMs)
 }
+
+let generation = 0
+const generationListeners = new Set<() => void>()
+
+/** New data is available: every mounted query refetches, still showing its current result meanwhile. */
+export function invalidateQueries(): void {
+  cache.markAllStale()
+  generation += 1
+  for (const listener of generationListeners) listener()
+}
+
+function subscribeGeneration(listener: () => void): () => void {
+  generationListeners.add(listener)
+  return () => generationListeners.delete(listener)
+}
+
+const currentGeneration = () => generation
 
 interface Settled {
   key: string
@@ -33,6 +52,7 @@ interface Settled {
  */
 export function useServiceQuery<T>(key: string | null, fetcher: () => Promise<T>): QueryState<T> {
   const [settled, setSettled] = useState<Settled | undefined>(undefined)
+  const dataGeneration = useSyncExternalStore(subscribeGeneration, currentGeneration)
 
   useEffect(() => {
     // A null key means "not ready to ask yet" (e.g. which project is still being resolved).
@@ -53,7 +73,7 @@ export function useServiceQuery<T>(key: string | null, fetcher: () => Promise<T>
     }
     // The fetcher is intentionally excluded: callers pass inline closures and `key` identifies the request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
+  }, [key, dataGeneration])
 
   if (key === null) return { data: undefined, error: undefined, isLoading: true }
   if (cache.has(key)) return { data: cache.get<T>(key), error: undefined, isLoading: false }

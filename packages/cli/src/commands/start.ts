@@ -1,4 +1,4 @@
-import { startCapture } from '@continuum/capture'
+import { DEFAULT_POLL_MS, startCapture } from '@continuum/capture'
 import { formatChange } from '../format'
 import { EXIT_OK, type Io } from '../io'
 import { openWorkspace } from '@continuum/capture'
@@ -27,9 +27,14 @@ export async function startCommand(io: Io): Promise<number> {
         for (const change of changes) io.out(`${time}  ${formatChange(change)}`)
       },
       onError: (error) => io.err(`continuum: scan failed: ${error instanceof Error ? error.message : String(error)}`),
+      onPolling: (reason) =>
+        io.err(
+          `continuum: cannot watch this repository (${reason}); checking for changes every ${DEFAULT_POLL_MS / 1000}s instead. ` +
+            'On Linux, raising fs.inotify.max_user_watches restores instant capture.',
+        ),
     })
     initial = false
-    io.out(`Watching ${workspace.root} — press Ctrl-C to stop.`)
+    io.out(`${capture.mode === 'watching' ? 'Watching' : 'Polling'} ${workspace.root} — press Ctrl-C to stop.`)
     await untilAborted(io.signal)
     await capture.close()
     io.out('Stopped.')

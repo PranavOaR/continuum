@@ -119,6 +119,12 @@ export class LocalContinuumService implements ContinuumService {
     this.onError = options.onError ?? (() => {})
   }
 
+  /** Forgets the cached snapshot, e.g. when the change feed reports new records, so the next request reads them. */
+  invalidate(): void {
+    // A load still in flight may have read before the change; later requests start a fresh one.
+    this.cache = null
+  }
+
   private load(): Promise<Loaded[]> {
     const { cache } = this
     if (cache && (cache.finishedAt === null || Date.now() - cache.finishedAt < this.ttlMs)) return cache.loaded

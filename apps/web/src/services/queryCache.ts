@@ -1,6 +1,8 @@
 interface Entry {
   data: unknown
   at: number
+  /** The invalidation epoch the request that produced this entry started in. */
+  epoch: number
 }
 
 export interface QueryCacheOptions {
@@ -19,6 +21,8 @@ export interface QueryCacheOptions {
 export class QueryCache {
   private readonly entries = new Map<string, Entry>()
   private readonly inflight = new Map<string, Promise<unknown>>()
+  /** Bumped by markAllStale; a request started before the bump cannot produce a fresh entry. */
+  private epoch = 0
   private ttlMs: number
   private readonly maxEntries: number
   private readonly now: () => number
@@ -31,6 +35,14 @@ export class QueryCache {
 
   setTtl(ttlMs: number): void {
     this.ttlMs = ttlMs
+  }
+
+  /** Keeps every result for display but refetches each on its next use (stale-while-revalidate). */
+  markAllStale(): void {
+    for (const [key, entry] of this.entries) this.entries.set(key, { ...entry, at: Number.NEGATIVE_INFINITY })
+    // Requests in flight may have read before the change: later callers start new ones.
+    this.inflight.clear()
+    this.epoch += 1
   }
 
   has(key: string): boolean {
@@ -51,19 +63,25 @@ export class QueryCache {
     if (this.isFresh(key)) return Promise.resolve(this.get<T>(key) as T)
     const pending = this.inflight.get(key)
     if (pending) return pending as Promise<T>
+    const startedIn = this.epoch
     const request = fetcher()
       .then((data) => {
-        this.set(key, data)
+        this.set(key, data, startedIn)
         return data
       })
-      .finally(() => this.inflight.delete(key))
+      .finally(() => {
+        if (this.inflight.get(key) === request) this.inflight.delete(key)
+      })
     this.inflight.set(key, request)
     return request
   }
 
-  private set(key: string, data: unknown): void {
+  private set(key: string, data: unknown, startedIn: number): void {
+    // A slow request from before an invalidation never replaces a result read after it.
+    const existing = this.entries.get(key)
+    if (existing && existing.epoch > startedIn) return
     this.entries.delete(key)
-    this.entries.set(key, { data, at: this.now() })
+    this.entries.set(key, { data, at: startedIn === this.epoch ? this.now() : Number.NEGATIVE_INFINITY, epoch: startedIn })
     while (this.entries.size > this.maxEntries) {
       const oldest = this.entries.keys().next().value as string
       this.entries.delete(oldest)
