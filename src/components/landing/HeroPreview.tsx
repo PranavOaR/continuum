@@ -26,7 +26,7 @@ function Column({ title, children }: { title: string; children: ReactNode }) {
 /** A static, simplified illustration of the project workspace. Not interactive. */
 export function HeroPreview() {
   return (
-    <div role="img" aria-label="Illustration of a Continuum project view: changed files, agent activity, verification state, and a handoff action." className="rounded-xl border border-line-strong bg-surface p-3 sm:p-4">
+    <div role="img" aria-label="Illustration of a Continuum project view: changed files, agent activity, verification state, and a handoff action." className="rounded-xl border border-line bg-surface p-3 shadow-[0_30px_80px_-40px_rgb(20_19_24/0.35)] sm:p-4">
       <div aria-hidden>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-line pb-3">
           <div className="min-w-0">
