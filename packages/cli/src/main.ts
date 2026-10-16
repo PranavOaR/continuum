@@ -83,6 +83,14 @@ function parseGlobal(argv: readonly string[]): GlobalArgs | { error: string } {
   return parsed
 }
 
+/** Commands that stop gracefully on Ctrl-C/SIGTERM; every other command keeps Node's default of exiting at once. */
+const INTERRUPTIBLE = new Set(['start', 'run'])
+
+export function handlesInterrupts(argv: readonly string[]): boolean {
+  const parsed = parseGlobal(argv)
+  return !('error' in parsed) && INTERRUPTIBLE.has(parsed.rest[0] ?? '')
+}
+
 function exitCodeFor(error: unknown): number {
   if (error instanceof CommandNotFoundError) return EXIT_NOT_FOUND
   return EXIT_FAILURE
