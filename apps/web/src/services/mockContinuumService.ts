@@ -190,4 +190,15 @@ export const mockContinuumService: ContinuumService = {
   search(query) {
     return respond(searchAll(query))
   },
+  getBriefing(projectId) {
+    try {
+      const { project, tasks } = buildWorkspace(projectId)
+      const task = tasks.find((candidate) => candidate.id === project.currentTaskId) ?? tasks[0]
+      const lines = [`# Continuum handoff: ${project.name} (demo data)`, '', task ? `Current task: ${task.title}` : 'No current task.']
+      if (task?.nextAction) lines.push(`Next action: ${task.nextAction}`)
+      return respond(lines.join('\n'))
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  },
 }

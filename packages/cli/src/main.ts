@@ -1,12 +1,14 @@
 import { resolve } from 'node:path'
 import { CommandNotFoundError, NotAGitRepositoryError, WatchUnavailableError } from '@continuum/capture'
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
+import { PortInUseError } from '@continuum/daemon'
 import { handoffCommand } from './commands/handoff'
 import { ingestCommand } from './commands/ingest'
 import { initCommand } from './commands/init'
 import { mcpCommand } from './commands/mcp'
 import { RUN_USAGE, runCommand } from './commands/run'
 import { scanCommand } from './commands/scan'
+import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
@@ -28,6 +30,7 @@ Commands
   run -- <command>     Run a check (tests, lint, build) and record it as verified
                        ${RUN_USAGE.replace('Usage: ', '')}
   handoff              Print where the project left off, for any agent or chat
+  serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
 
 Used by agents
@@ -50,6 +53,7 @@ const COMMANDS: Record<string, Command> = {
   status: (io) => statusCommand(io),
   run: (io, args) => runCommand(io, args),
   handoff: (io, args) => handoffCommand(io, args),
+  serve: (io, args) => serveCommand(io, args, VERSION),
   setup: (io, args) => setupCommand(io, args, selfInvocation()),
   mcp: (io) => mcpCommand(io, VERSION),
   ingest: (io) => ingestCommand(io),
@@ -84,7 +88,7 @@ function parseGlobal(argv: readonly string[]): GlobalArgs | { error: string } {
 }
 
 /** Commands that stop gracefully on Ctrl-C/SIGTERM; every other command keeps Node's default of exiting at once. */
-const INTERRUPTIBLE = new Set(['start', 'run'])
+const INTERRUPTIBLE = new Set(['start', 'run', 'serve'])
 
 export function handlesInterrupts(argv: readonly string[]): boolean {
   const parsed = parseGlobal(argv)
@@ -103,6 +107,7 @@ function isExpected(error: unknown): error is Error {
     error instanceof CommandNotFoundError ||
     error instanceof WatchUnavailableError ||
     error instanceof SetupError ||
+    error instanceof PortInUseError ||
     error instanceof InvalidHookPayloadError
   )
 }

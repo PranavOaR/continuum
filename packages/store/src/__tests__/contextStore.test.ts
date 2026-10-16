@@ -171,6 +171,20 @@ describe('ContextStore persistence', () => {
     expect(statSync(path).mode & 0o777).toBe(0o600)
   })
 
+  it('lists the newest events first with their sequence numbers', () => {
+    const store = ContextStore.open(':memory:')
+    seed(store)
+    const recent = store.recentEvents(2)
+    expect(recent.map((entry) => entry.seq)).toEqual([7, 6])
+    expect(recent[0].event.type).toBe('session.ended')
+    expect(store.recentEvents(100)).toHaveLength(7)
+    expect(store.firstEvent()?.type).toBe('task.upserted')
+    expect(store.firstEvent({ type: 'file.changed' })?.payload).toMatchObject({ path: 'src/auth/login.ts' })
+    expect(store.firstEvent({ source: 'nowhere' })).toBeUndefined()
+    expect(ContextStore.open(':memory:').firstEvent()).toBeUndefined()
+    store.close()
+  })
+
   it('replays the event log into the same state', () => {
     const store = ContextStore.open(':memory:')
     seed(store)

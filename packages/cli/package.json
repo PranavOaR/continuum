@@ -19,6 +19,7 @@
     "@continuum/claude-code": "*",
     "@continuum/context": "*",
     "@continuum/core": "*",
+    "@continuum/daemon": "*",
     "@continuum/mcp": "*",
     "@continuum/store": "*",
     "tsx": "^4.23.15"

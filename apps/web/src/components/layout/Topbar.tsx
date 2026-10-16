@@ -1,6 +1,7 @@
-import { Bell, FlaskConical, Menu, Search, Settings, User } from 'lucide-react'
+import { Bell, FlaskConical, HardDrive, Menu, Search, Settings, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAttentionItems } from '../../hooks/useOverview'
+import { useIsLive } from '../../state/dataMode'
 import { useUI } from '../../state/ui'
 import { AttentionList } from '../shared/AttentionList'
 import { IconButton } from '../shared/Button'
@@ -9,6 +10,7 @@ import { Popover, PopoverItem } from '../shared/Popover'
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
 export function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
+  const isLive = useIsLive()
   const { openSearch } = useUI()
   const { items } = useAttentionItems()
   const navigate = useNavigate()
@@ -32,12 +34,15 @@ export function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
       </button>
 
       <div className="ml-auto flex items-center gap-1">
-        <span title="Everything in this workspace is mock data" className="mr-2 hidden items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-[12px] text-muted sm:inline-flex">
+        <span
+          title={isLive ? 'Live data from repositories on this machine' : 'Everything in this workspace is mock data'}
+          className="mr-2 hidden items-center gap-2 rounded-full border border-line bg-surface px-3 py-1 text-[12px] text-muted sm:inline-flex"
+        >
           <span aria-hidden className="size-1.5 rounded-full bg-live" />
-          Demo workspace
+          {isLive ? 'Local workspace' : 'Demo workspace'}
           <span className="flex items-center gap-1 border-l border-line pl-2 label-mono text-fg">
-            <FlaskConical className="size-3" aria-hidden />
-            Mock data
+            {isLive ? <HardDrive className="size-3" aria-hidden /> : <FlaskConical className="size-3" aria-hidden />}
+            {isLive ? 'Live' : 'Mock data'}
           </span>
         </span>
 

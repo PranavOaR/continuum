@@ -10,6 +10,7 @@ import { useProjects } from '../hooks/useWorkspace'
 import type { ProjectSummary } from '../services'
 import { cn } from '../utils/cn'
 import { matchesQuery } from '../utils/search'
+import { useIsLive } from '../state/dataMode'
 
 const STATUS_FILTERS = [
   { id: 'all', label: 'All' },
@@ -32,6 +33,7 @@ function parseFilter(value: string | null): StatusFilter {
 }
 
 export function ProjectsPage() {
+  const isLive = useIsLive()
   useDocumentTitle('Projects')
   const { data, error, isLoading } = useProjects()
   const [params, setParams] = useSearchParams()
@@ -55,7 +57,7 @@ export function ProjectsPage() {
 
   return (
     <>
-      <PageHeader title="Projects" description="Every project Continuum is tracking in this demo." crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Projects' }]} />
+      <PageHeader title="Projects" description={isLive ? 'Repositories this dashboard is serving from your machine.' : 'Every project Continuum is tracking in this demo.'} crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Projects' }]} />
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1">

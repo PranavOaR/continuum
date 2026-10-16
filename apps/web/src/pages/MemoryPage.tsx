@@ -10,12 +10,12 @@ import { PageHeader } from '../components/shared/PageHeader'
 import { EmptyState, ErrorState, LoadingBlock } from '../components/shared/States'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useServiceQuery } from '../hooks/useServiceQuery'
-import { useProjects } from '../hooks/useWorkspace'
+import { usePreferredProjectId, useProjects } from '../hooks/useWorkspace'
 import { continuumService } from '../services'
-import { usePreferences } from '../state/preferences'
 import type { GraphNode } from '@continuum/core'
 import { cn } from '../utils/cn'
 import { matchesQuery } from '../utils/search'
+import { useIsLive } from '../state/dataMode'
 
 type View = 'graph' | 'list'
 
@@ -57,17 +57,18 @@ function NodeList({ nodes, selectedId, onSelect }: { nodes: GraphNode[]; selecte
 }
 
 export function MemoryPage() {
+  const isLive = useIsLive()
   useDocumentTitle('Memory')
-  const { preferences } = usePreferences()
   const projects = useProjects()
   const [params, setParams] = useSearchParams()
-  const projectId = params.get('project') ?? preferences.defaultProjectId
+  const preferredProjectId = usePreferredProjectId()
+  const projectId = params.get('project') ?? preferredProjectId
   const filter = (NODE_FILTERS.find((option) => option.id === params.get('filter'))?.id ?? 'all') as NodeFilter
   const query = params.get('q') ?? ''
   const selectedId = params.get('node')
   const viewParam = params.get('view')
   const view: View = viewParam === 'list' || viewParam === 'graph' ? viewParam : defaultView()
-  const graph = useServiceQuery(`graph:${projectId}`, () => continuumService.getMemoryGraph(projectId))
+  const graph = useServiceQuery(projectId ? `graph:${projectId}` : null, () => continuumService.getMemoryGraph(projectId as string))
 
   const update = (changes: Record<string, string | null>) =>
     setParams(
@@ -95,7 +96,7 @@ export function MemoryPage() {
     <>
       <PageHeader
         title="Memory Explorer"
-        description="How tasks, files, decisions, sessions and checks relate. A fixed sample, derived from the mock dataset."
+        description={isLive ? 'How sessions, the files they changed, checks and decisions relate, straight from the local context graph.' : 'How tasks, files, decisions, sessions and checks relate. A fixed sample, derived from the mock dataset.'}
         crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Memory' }]}
       />
 

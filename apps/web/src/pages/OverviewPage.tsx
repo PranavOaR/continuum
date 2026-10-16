@@ -10,8 +10,8 @@ import { EmptyState, ErrorState, LoadingBlock, Skeleton } from '../components/sh
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAttentionItems, useOverviewQuery } from '../hooks/useOverview'
 import { useHandoffs } from '../state/handoffs'
-import { usePreferences } from '../state/preferences'
 import { useUI } from '../state/ui'
+import { usePreferredProjectId } from '../hooks/useWorkspace'
 
 interface SummaryCardProps {
   label: string
@@ -39,7 +39,7 @@ export function OverviewPage() {
   const { data, error, isLoading } = useOverviewQuery()
   const { items: attention } = useAttentionItems()
   const { handoffs } = useHandoffs()
-  const { preferences } = usePreferences()
+  const preferredProjectId = usePreferredProjectId()
   const { openSearch } = useUI()
   const navigate = useNavigate()
 
@@ -52,7 +52,7 @@ export function OverviewPage() {
           <Button size="sm" icon={<Search />} onClick={openSearch}>
             Search
           </Button>
-          <ButtonLink to={`/app/projects/${preferences.defaultProjectId}`} variant="primary" size="sm" icon={<FolderOpen />}>
+          <ButtonLink to={preferredProjectId ? `/app/projects/${preferredProjectId}` : '/app/projects'} variant="primary" size="sm" icon={<FolderOpen />}>
             Open Project
           </ButtonLink>
         </>

@@ -71,6 +71,17 @@ export async function headRevision(root: string): Promise<string | null> {
   }
 }
 
+/** The checked-out branch, or null when HEAD is detached. */
+export async function currentBranch(root: string): Promise<string | null> {
+  try {
+    const name = (await git(root, ['symbolic-ref', '--quiet', '--short', 'HEAD'])).trim()
+    return name || null
+  } catch (error) {
+    if (error instanceof GitCommandError) return null
+    throw error
+  }
+}
+
 /** Absolute path of a file inside the git directory, correct for worktrees too. */
 export async function gitPath(root: string, path: string): Promise<string> {
   const resolved = (await git(root, ['rev-parse', '--git-path', path])).trim()

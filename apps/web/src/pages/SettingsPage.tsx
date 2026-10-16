@@ -7,13 +7,14 @@ import { PageHeader } from '../components/shared/PageHeader'
 import { Panel } from '../components/shared/Panel'
 import { AGENTS } from '@continuum/core'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { useProjects } from '../hooks/useWorkspace'
+import { useProjects, usePreferredProjectId } from '../hooks/useWorkspace'
 import { useHandoffs } from '../state/handoffs'
 import { usePreferences, type ThemePreference } from '../state/preferences'
 import { useToast } from '../state/toasts'
 import type { AgentType, ContextCategory } from '@continuum/core'
 import { cn } from '../utils/cn'
 import { CONTEXT_CATEGORIES } from '@continuum/core'
+import { useIsLive } from '../state/dataMode'
 
 const THEMES: { id: ThemePreference; label: string; icon: ReactNode }[] = [
   { id: 'dark', label: 'Dark', icon: <Moon /> },
@@ -57,8 +58,10 @@ function SettingRow({ label, description, children }: { label: string; descripti
 }
 
 export function SettingsPage() {
+  const isLive = useIsLive()
   useDocumentTitle('Settings')
   const { preferences, updatePreferences, resetPreferences } = usePreferences()
+  const preferredProjectId = usePreferredProjectId()
   const { restoreSeedData, clearHistory } = useHandoffs()
   const projects = useProjects()
   const notify = useToast()
@@ -113,7 +116,7 @@ export function SettingsPage() {
               </div>
             </SettingRow>
             <SettingRow label="Default project" description="Opened by “Open Project” and preselected in handoffs.">
-              <SelectField label="Default project" hideLabel value={preferences.defaultProjectId} onChange={(event) => updatePreferences({ defaultProjectId: event.target.value })}>
+              <SelectField label="Default project" hideLabel value={preferredProjectId ?? ''} onChange={(event) => updatePreferences({ defaultProjectId: event.target.value })}>
                 {(projects.data ?? []).map(({ project }) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
@@ -184,32 +187,44 @@ export function SettingsPage() {
                 Continuum is designed to index and retrieve project context on your machine, without requiring external AI APIs. Agent integrations
                 would read and write through local adapters.
               </p>
-              <p>
-                <span className="font-medium text-fg">This prototype uses mock data only.</span> No project files are monitored, no repository is
-                read, no tests are run, and nothing is sent to any agent or server. Preferences and handoff history are kept in this browser's local
-                storage.
-              </p>
+              {isLive ? (
+                <p>
+                  <span className="font-medium text-fg">Connected to your local repositories.</span> This dashboard reads Continuum's records from
+                  disk through <span className="font-mono">continuum serve</span> on 127.0.0.1; it never writes to them and nothing is sent to any
+                  server. Preferences and handoff history are kept in this browser's local storage.
+                </p>
+              ) : (
+                <p>
+                  <span className="font-medium text-fg">This prototype uses mock data only.</span> No project files are monitored, no repository is
+                  read, no tests are run, and nothing is sent to any agent or server. Preferences and handoff history are kept in this browser's local
+                  storage.
+                </p>
+              )}
             </div>
           </div>
         </Panel>
 
-        <Panel title="Demo controls" description="Return the demo to a known state.">
+        <Panel title={isLive ? 'Browser data' : 'Demo controls'} description={isLive ? 'Data this browser keeps for the dashboard.' : 'Return the demo to a known state.'}>
           <div className="divide-y divide-line">
-            <SettingRow label="Reset mock data" description="Restore the sample handoffs and statuses.">
-              <Button size="sm" icon={<RotateCcw />} onClick={() => setPendingReset('mock-data')} className="w-full">
-                Reset mock data
-              </Button>
-            </SettingRow>
+            {!isLive && (
+              <SettingRow label="Reset mock data" description="Restore the sample handoffs and statuses.">
+                <Button size="sm" icon={<RotateCcw />} onClick={() => setPendingReset('mock-data')} className="w-full">
+                  Reset mock data
+                </Button>
+              </SettingRow>
+            )}
             <SettingRow label="Reset handoff history" description="Remove every handoff record.">
               <Button size="sm" variant="danger" onClick={() => setPendingReset('handoffs')} className="w-full">
                 Clear handoff history
               </Button>
             </SettingRow>
-            <SettingRow label="Restore default demo state" description="Preferences and data back to first load.">
-              <Button size="sm" variant="danger" onClick={() => setPendingReset('everything')} className="w-full">
-                Restore defaults
-              </Button>
-            </SettingRow>
+            {!isLive && (
+              <SettingRow label="Restore default demo state" description="Preferences and data back to first load.">
+                <Button size="sm" variant="danger" onClick={() => setPendingReset('everything')} className="w-full">
+                  Restore defaults
+                </Button>
+              </SettingRow>
+            )}
           </div>
         </Panel>
       </div>

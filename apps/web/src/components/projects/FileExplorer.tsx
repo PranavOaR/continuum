@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
 import type { ProjectFile } from '@continuum/core'
 import { matchesQuery } from '../../utils/search'
+import { useIsLive } from '../../state/dataMode'
+import { hasLineDetail } from './FileDetailDrawer'
 import { SearchInput } from '../shared/Fields'
 import { Panel } from '../shared/Panel'
 import { EmptyState } from '../shared/States'
@@ -14,6 +16,7 @@ interface FileExplorerProps {
 }
 
 export function FileExplorer({ files, onOpenFile }: FileExplorerProps) {
+  const isLive = useIsLive()
   const [query, setQuery] = useState('')
   const format = useTimeFormat()
   const visible = files.filter((file) => matchesQuery(query, file.path))
@@ -22,7 +25,7 @@ export function FileExplorer({ files, onOpenFile }: FileExplorerProps) {
     <Panel
       id="files"
       title="File changes"
-      description="Files associated with the selected task, as recorded in the demo dataset."
+      description={isLive ? 'Files changed since Continuum started recording, newest first.' : 'Files associated with the selected task, as recorded in the demo dataset.'}
       actions={<SearchInput value={query} onChange={setQuery} label="Filter files by path" placeholder="Filter by path" className="w-44 sm:w-56" />}
       bodyClassName="p-0"
     >
@@ -49,9 +52,11 @@ export function FileExplorer({ files, onOpenFile }: FileExplorerProps) {
                   <span className="mt-1 block text-[12.5px] text-muted">{file.relevance}</span>
                   <span className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-subtle">
                     {file.revision && <span className="font-mono">rev {file.revision}</span>}
-                    <span>
-                      <span className="text-success">+{file.additions}</span> <span className="text-danger">−{file.deletions}</span>
-                    </span>
+                    {hasLineDetail(file) && (
+                      <span>
+                        <span className="text-success">+{file.additions}</span> <span className="text-danger">−{file.deletions}</span>
+                      </span>
+                    )}
                     <span>observed {format(file.updatedAt)}</span>
                   </span>
                 </span>

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findRepoRoot, hashFiles, headRevision, isIgnored, isRegularFileInRepo, isTracked, NotAGitRepositoryError, readWorkingTree } from '../git'
+import { currentBranch, findRepoRoot, hashFiles, headRevision, isIgnored, isRegularFileInRepo, isTracked, NotAGitRepositoryError, readWorkingTree } from '../git'
 import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
@@ -150,5 +150,15 @@ describe('isRegularFileInRepo', () => {
     } finally {
       rmSync(outside, { recursive: true, force: true })
     }
+  })
+})
+
+describe('currentBranch', () => {
+  it('names the branch, even before the first commit, and is null when detached', async () => {
+    const repo = sandbox({ 'a.ts': 'a' })
+    expect(await currentBranch(repo.root)).toBe('main')
+    repo.commit()
+    repo.git('checkout', '--quiet', '--detach')
+    expect(await currentBranch(repo.root)).toBeNull()
   })
 })

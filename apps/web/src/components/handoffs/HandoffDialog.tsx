@@ -2,7 +2,7 @@ import { ArrowRight, Info } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AGENTS, getAgent } from '@continuum/core'
-import { useProjects, useWorkspace } from '../../hooks/useWorkspace'
+import { usePreferredProjectId, useProjects, useWorkspace } from '../../hooks/useWorkspace'
 import type { ProjectWorkspace } from '../../services'
 import { useHandoffs } from '../../state/handoffs'
 import { usePreferences } from '../../state/preferences'
@@ -15,6 +15,8 @@ import { Button } from '../shared/Button'
 import { Dialog } from '../shared/Dialog'
 import { Checkbox, SelectField } from '../shared/Fields'
 import { EmptyState, ErrorState, LoadingBlock } from '../shared/States'
+import { useIsLive } from '../../state/dataMode'
+import { BriefingPreview } from './BriefingPreview'
 import { HandoffContextPreview, TokenEstimate } from './HandoffContextPreview'
 
 function pickTarget(source: AgentType, preferred: AgentType): AgentType {
@@ -48,7 +50,9 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
   const navigate = useNavigate()
   const projects = useProjects()
 
-  const [projectId, setProjectId] = useState(initial.projectId ?? preferences.defaultProjectId)
+  const preferredProjectId = usePreferredProjectId()
+  const [chosenProjectId, setProjectId] = useState(initial.projectId)
+  const projectId = chosenProjectId ?? preferredProjectId ?? ''
   const [requestedTaskId, setRequestedTaskId] = useState(initial.taskId ?? '')
   const [sourceAgent, setSourceAgent] = useState<AgentType>(preferences.preferredSourceAgent)
   const [targetAgent, setTargetAgent] = useState<AgentType>(() =>
@@ -56,7 +60,8 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
   )
   const [included, setIncluded] = useState<ContextCategory[]>(preferences.defaultContext)
 
-  const workspace = useWorkspace(projectId)
+  const workspace = useWorkspace(projectId || undefined)
+  const isLive = useIsLive()
   const task = workspace.data ? resolveTask(workspace.data, requestedTaskId) : undefined
 
   const context = useMemo(() => {
@@ -170,7 +175,8 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
         </div>
         {workspace.isLoading && <LoadingBlock rows={3} label="Loading project context" />}
         {workspace.error && <ErrorState title="Could not load this project" description={workspace.error.message} />}
-        {workspace.data && !task && <EmptyState title="This project has no tasks" description="Choose another project to prepare a handoff." />}
+        {workspace.data && !task && isLive && <BriefingPreview projectId={projectId} />}
+        {workspace.data && !task && !isLive && <EmptyState title="This project has no tasks" description="Choose another project to prepare a handoff." />}
         {context instanceof Error && <ErrorState title="Handoff could not be prepared" description={context.message} />}
         {context && !(context instanceof Error) && <HandoffContextPreview context={context} compact />}
       </div>

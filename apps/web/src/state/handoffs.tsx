@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { dataMode } from '../services'
 import { createPersistentStore } from '../services/storage'
 import type { Handoff, HandoffDraft, HandoffStatus } from '@continuum/core'
 import {
@@ -11,7 +12,10 @@ import {
   type HandoffState,
 } from './handoffStore'
 
-const store = createPersistentStore<HandoffState>('handoffs', INITIAL_HANDOFF_STATE, isHandoffState)
+// Local mode keeps its own history with no sample records: the demo's samples point at demo projects.
+const IS_LOCAL = dataMode() === 'local'
+const BASELINE_STATE: HandoffState = IS_LOCAL ? { ...INITIAL_HANDOFF_STATE, seedsCleared: true } : INITIAL_HANDOFF_STATE
+const store = createPersistentStore<HandoffState>(IS_LOCAL ? 'handoffs.local' : 'handoffs', BASELINE_STATE, isHandoffState)
 
 interface HandoffsContextValue {
   handoffs: Handoff[]
@@ -49,7 +53,7 @@ export function HandoffsProvider({ children }: { children: ReactNode }) {
   )
 
   const clearHistory = useCallback(() => commit(() => ({ seedsCleared: true, seedStatus: {}, created: [] })), [commit])
-  const restoreSeedData = useCallback(() => commit(() => INITIAL_HANDOFF_STATE), [commit])
+  const restoreSeedData = useCallback(() => commit(() => BASELINE_STATE), [commit])
 
   const handoffs = useMemo(() => selectHandoffs(state), [state])
   const value = useMemo(

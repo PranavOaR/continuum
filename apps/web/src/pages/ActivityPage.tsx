@@ -15,6 +15,7 @@ import type { ActivityEvent, ActivityType } from '@continuum/core'
 import { formatDay } from '../utils/formatDate'
 import { ACTIVITY_TYPE_LABEL } from '@continuum/core'
 import { matchesQuery } from '../utils/search'
+import { useIsLive } from '../state/dataMode'
 
 const FILTER_KEYS = ['project', 'type', 'agent', 'q'] as const
 
@@ -28,6 +29,7 @@ function groupByDay(events: ActivityEvent[]): Array<{ day: string; events: Activ
 }
 
 export function ActivityPage() {
+  const isLive = useIsLive()
   useDocumentTitle('Activity')
   const activity = useServiceQuery('activity', () => continuumService.listActivity())
   const projects = useProjects()
@@ -68,7 +70,7 @@ export function ActivityPage() {
     <>
       <PageHeader
         title="Activity"
-        description="A cross-project timeline of recorded work. All events are mock data."
+        description={isLive ? 'A cross-project timeline of recorded work: agent sessions, file changes, checks and decisions.' : 'A cross-project timeline of recorded work. All events are mock data.'}
         crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Activity' }]}
       />
 
