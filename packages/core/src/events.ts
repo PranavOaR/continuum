@@ -28,7 +28,17 @@ export type FileChangedEvent = EventBase<
 
 export type CheckRecordedEvent = EventBase<
   'check.recorded',
-  { name: string; command: string; exitCode: number; durationMs: number; ranAgainst: Record<IdentityKey, ContentHash>; outputTail?: string }
+  {
+    name: string
+    command: string
+    exitCode: number
+    durationMs: number
+    /** Hash of the stored coverage manifest (identity → content hash): runs against the same tree share one. */
+    coverage?: ContentHash
+    /** The manifest inline, as stores written before manifests recorded it. */
+    ranAgainst?: Record<IdentityKey, ContentHash>
+    outputTail?: string
+  }
 >
 
 export type MemoryRecordedEvent = EventBase<

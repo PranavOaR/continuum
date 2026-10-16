@@ -13,7 +13,7 @@ import {
 import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
-import { project, type Mutations } from './projector'
+import { COVERAGE_KIND, project, type Mutations } from './projector'
 import { migrate, readSchemaVersion } from './migrations'
 import { SCHEMA } from './schema'
 
@@ -213,10 +213,31 @@ export class ContextStore implements Mutations {
 
   // ── Evidence queries ───────────────────────────────────────────
 
+  /** Stores a check's coverage manifest once per distinct tree and returns its hash for `check.recorded`. */
+  putCoverage(ranAgainst: Readonly<Record<IdentityKey, ContentHash>>): ContentHash {
+    return this.putObject(COVERAGE_KIND, ranAgainst)
+  }
+
+  /**
+   * The event with any stored objects it refers to written inline, so it can
+   * be recorded in another store (export, rebuilding a log) on its own.
+   */
+  selfContained(event: ContinuumEvent): ContinuumEvent {
+    if (event.type !== 'check.recorded' || !event.payload.coverage) return event
+    const { coverage, ...payload } = event.payload
+    const manifest = this.getObject(coverage)
+    if (manifest?.kind !== COVERAGE_KIND) throw new Error(`Coverage manifest ${coverage} is missing from the store.`)
+    return { ...event, payload: { ...payload, ranAgainst: manifest.value as Record<IdentityKey, ContentHash> } }
+  }
+
   checkRun(name: string): RecordedRun | undefined {
     const runHash = this.graphIndex.get(keys.check(name))?.props.lastRunHash
     if (typeof runHash !== 'string') return undefined
-    return this.getObject(runHash)?.value as RecordedRun | undefined
+    const run = this.getObject(runHash)?.value as (Omit<RecordedRun, 'ranAgainst'> & { ranAgainst?: RecordedRun['ranAgainst']; coverage?: ContentHash }) | undefined
+    if (!run) return undefined
+    // Runs recorded before manifests carry their coverage inline.
+    const ranAgainst = run.ranAgainst ?? ((run.coverage ? this.getObject(run.coverage)?.value : undefined) as RecordedRun['ranAgainst'] | undefined) ?? {}
+    return { ...run, ranAgainst }
   }
 
   checkStatus(name: string): { status: CheckStatus; changed: IdentityKey[] } {

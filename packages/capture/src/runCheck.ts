@@ -151,7 +151,6 @@ export async function runCheck(store: ContextStore, options: RunCheckOptions): P
       command: commandLine,
       exitCode: outcome.exitCode,
       durationMs,
-      ranAgainst: coverage(tree.files),
       ...(outcome.output ? { outputTail: outcome.output } : {}),
     },
     evidence: 'verified',
@@ -159,7 +158,8 @@ export async function runCheck(store: ContextStore, options: RunCheckOptions): P
     occurredAt: startedAt.toISOString(),
     ...(tree.revision ? { revision: tree.revision } : {}),
   }
-  store.record(event)
+  // The manifest and the event that names it are written together.
+  store.transact(() => [{ ...event, payload: { ...event.payload, coverage: store.putCoverage(coverage(tree.files)) } }])
   const result: RunCheckResult = { name, exitCode: outcome.exitCode, durationMs, status: 'unknown' }
   try {
     await scanRepository(store, options.root, { now })

@@ -187,7 +187,7 @@ describe('LocalContinuumService resilience', () => {
     const { repo, storePath } = await seededRepo()
     sandboxes.push(repo)
     const store = openStore(storePath)
-    const events = [...store.events()]
+    const events = [...store.events()].map((event) => store.selfContained(event))
     store.close()
     // Rebuild the log with a session event first, then the original history.
     const { ContextStore } = await import('@continuum/store')
