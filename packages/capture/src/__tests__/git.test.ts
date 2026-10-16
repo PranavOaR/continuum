@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { findRepoRoot, hashFiles, headRevision, isIgnored, isTracked, NotAGitRepositoryError, readWorkingTree } from '../git'
+import { findRepoRoot, hashFiles, headRevision, isIgnored, isRegularFileInRepo, isTracked, NotAGitRepositoryError, readWorkingTree } from '../git'
 import { createSandbox, type Sandbox } from '../testing'
 
 const sandboxes: Sandbox[] = []
@@ -130,5 +130,25 @@ describe('isTracked', () => {
     repo.commit()
     expect(await isTracked(repo.root, 'a.ts')).toBe(true)
     expect(await isTracked(repo.root, 'missing.ts')).toBe(false)
+  })
+})
+
+describe('isRegularFileInRepo', () => {
+  it('accepts real files and rejects symlinks, symlinked directories, directories and missing paths', async () => {
+    const repo = sandbox({ 'src/a.ts': 'a' })
+    const outside = mkdtempSync(join(tmpdir(), 'continuum-outside-'))
+    try {
+      writeFileSync(join(outside, 'secret.txt'), 'x')
+      symlinkSync(join(outside, 'secret.txt'), join(repo.root, 'link.txt'))
+      symlinkSync(outside, join(repo.root, 'linked-dir'))
+      mkdirSync(join(repo.root, 'empty'))
+      expect(await isRegularFileInRepo(repo.root, 'src/a.ts')).toBe(true)
+      expect(await isRegularFileInRepo(repo.root, 'link.txt')).toBe(false)
+      expect(await isRegularFileInRepo(repo.root, 'linked-dir/secret.txt')).toBe(false)
+      expect(await isRegularFileInRepo(repo.root, 'empty')).toBe(false)
+      expect(await isRegularFileInRepo(repo.root, 'missing.ts')).toBe(false)
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+    }
   })
 })

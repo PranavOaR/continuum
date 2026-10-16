@@ -4,6 +4,7 @@ import {
   headRevision,
   isIgnored,
   isInitialized,
+  isRegularFileInRepo,
   locateWorkspace,
   NotAGitRepositoryError,
   readWorkingTree,
@@ -40,7 +41,8 @@ async function resolveEdit(root: string, payload: HookPayload): Promise<FileEdit
   const absolute = editedPath(payload)
   if (!absolute) return null
   const path = normalizePath(relative(root, resolve(payload.cwd, absolute)))
-  if (path === '' || path.startsWith('../') || isAbsolute(path) || (await isIgnored(root, path))) return null
+  if (path === '' || path.startsWith('../') || isAbsolute(path)) return null
+  if (!(await isRegularFileInRepo(root, path)) || (await isIgnored(root, path))) return null
   const hashes = await hashFiles(root, [path])
   return { path, contentHash: hashes.get(path) ?? null }
 }

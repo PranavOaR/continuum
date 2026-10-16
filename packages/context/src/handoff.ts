@@ -28,6 +28,7 @@ function quote(text: string, limit = MAX_NOTE_CHARS): string {
 }
 
 const MAX_IDENTIFIER_CHARS = 200
+// oxlint-disable-next-line no-control-regex -- removing control characters is the purpose
 const UNSAFE_IN_CODE = new RegExp('[\\u0000-\\u001f\\u007f\\u2028\\u2029`]', 'g')
 
 /** Repository-controlled identifiers (paths, check names, commands) as inline code: one line, no backticks, bounded. */

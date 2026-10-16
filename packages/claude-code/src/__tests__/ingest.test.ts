@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { initWorkspace, scanRepository } from '@continuum/capture'
@@ -88,6 +88,9 @@ describe('ingestHook', () => {
     expect(ignored).toEqual({ status: 'ignored', reason: 'edited file is outside what Continuum captures' })
     const outside = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: '/etc/hosts' } }))
     expect(outside.status).toBe('ignored')
+    symlinkSync('/etc/hosts', join(repo.root, 'hosts-link'))
+    const viaLink = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'hosts-link') } }))
+    expect(viaLink.status).toBe('ignored')
   })
 
   it('briefs a new session on where the previous one left off', async () => {

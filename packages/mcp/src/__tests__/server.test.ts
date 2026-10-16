@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -111,7 +111,9 @@ describe('Continuum MCP server', () => {
     const attempt = (files: string[]) => client.callTool({ name: 'record_decision', arguments: { title: 't', files } })
     expect(text(await attempt(['../outside.ts']))).toContain('Files must be inside the repository: ../outside.ts')
     expect(text(await attempt(['dist/out.js']))).toContain('Files ignored by git cannot anchor a decision: dist/out.js')
-    expect(text(await attempt(['src/nope.ts']))).toContain('Files not found: src/nope.ts')
+    expect(text(await attempt(['src/nope.ts']))).toContain('Files not found (symlinks are not followed): src/nope.ts')
+    symlinkSync('/etc/hosts', join(repo.root, 'hosts-link'))
+    expect(text(await attempt(['hosts-link']))).toContain('Files not found (symlinks are not followed): hosts-link')
     expect((await attempt(['src/nope.ts'])).isError).toBe(true)
   })
 

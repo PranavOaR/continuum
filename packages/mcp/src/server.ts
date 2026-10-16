@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { hashFiles, isIgnored, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
+import { hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
 import { DEFAULT_HANDOFF_CHARS, projectState, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
@@ -66,11 +66,13 @@ async function anchorsFor(root: string, cwd: string, files: readonly string[]): 
   const paths = files.map((file) => normalizePath(relative(root, resolve(cwd, file))))
   const outside = paths.filter((path) => path === '' || path.startsWith('../') || isAbsolute(path))
   if (outside.length > 0) throw new ToolInputError(`Files must be inside the repository: ${outside.join(', ')}`)
+  const notFiles = (await Promise.all(paths.map(async (path) => ((await isRegularFileInRepo(root, path)) ? null : path)))).filter(Boolean)
+  if (notFiles.length > 0) throw new ToolInputError(`Files not found (symlinks are not followed): ${notFiles.join(', ')}`)
   const ignored = (await Promise.all(paths.map(async (path) => ((await isIgnored(root, path)) ? path : null)))).filter(Boolean)
   if (ignored.length > 0) throw new ToolInputError(`Files ignored by git cannot anchor a decision: ${ignored.join(', ')}`)
   const hashes = await hashFiles(root, paths)
-  const missing = paths.filter((path) => !hashes.has(path))
-  if (missing.length > 0) throw new ToolInputError(`Files not found: ${missing.join(', ')}`)
+  const vanished = paths.filter((path) => !hashes.has(path))
+  if (vanished.length > 0) throw new ToolInputError(`Files not found: ${vanished.join(', ')}`)
   return Object.fromEntries([...hashes].map(([path, hash]) => [keys.file(path), hash]))
 }
 
