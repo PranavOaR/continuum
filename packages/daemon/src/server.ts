@@ -110,9 +110,11 @@ type Access = 'granted' | 'denied' | 'redirected'
  * HttpOnly, SameSite=Strict cookie and stripped from the address bar.
  */
 function authorize(request: IncomingMessage, response: ServerResponse, url: URL, token: string, port: number): Access {
-  const bearer = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
-  if (sameSecret(bearer, token) || sameSecret(cookie(request, cookieName(port)), token)) return 'granted'
-  if (!sameSecret(url.searchParams.get(TOKEN_PARAM) ?? undefined, token)) return 'denied'
+  // A token in the address bar is always swapped for the cookie and stripped, even when already signed in.
+  if (!sameSecret(url.searchParams.get(TOKEN_PARAM) ?? undefined, token)) {
+    const bearer = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
+    return sameSecret(bearer, token) || sameSecret(cookie(request, cookieName(port)), token) ? 'granted' : 'denied'
+  }
   url.searchParams.delete(TOKEN_PARAM)
   response.writeHead(302, {
     Location: `${url.pathname}${url.search}`,
@@ -245,7 +247,8 @@ export function startDaemon(options: DaemonOptions): Promise<RunningDaemon> {
       boundPort = (server.address() as AddressInfo).port
       resolvePromise({
         url: `http://${LOOPBACK}:${boundPort}`,
-        launchUrl: `http://${LOOPBACK}:${boundPort}/?${TOKEN_PARAM}=${options.token}`,
+        // Straight to the dashboard: the site root is the product's landing page.
+        launchUrl: `http://${LOOPBACK}:${boundPort}/app?${TOKEN_PARAM}=${options.token}`,
         port: boundPort,
         close: () => new Promise((done) => server.close(() => done())),
       })

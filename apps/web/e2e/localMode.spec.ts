@@ -66,7 +66,7 @@ test.beforeAll(async () => {
     let output = ''
     server?.stdout?.on('data', (chunk: Buffer) => {
       output += chunk.toString()
-      const match = /http:\/\/127\.0\.0\.1:\d+\/\?token=[\w-]+/.exec(output)
+      const match = /http:\/\/127\.0\.0\.1:\d+\/app\?token=[\w-]+/.exec(output)
       if (match) resolve(match[0])
     })
     server?.once('exit', (code) => reject(new Error(`continuum serve exited with ${code}: ${output}`)))
@@ -96,8 +96,9 @@ test.afterAll(async () => {
   if (repo) rmSync(repo, { recursive: true, force: true })
 })
 
-test('labels the workspace as live local data', async ({ page }) => {
-  await page.goto(`${url}/app`)
+test('the printed link opens the dashboard, labelled as live local data', async ({ page }) => {
+  await page.goto(launchUrl)
+  await expect(page).toHaveURL(`${url}/app`)
   await expect(page.getByText('Local workspace').first()).toBeVisible()
   await expect(page.getByText('Mock data')).toHaveCount(0)
   await expect(page.getByText('Live records from repositories on this machine')).toBeVisible()

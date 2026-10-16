@@ -26,7 +26,7 @@ async function serving(cwd: string, args: string[], webDist?: string) {
   const io = { cwd, out: (line: string) => lines.push(line), err: (line: string) => lines.push(line), now: () => new Date(), signal: controller.signal, readStdin: async () => '' }
   const done = serveCommand(io, args, 'test', webDist)
   await vi.waitFor(() => expect(lines.join('\n')).toContain('Continuum dashboard: http://127.0.0.1:'), { timeout: 5000 })
-  const launch = /http:\/\/127\.0\.0\.1:\d+\/\?token=[\w-]+/.exec(lines[0])?.[0] as string
+  const launch = /http:\/\/127\.0\.0\.1:\d+\/app\?token=[\w-]+/.exec(lines[0])?.[0] as string
   const url = new URL(launch).origin
   const token = new URL(launch).searchParams.get('token') as string
   const auth = { headers: { authorization: `Bearer ${token}` } }

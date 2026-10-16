@@ -60,7 +60,7 @@ Restart Claude Code in that repository and approve the `continuum` server when p
 
 ```bash
 npm run build                                          # once, and after pulling changes
-npm run continuum -- serve ~/code/my-app ~/code/api    # prints http://127.0.0.1:4747/?token=…
+npm run continuum -- serve ~/code/my-app ~/code/api    # prints http://127.0.0.1:4747/app?token=…
 ```
 
 `serve` opens a read-only dashboard for one or more initialized repositories:
