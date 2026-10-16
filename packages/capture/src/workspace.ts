@@ -1,11 +1,12 @@
 import { existsSync } from 'node:fs'
-import { appendFile, mkdir, readFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CONTINUUM_DIR, findRepoRoot, gitPath } from './git'
 import { ContextStore } from '@continuum/store'
 
 export const STORE_FILE = 'context.db'
 const EXCLUDE_ENTRY = `/${CONTINUUM_DIR}/`
+const EXCLUDE_COMMENT = 'Continuum local context store'
 
 export class NotInitializedError extends Error {
   constructor(root: string) {
@@ -40,7 +41,12 @@ export async function openWorkspace(cwd: string): Promise<{ workspace: Workspace
  * the entry goes in .git/info/exclude, which is local to this clone.
  */
 export function excludeFromGit(root: string): Promise<boolean> {
-  return addGitExclude(root, EXCLUDE_ENTRY, 'Continuum local context store')
+  return addGitExclude(root, EXCLUDE_ENTRY, EXCLUDE_COMMENT)
+}
+
+/** Undoes excludeFromGit. */
+export function includeInGit(root: string): Promise<boolean> {
+  return removeGitExclude(root, EXCLUDE_ENTRY, EXCLUDE_COMMENT)
 }
 
 /** Adds one pattern to .git/info/exclude (local to this clone) unless it is already there. */
@@ -51,6 +57,19 @@ export async function addGitExclude(root: string, entry: string, comment: string
   await mkdir(join(excludePath, '..'), { recursive: true })
   const separator = current === '' || current.endsWith('\n') ? '' : '\n'
   await appendFile(excludePath, `${separator}# ${comment}\n${entry}\n`)
+  return true
+}
+
+/** Removes exactly the comment-and-pattern pair addGitExclude wrote; the user's own lines are never touched. */
+export async function removeGitExclude(root: string, entry: string, comment: string): Promise<boolean> {
+  const excludePath = await gitPath(root, 'info/exclude')
+  if (!existsSync(excludePath)) return false
+  const content = await readFile(excludePath, 'utf8')
+  const eol = content.includes('\r\n') ? '\r\n' : '\n'
+  const lines = content.split(eol)
+  const kept = lines.filter((line, index) => !(line === `# ${comment}` && lines[index + 1] === entry) && !(line === entry && lines[index - 1] === `# ${comment}`))
+  if (kept.length === lines.length) return false
+  await writeFile(excludePath, kept.join(eol))
   return true
 }
 

@@ -4,7 +4,7 @@ import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
 import { HOOKS_FILE, MCP_FILE, removeClaudeCodeSetup, SetupError, setupClaudeCode } from '../setup'
 
-const INVOCATION = { command: '/usr/local/bin/node', args: ['--import', 'file:///x/tsx/loader.mjs', '/x/continuum/packages/cli/src/bin.ts'] }
+const INVOCATION = { command: '/usr/local/bin/node', args: ['--import', 'file:///x/tsx/loader.mjs', '/x/continuum/packages/cli/src/bin.ts'], portable: false }
 const sandboxes: Sandbox[] = []
 
 afterEach(() => {
@@ -59,11 +59,25 @@ describe('setupClaudeCode', () => {
   it('replaces its own entries when the CLI moves', async () => {
     const { root } = repo()
     await setupClaudeCode(root, INVOCATION)
-    const moved = { command: 'npx', args: ['-y', '@acme/continuum'] }
+    const moved = { command: 'npx', args: ['-y', '@acme/continuum'], portable: true }
     await setupClaudeCode(root, moved)
     const { hooks } = readJson(root, HOOKS_FILE)
     expect(hooks.SessionStart).toEqual([{ hooks: [expect.objectContaining({ command: 'npx', args: ['-y', '@acme/continuum', 'ingest'] })] }])
     expect(readJson(root, MCP_FILE).mcpServers.continuum).toEqual({ command: 'npx', args: ['-y', '@acme/continuum', 'mcp'] })
+  })
+
+  it('leaves a portable .mcp.json visible to git so the team can share it', async () => {
+    const { root, git } = repo()
+    await setupClaudeCode(root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
+    expect(git('status', '--porcelain').split('\n').sort()).toEqual(['?? .mcp.json', '?? a.ts'])
+  })
+
+  it('lifts the git exclude when a machine-specific setup becomes portable', async () => {
+    const { root, git } = repo()
+    await setupClaudeCode(root, INVOCATION)
+    expect(git('status', '--porcelain')).toBe('?? a.ts')
+    await setupClaudeCode(root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
+    expect(git('status', '--porcelain').split('\n').sort()).toEqual(['?? .mcp.json', '?? a.ts'])
   })
 
   it('refuses to overwrite invalid JSON', async () => {
@@ -106,7 +120,7 @@ describe('setupClaudeCode with existing team configuration', () => {
 
   it('recognizes its own entries from a published package', async () => {
     const { root } = repo()
-    await setupClaudeCode(root, { command: 'npx', args: ['-y', '@acme/continuum@0.1.0'] })
+    await setupClaudeCode(root, { command: 'npx', args: ['-y', '@acme/continuum@0.1.0'], portable: true })
     await setupClaudeCode(root, INVOCATION)
     expect(readJson(root, HOOKS_FILE).hooks.SessionStart).toHaveLength(1)
   })

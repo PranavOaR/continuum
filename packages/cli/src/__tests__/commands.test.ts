@@ -25,7 +25,7 @@ afterEach(() => {
 describe('continuum (global)', () => {
   it('prints help and version', async () => {
     expect((await cli('/', ['--help'])).out).toContain('Usage: continuum')
-    expect((await cli('/', ['--version'])).out).toBe('0.0.0')
+    expect((await cli('/', ['--version'])).out).toBe('0.0.0-dev')
   })
 
   it('shows help with a usage exit code when no command is given', async () => {

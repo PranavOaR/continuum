@@ -1,25 +1,32 @@
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
-import { addGitExclude, isTracked } from '@continuum/capture'
+import { addGitExclude, isTracked, removeGitExclude } from '@continuum/capture'
 import { FILE_EDIT_TOOLS } from './hookPayload'
 
 /** Hooks hold machine-specific paths, so they go in the gitignored local settings, never in ~/.claude. */
 export const HOOKS_FILE = '.claude/settings.local.json'
 export const MCP_FILE = '.mcp.json'
 export const MCP_SERVER_NAME = 'continuum'
+/** Marks the .git/info/exclude entries setup adds, so uninstall can remove exactly those. */
+export const GIT_EXCLUDE_COMMENT = 'Continuum: machine-specific Claude Code configuration'
 const INGEST = 'ingest'
 const MCP = 'mcp'
 const SESSION_START_TIMEOUT_S = 20
 const SESSION_END_TIMEOUT_S = 10
 const BACKGROUND_TIMEOUT_S = 30
-/** A path or package that is the Continuum CLI: this checkout's bin.ts, a `continuum` binary, or an npm package named continuum. */
-const CONTINUUM_PROGRAM = /(^|[\\/])packages[\\/]cli[\\/]src[\\/]bin\.ts$|(^|[\\/@])continuum(@[\w.-]+)?$/
+/**
+ * A path or package that is the Continuum CLI: this checkout's bin.ts, a
+ * `continuum` binary, the release bundle, or an npm package named continuum.
+ */
+const CONTINUUM_PROGRAM = /(^|[\\/])packages[\\/]cli[\\/]src[\\/]bin\.ts$|(^|[\\/@])continuum(@[\w.-]+)?$|(^|[\\/])continuum\.js$/
 
 /** How to run this CLI, e.g. `node --import tsx …/bin.ts` during development or `npx …` once published. */
 export interface Invocation {
   command: string
   args: string[]
+  /** True when it works on any machine (npx), so .mcp.json can be committed and shared. */
+  portable: boolean
 }
 
 export type FileAction = 'created' | 'updated' | 'unchanged' | 'removed' | 'skipped'
@@ -49,6 +56,11 @@ function runsContinuum(entry: { command?: unknown; args?: unknown }, subcommand:
   const args = Array.isArray(entry.args) ? entry.args : []
   if (args.at(-1) !== subcommand) return false
   return [entry.command, ...args.slice(0, -1)].some((part) => typeof part === 'string' && CONTINUUM_PROGRAM.test(part))
+}
+
+/** Ours: an MCP server entry that runs the Continuum CLI's `mcp`. */
+export function isContinuumServer(server: unknown): boolean {
+  return isObject(server) && runsContinuum(server, MCP)
 }
 
 /** Ours: a command hook that runs the Continuum CLI's `ingest`. */
@@ -87,7 +99,10 @@ function withoutOurs(groups: unknown): unknown {
   })
 }
 
-function ourHooks(invocation: Invocation): Record<string, Json[]> {
+/** The Claude Code events setup registers. */
+export const HOOK_EVENTS = ['SessionStart', 'SessionEnd', 'Stop', 'PostToolUse'] as const
+
+function ourHooks(invocation: Invocation): Record<(typeof HOOK_EVENTS)[number], Json[]> {
   const handler = (extra: Json): Json => ({ type: 'command', command: invocation.command, args: [...invocation.args, INGEST], ...extra })
   return {
     // Synchronous: its output is injected as context before Claude's first turn.
@@ -120,7 +135,7 @@ function mergeMcp(config: Json, server: Json | null): Json {
   if (config.mcpServers !== undefined && !isObject(config.mcpServers)) throw new SetupError(`"mcpServers" in ${MCP_FILE} must be an object. Nothing was changed.`)
   const servers = config.mcpServers ?? {}
   const current = servers[MCP_SERVER_NAME]
-  if (current !== undefined && !(isObject(current) && runsContinuum(current, MCP))) {
+  if (current !== undefined && !isContinuumServer(current)) {
     throw new SetupError(`${MCP_FILE} already has a "${MCP_SERVER_NAME}" server that Continuum did not write; rename or remove it, then run setup again. Nothing was changed.`)
   }
   const { [MCP_SERVER_NAME]: _previous, ...others } = servers
@@ -145,9 +160,10 @@ export async function setupClaudeCode(root: string, invocation: Invocation): Pro
   const nextMcp = mcpTracked ? null : mergeMcp(mcpConfig ?? {}, server)
 
   const files: SetupResult['files'] = []
-  files.push({ path: HOOKS_FILE, action: await apply(root, HOOKS_FILE, settings, nextSettings) })
+  files.push({ path: HOOKS_FILE, action: await apply(root, HOOKS_FILE, settings, nextSettings, true) })
   if (nextMcp) {
-    files.push({ path: MCP_FILE, action: await apply(root, MCP_FILE, mcpConfig, nextMcp) })
+    // A portable server entry works for everyone, so .mcp.json may be committed; a machine-specific one is kept out of git.
+    files.push({ path: MCP_FILE, action: await apply(root, MCP_FILE, mcpConfig, nextMcp, !invocation.portable) })
   } else {
     files.push({
       path: MCP_FILE,
@@ -158,10 +174,12 @@ export async function setupClaudeCode(root: string, invocation: Invocation): Pro
   return { files }
 }
 
-async function apply(root: string, file: string, before: Json | null, after: Json): Promise<FileAction> {
+async function apply(root: string, file: string, before: Json | null, after: Json, keepOutOfGit: boolean): Promise<FileAction> {
+  // A config that became portable may be committed, so lift an exclude an earlier machine-specific setup added.
+  if (!keepOutOfGit) await removeGitExclude(root, `/${file}`, GIT_EXCLUDE_COMMENT)
   if (before && JSON.stringify(before) === JSON.stringify(after)) return 'unchanged'
   await writeAtomically(join(root, file), after)
-  if (before === null) await addGitExclude(root, `/${file}`, 'Continuum: machine-specific Claude Code configuration')
+  if (before === null && keepOutOfGit) await addGitExclude(root, `/${file}`, GIT_EXCLUDE_COMMENT)
   return before === null ? 'created' : 'updated'
 }
 
@@ -182,8 +200,10 @@ export async function removeClaudeCodeSetup(root: string): Promise<SetupResult> 
       continue
     }
     // A file left with nothing but empty containers was ours alone; remove it unless the team tracks it.
-    if (isEmptyConfig(after) && !(await isTracked(root, file))) await rm(path)
-    else await writeAtomically(path, after)
+    if (isEmptyConfig(after) && !(await isTracked(root, file))) {
+      await rm(path)
+      await removeGitExclude(root, `/${file}`, GIT_EXCLUDE_COMMENT)
+    } else await writeAtomically(path, after)
     files.push({ path: file, action: 'removed' })
   }
   return { files }

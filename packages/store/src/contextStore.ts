@@ -1,6 +1,5 @@
 import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import {
   anchorStatus,
   checkStatus,
@@ -15,7 +14,13 @@ import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './g
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
 import { project, type Mutations } from './projector'
+import { migrate, readSchemaVersion } from './migrations'
 import { SCHEMA } from './schema'
+
+// Loaded at run time rather than by a static import, which Node resolves before any code runs:
+// the CLI first installs a filter for Node 22's "SQLite is experimental" warning.
+const { DatabaseSync } = process.getBuiltinModule('node:sqlite')
+type DatabaseSync = InstanceType<typeof DatabaseSync>
 
 const PRIVATE_DIR_MODE = 0o700
 const PRIVATE_FILE_MODE = 0o600
@@ -58,7 +63,13 @@ export class ContextStore implements Mutations {
 
   private constructor(db: DatabaseSync) {
     this.db = db
-    db.exec(SCHEMA)
+    try {
+      db.exec(SCHEMA)
+      migrate(db)
+    } catch (error) {
+      db.close()
+      throw error
+    }
     this.loadGraph()
   }
 
@@ -78,6 +89,10 @@ export class ContextStore implements Mutations {
 
   close(): void {
     this.db.close()
+  }
+
+  schemaVersion(): number {
+    return readSchemaVersion(this.db)
   }
 
   /** Appends an event and projects it, atomically. On failure nothing is persisted and memory is restored. */
@@ -125,9 +140,10 @@ export class ContextStore implements Mutations {
   firstEvent(filter: { source?: string; type?: ContinuumEvent['type'] } = {}): ContinuumEvent | undefined {
     const row = this.db
       .prepare(
-        'SELECT type, payload, evidence, source, occurred_at, revision FROM events WHERE (?1 IS NULL OR source = ?1) AND (?2 IS NULL OR type = ?2) ORDER BY seq LIMIT 1',
+        // Plain placeholders: node:sqlite before 22.14 cannot bind a numbered one (?1) used twice.
+        'SELECT type, payload, evidence, source, occurred_at, revision FROM events WHERE (? IS NULL OR source = ?) AND (? IS NULL OR type = ?) ORDER BY seq LIMIT 1',
       )
-      .get(filter.source ?? null, filter.type ?? null) as EventRow | undefined
+      .get(filter.source ?? null, filter.source ?? null, filter.type ?? null, filter.type ?? null) as EventRow | undefined
     return row ? toEvent(row) : undefined
   }
 

@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import { CommandNotFoundError, NotAGitRepositoryError, WatchUnavailableError } from '@continuum/capture'
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
 import { PortInUseError } from '@continuum/daemon'
+import { doctorCommand } from './commands/doctor'
 import { handoffCommand } from './commands/handoff'
 import { ingestCommand } from './commands/ingest'
 import { initCommand } from './commands/init'
@@ -12,11 +13,13 @@ import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
+import { uninstallCommand } from './commands/uninstall'
+import { VERSION } from './build'
 import { selfInvocation } from './invocation'
 import { EXIT_FAILURE, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE, type Io } from './io'
 import { NotInitializedError } from '@continuum/capture'
+import { StoreVersionError } from '@continuum/store'
 
-export const VERSION = '0.0.0'
 
 export const HELP = `continuum — keep AI coding work continuous across sessions and agents
 
@@ -32,6 +35,8 @@ Commands
   handoff              Print where the project left off, for any agent or chat
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
+  doctor               Check the install and this repository's setup, with fixes
+  uninstall [--purge]  Disconnect Claude Code; --purge also deletes .continuum/
 
 Used by agents
   mcp                  Serve the Continuum MCP server on stdio
@@ -43,6 +48,8 @@ Options
   -v, --version        Show the version
 
 Everything stays on this machine, in .continuum/ at the repository root.`
+
+export { VERSION }
 
 type Command = (io: Io, args: readonly string[]) => Promise<number>
 
@@ -57,6 +64,8 @@ const COMMANDS: Record<string, Command> = {
   setup: (io, args) => setupCommand(io, args, selfInvocation()),
   mcp: (io) => mcpCommand(io, VERSION),
   ingest: (io) => ingestCommand(io),
+  doctor: (io, args) => doctorCommand(io, args, selfInvocation()),
+  uninstall: (io, args) => uninstallCommand(io, args),
 }
 
 interface GlobalArgs {
@@ -108,7 +117,8 @@ function isExpected(error: unknown): error is Error {
     error instanceof WatchUnavailableError ||
     error instanceof SetupError ||
     error instanceof PortInUseError ||
-    error instanceof InvalidHookPayloadError
+    error instanceof InvalidHookPayloadError ||
+    error instanceof StoreVersionError
   )
 }
 

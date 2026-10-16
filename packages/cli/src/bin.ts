@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './warnings'
 import { handlesInterrupts, main } from './main'
 
 async function readStdin(): Promise<string> {

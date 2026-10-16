@@ -1,8 +1,9 @@
 import { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { delimiter, join } from 'node:path'
+import { delimiter, join, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { Invocation } from '@continuum/claude-code'
+import { BUILD_INFO, type BuildInfo } from './build'
 
 function realpath(path: string): string | null {
   try {
@@ -25,12 +26,21 @@ export function stableNodePath(execPath: string, pathEnv: string | undefined): s
   return execPath
 }
 
+const isInstalledPackage = (file: string) => file.includes(`${sep}node_modules${sep}`)
+
 /**
- * How Claude Code should run this CLI. Until Continuum is published to npm it
- * runs from this checkout through tsx, so the paths are absolute and machine-specific.
+ * How Claude Code should run this CLI.
+ * - Installed from npm (npx, global or local install): `npx -y <package>@<version>`,
+ *   which works on any machine, so the configuration can be shared.
+ * - A bundle outside node_modules (a local build): `node <bundle>`.
+ * - A checkout: `node --import tsx …/bin.ts`.
+ * The last two hold absolute, machine-specific paths.
  */
-export function selfInvocation(): Invocation {
+export function selfInvocation(build: BuildInfo | null = BUILD_INFO, entry: string = fileURLToPath(import.meta.url)): Invocation {
+  const node = stableNodePath(process.execPath, process.env.PATH)
+  if (build && isInstalledPackage(entry)) return { command: 'npx', args: ['-y', `${build.packageName}@${build.version}`], portable: true }
+  if (build) return { command: node, args: [entry], portable: false }
   const bin = fileURLToPath(new URL('./bin.ts', import.meta.url))
   const loader = pathToFileURL(createRequire(import.meta.url).resolve('tsx')).href
-  return { command: stableNodePath(process.execPath, process.env.PATH), args: ['--import', loader, bin] }
+  return { command: node, args: ['--import', loader, bin], portable: false }
 }

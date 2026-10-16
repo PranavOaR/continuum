@@ -1,5 +1,5 @@
 import { initWorkspace, locateWorkspace, scanRepository } from '@continuum/capture'
-import { removeClaudeCodeSetup, setupClaudeCode, type Invocation, type SetupResult } from '@continuum/claude-code'
+import { MCP_FILE, removeClaudeCodeSetup, setupClaudeCode, type Invocation, type SetupResult } from '@continuum/claude-code'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 export const SETUP_USAGE = 'Usage: continuum setup claude-code [--remove]'
@@ -35,6 +35,10 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
   io.out('')
   io.out('Next: start (or restart) Claude Code in this repository and approve the "continuum" MCP server.')
   io.out('New sessions are briefed on where the last one left off; edits and progress are recorded as you work.')
-  io.out('These files point at this checkout of Continuum, so they are kept out of git.')
+  io.out(
+    invocation.portable
+      ? `${MCP_FILE} runs Continuum through npx, so you can commit it to share the MCP server with your team.`
+      : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
+  )
   return EXIT_OK
 }

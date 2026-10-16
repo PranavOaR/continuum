@@ -25,7 +25,7 @@ CI runs all of the above on every pull request. `main` is kept releasable: work 
 
 ## Try the CLI (early)
 
-The `continuum` command records what happens in a git repository into a local store at `.continuum/` (kept out of git through `.git/info/exclude`). Requires Node 22.5+ and git. Until it is published to npm, run it from this checkout and point it at any repository with `-C`:
+The `continuum` command records what happens in a git repository into a local store at `.continuum/` (kept out of git through `.git/info/exclude`). Requires Node 22.13+ and git. Until it is published to npm, run it from this checkout and point it at any repository with `-C`:
 
 ```bash
 npm run continuum -- -C ~/code/my-app init      # set up and record the current files
@@ -54,7 +54,20 @@ It writes two project-scoped files and nothing in `~/.claude`:
   - Tasks: `start_task` and `update_task` record what Claude is working on (objective, acceptance criteria, steps and next action), and edits are attributed to the current task.
   - Decisions: `record_decision` saves decisions, known issues and next steps tied to specific files.
 
-Restart Claude Code in that repository and approve the `continuum` server when prompted. Both files point at this checkout, so they are kept out of git. `setup claude-code --remove` takes out exactly what setup added. `npm run continuum -- handoff` prints the same briefing for pasting into any other agent or chat.
+Restart Claude Code in that repository and approve the `continuum` server when prompted. Run from a checkout, both files point at it, so they are kept out of git. Installed from npm, setup writes `npx -y <package>@<version>` instead, and `.mcp.json` can be committed to share the server with your team. `npm run continuum -- handoff` prints the same briefing for pasting into any other agent or chat.
+
+If something does not work, `continuum doctor` checks Node.js, git, the store, the hooks, the MCP server and whether Claude Code approved it, and prints the fix for each problem.
+
+To remove Continuum, `setup claude-code --remove` takes out exactly what setup added. `continuum uninstall` does the same; `continuum uninstall --purge` also deletes `.continuum/` and leaves the repository as it was before setup.
+
+## Release package
+
+```bash
+npm run build && npm run bundle    # dist/release: one ESM file plus the dashboard, about 1 MB
+npm run smoke:release              # packs, installs and drives the real binary in a scratch repo
+```
+
+`CONTINUUM_PACKAGE_NAME` sets the npm name stamped into the bundle. The store records its schema version; migrations apply forward on open, and a store written by a newer Continuum is refused rather than changed.
 
 ## Dashboard
 
