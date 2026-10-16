@@ -27,14 +27,23 @@ function quote(text: string, limit = MAX_NOTE_CHARS): string {
   return `"${clipped.replace(/"/g, "'")}"`
 }
 
+const MAX_IDENTIFIER_CHARS = 200
+const UNSAFE_IN_CODE = new RegExp('[\\u0000-\\u001f\\u007f\\u2028\\u2029`]', 'g')
+
+/** Repository-controlled identifiers (paths, check names, commands) as inline code: one line, no backticks, bounded. */
+function code(text: string): string {
+  const safe = text.replace(UNSAFE_IN_CODE, ' ').trim()
+  return `\`${safe.length > MAX_IDENTIFIER_CHARS ? `${safe.slice(0, MAX_IDENTIFIER_CHARS - 1)}…` : safe}\``
+}
+
 function listPaths(paths: readonly string[]): string {
-  const shown = paths.slice(0, MAX_LISTED).join(', ')
+  const shown = paths.slice(0, MAX_LISTED).map(code).join(', ')
   return paths.length > MAX_LISTED ? `${shown} and ${paths.length - MAX_LISTED} more` : shown
 }
 
 function describeSession(session: SessionSummary, now: Date): string {
   const state = session.ended ? 'ended' : 'still open'
-  return `${session.agent} session, started ${agoFromIso(session.startedAt, now)}, last active ${agoFromIso(session.lastActivityAt, now)}, ${state}`
+  return `${code(session.agent)} session, started ${agoFromIso(session.startedAt, now)}, last active ${agoFromIso(session.lastActivityAt, now)}, ${state}`
 }
 
 function leftOffSection(state: ProjectState, now: Date): string[] {
@@ -43,15 +52,16 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
   const lines = ['## Where we left off', `Latest: ${describeSession(latest, now)}.`]
   if (latest.note) lines.push(`Last note [agent-reported]: ${quote(latest.note)}`)
   if (latest.filesChanged.length > 0) {
-    const files = latest.filesChanged.map((file) => (file.exists ? file.path : `${file.path} (since deleted)`))
-    lines.push(`Files it changed: ${listPaths(files)}`)
+    const files = latest.filesChanged.map((file) => (file.exists ? code(file.path) : `${code(file.path)} (since deleted)`))
+    const shown = files.slice(0, MAX_LISTED).join(', ')
+    lines.push(`Files it changed: ${files.length > MAX_LISTED ? `${shown} and ${files.length - MAX_LISTED} more` : shown}`)
   }
   return lines
 }
 
 function describeCheck(check: CheckSummary, now: Date): string {
   const ran = `Ran ${agoFromIso(check.ranAt, now)}`
-  const label = `${check.name} (\`${check.command}\`)`
+  const label = `${code(check.name)} (${code(check.command)})`
   switch (check.status) {
     case 'out-of-date':
       return `- [verified] OUT OF DATE: ${label}. ${ran}; changed since: ${listPaths(check.changed)}`
@@ -84,7 +94,7 @@ function decisionsSection(state: ProjectState): string[] {
 function unrecordedSection(state: ProjectState): string[] {
   const { unrecorded } = state.files
   if (unrecorded.length === 0) return []
-  const shown = unrecorded.slice(0, MAX_LISTED).map((change) => `- ${change.changeType} ${change.path}`)
+  const shown = unrecorded.slice(0, MAX_LISTED).map((change) => `- ${change.changeType} ${code(change.path)}`)
   const more = unrecorded.length > MAX_LISTED ? [`- …and ${unrecorded.length - MAX_LISTED} more`] : []
   return ['## Changes not yet recorded', ...shown, ...more]
 }

@@ -107,7 +107,7 @@ describe('Claude Code session, end to end through the configured commands', () =
     expect(output.hookSpecificOutput.hookEventName).toBe('SessionStart')
     const context: string = output.hookSpecificOutput.additionalContext
     expect(context).toContain('"Login now takes a user. Next: add the session cookie."')
-    expect(context).toContain('Files it changed: src/login.ts')
+    expect(context).toContain('Files it changed: `src/login.ts`')
 
     // The agent can pull the same state over MCP, using the configured server command.
     const server = JSON.parse(readFileSync(join(repo.root, '.mcp.json'), 'utf8')).mcpServers.continuum

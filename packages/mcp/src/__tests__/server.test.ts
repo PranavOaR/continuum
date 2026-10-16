@@ -58,12 +58,12 @@ describe('Continuum MCP server', () => {
   it('returns a handoff judged against the current code', async () => {
     const repo = await initializedRepo()
     const client = await connect(repo.root)
-    expect(text(await client.callTool({ name: 'get_handoff', arguments: {} }))).toContain('- [verified] passed: unit')
+    expect(text(await client.callTool({ name: 'get_handoff', arguments: {} }))).toContain('- [verified] passed: `unit`')
     repo.write('src/auth.ts', 'changed')
     const handoff = text(await client.callTool({ name: 'get_handoff', arguments: {} }))
-    expect(handoff).toContain('OUT OF DATE: unit')
-    expect(handoff).toContain('changed since: src/auth.ts')
-    expect(handoff).toContain('- modified src/auth.ts')
+    expect(handoff).toContain('OUT OF DATE: `unit`')
+    expect(handoff).toContain('changed since: `src/auth.ts`')
+    expect(handoff).toContain('- modified `src/auth.ts`')
   })
 
   it('honours and validates the handoff size limit', async () => {
@@ -91,7 +91,7 @@ describe('Continuum MCP server', () => {
     expect(text(recorded)).toMatch(/^Recorded decision [0-9a-f-]{36}, anchored to 1 file\./)
     expect(text(await client.callTool({ name: 'get_handoff', arguments: {} }))).toContain('[agent-reported] Decision: Sessions live in db.ts. Do not cache sessions in auth.ts.')
     repo.write('src/db.ts', 'rewritten')
-    expect(text(await client.callTool({ name: 'get_handoff', arguments: {} }))).toContain('(anchored code changed since: src/db.ts)')
+    expect(text(await client.callTool({ name: 'get_handoff', arguments: {} }))).toContain('(anchored code changed since: `src/db.ts`)')
   })
 
   it('redacts secrets in recorded notes', async () => {
