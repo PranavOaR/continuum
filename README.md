@@ -4,7 +4,7 @@
 
 Continuum is a local-first project-continuity layer for switching between AI coding agents. It is early: the repository capture engine and CLI work against real git repositories, while the web app is still an interactive prototype.
 
-> **The web app uses mock data only.** No agents, repositories, files, tests, or external APIs are connected to it yet. Handoffs there are simulated: preparing one builds a text package you can copy. Nothing is sent anywhere.
+> **Two modes, always labelled.** Served by `continuum serve`, the web app shows live data from your repositories ("Local workspace · Live"). Anywhere else, such as `npm run dev` or a static host, it shows a mock demo dataset ("Demo workspace · Mock data"). Nothing is sent anywhere in either mode.
 
 ## Run
 
@@ -53,6 +53,23 @@ It writes two project-scoped files and nothing in `~/.claude`:
 
 Restart Claude Code in that repository and approve the `continuum` server when prompted. Both files point at this checkout, so they are kept out of git. `setup claude-code --remove` takes out exactly what setup added. `npm run continuum -- handoff` prints the same briefing for pasting into any other agent or chat.
 
+## Dashboard
+
+```bash
+npm run build                                          # once, and after pulling changes
+npm run continuum -- serve ~/code/my-app ~/code/api    # http://127.0.0.1:4747
+```
+
+`serve` opens a read-only dashboard for one or more initialized repositories:
+- what changed and which agent changed it;
+- where the last session left off;
+- checks, with whether they still cover the current code;
+- recorded decisions, and the context graph.
+
+It listens on 127.0.0.1 only and accepts requests only from its own origin. *Prepare handoff* shows the exact briefing a new agent session receives. Some data is not captured yet: line-level diffs and tasks. Screens say so rather than showing placeholders.
+
+To work on the UI against live data, run `continuum serve` and then `CONTINUUM_API=http://127.0.0.1:4747 VITE_CONTINUUM_DATA=local npm run dev`.
+
 Every item in a handoff is labelled with its evidence:
 
 - **verified:** a check run recorded against exact file hashes.
@@ -73,12 +90,13 @@ npm workspaces:
 | `packages/context` | `@continuum/context` | Project state judged against the live working tree, and the token-bounded handoff |
 | `packages/claude-code` | `@continuum/claude-code` | Claude Code hook ingestion and project-scoped setup |
 | `packages/mcp` | `@continuum/mcp` | The local stdio MCP server (`get_handoff`, `get_project_state`, `record_decision`) |
+| `packages/daemon` | `@continuum/daemon` | The local daemon: maps context stores onto the dashboard's service contract and serves it on 127.0.0.1 |
 | `packages/cli` | `@continuum/cli` | The `continuum` command |
-| `apps/web` | `@continuum/web` | The web app: landing page and dashboard, currently backed by mock data through `mockContinuumService` |
+| `apps/web` | `@continuum/web` | The web app: landing page and dashboard, reading live data from the daemon or the mock demo dataset |
 
-Upcoming pieces (the local daemon that will feed the web app, symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
+Upcoming pieces (recorded tasks, symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
 
-Inside `apps/web/src`: `data/` holds the mock dataset, `services/` the mock service, `state/` preferences and handoff history, and `components/` + `pages/` the UI.
+Inside `apps/web/src`: `data/` holds the mock dataset, `services/` the mock and HTTP services, `state/` data mode, preferences and handoff history, and `components/` + `pages/` the UI.
 
 ## Design
 
