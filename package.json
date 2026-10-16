@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "npm run dev -w @continuum/web",
     "build": "npm run build -w @continuum/web",
-    "lint": "npm run lint -w @continuum/web",
+    "lint": "oxlint apps packages",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e -w @continuum/web"
