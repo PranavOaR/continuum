@@ -100,6 +100,11 @@ describe('LocalContinuumService', () => {
     ])
   })
 
+  it('flags a failing check while its files are unchanged', async () => {
+    const { service: local } = await service()
+    expect((await local.getOverview()).attention.map((item) => item.title)).toEqual(['lint is failing'])
+  })
+
   it('builds the memory graph from the context graph', async () => {
     const { service: local } = await service()
     const graph = await local.getMemoryGraph('acme')
