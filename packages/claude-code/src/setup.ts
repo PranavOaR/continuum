@@ -58,6 +58,11 @@ function runsContinuum(entry: { command?: unknown; args?: unknown }, subcommand:
   return [entry.command, ...args.slice(0, -1)].some((part) => typeof part === 'string' && CONTINUUM_PROGRAM.test(part))
 }
 
+/** Ours: an MCP server entry that runs the Continuum CLI's `mcp`. */
+export function isContinuumServer(server: unknown): boolean {
+  return isObject(server) && runsContinuum(server, MCP)
+}
+
 /** Ours: a command hook that runs the Continuum CLI's `ingest`. */
 export function isContinuumHandler(handler: HookHandler): boolean {
   return handler.type === 'command' && runsContinuum(handler, INGEST)
@@ -94,7 +99,10 @@ function withoutOurs(groups: unknown): unknown {
   })
 }
 
-function ourHooks(invocation: Invocation): Record<string, Json[]> {
+/** The Claude Code events setup registers. */
+export const HOOK_EVENTS = ['SessionStart', 'SessionEnd', 'Stop', 'PostToolUse'] as const
+
+function ourHooks(invocation: Invocation): Record<(typeof HOOK_EVENTS)[number], Json[]> {
   const handler = (extra: Json): Json => ({ type: 'command', command: invocation.command, args: [...invocation.args, INGEST], ...extra })
   return {
     // Synchronous: its output is injected as context before Claude's first turn.
@@ -127,7 +135,7 @@ function mergeMcp(config: Json, server: Json | null): Json {
   if (config.mcpServers !== undefined && !isObject(config.mcpServers)) throw new SetupError(`"mcpServers" in ${MCP_FILE} must be an object. Nothing was changed.`)
   const servers = config.mcpServers ?? {}
   const current = servers[MCP_SERVER_NAME]
-  if (current !== undefined && !(isObject(current) && runsContinuum(current, MCP))) {
+  if (current !== undefined && !isContinuumServer(current)) {
     throw new SetupError(`${MCP_FILE} already has a "${MCP_SERVER_NAME}" server that Continuum did not write; rename or remove it, then run setup again. Nothing was changed.`)
   }
   const { [MCP_SERVER_NAME]: _previous, ...others } = servers

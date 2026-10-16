@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import { CommandNotFoundError, NotAGitRepositoryError, WatchUnavailableError } from '@continuum/capture'
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
 import { PortInUseError } from '@continuum/daemon'
+import { doctorCommand } from './commands/doctor'
 import { handoffCommand } from './commands/handoff'
 import { ingestCommand } from './commands/ingest'
 import { initCommand } from './commands/init'
@@ -34,6 +35,7 @@ Commands
   handoff              Print where the project left off, for any agent or chat
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
+  doctor               Check the install and this repository's setup, with fixes
   uninstall [--purge]  Disconnect Claude Code; --purge also deletes .continuum/
 
 Used by agents
@@ -62,6 +64,7 @@ const COMMANDS: Record<string, Command> = {
   setup: (io, args) => setupCommand(io, args, selfInvocation()),
   mcp: (io) => mcpCommand(io, VERSION),
   ingest: (io) => ingestCommand(io),
+  doctor: (io, args) => doctorCommand(io, args, selfInvocation()),
   uninstall: (io, args) => uninstallCommand(io, args),
 }
 
