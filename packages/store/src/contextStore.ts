@@ -11,7 +11,7 @@ import {
   type IdentityKey,
   type RecordedRun,
 } from '@continuum/core'
-import { EXPORT_FORMAT, EXPORT_VERSION, mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState, type HistoryExport, type HistoryRewrite, type RewriteResult } from './checkpoint'
+import { EXPORT_FORMAT, EXPORT_VERSION, mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState, type HistoryExport, type HistoryRewrite, type RewriteResult, type VacuumResult } from './checkpoint'
 import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
@@ -184,14 +184,18 @@ export class ContextStore implements Mutations {
    * with no other connection reading; returns false if one was, and SQLite
    * reuses the space instead.
    */
-  vacuum(): boolean {
-    try {
-      this.db.exec('VACUUM')
-      this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
-      return true
-    } catch {
-      return false
+  vacuum(): VacuumResult {
+    const attempt = (sql: string) => {
+      try {
+        return this.db.prepare(sql).get() as Record<string, number> | undefined
+      } catch {
+        return null
+      }
     }
+    const shrunk = attempt('VACUUM') !== null
+    // busy = 1 means another connection kept the log from being emptied.
+    const checkpoint = attempt('PRAGMA wal_checkpoint(TRUNCATE)')
+    return { shrunk, walCleared: checkpoint !== null && checkpoint?.busy !== 1 }
   }
 
   /**
@@ -206,6 +210,7 @@ export class ContextStore implements Mutations {
     const previous = this.checkpoint()
     let removedEvents = 0
     let changedEvents = 0
+    let changedCheckpoint = false
     this.db.exec('PRAGMA secure_delete = ON')
     this.transaction(() => {
       const kept: { seq: number; event: ContinuumEvent }[] = []
@@ -232,7 +237,9 @@ export class ContextStore implements Mutations {
         const stored = this.withStoredCoverage(event)
         insert.run(seq, stored.type, canonicalJson(stored.payload), stored.evidence, stored.source, stored.occurredAt, stored.revision ?? null)
       }
-      if (checkpoint) {
+      if (checkpoint && previous) {
+        changedCheckpoint =
+          canonicalJson(checkpoint.state) !== canonicalJson(previous.state) || canonicalJson(checkpoint.firstEvents) !== canonicalJson(previous.firstEvents)
         this.db
           .prepare('UPDATE checkpoints SET state = ?, first_events = ? WHERE id = 1')
           .run(gzipSync(JSON.stringify(checkpoint.state)), JSON.stringify(checkpoint.firstEvents))
@@ -241,7 +248,7 @@ export class ContextStore implements Mutations {
       for (const { event } of kept) project(this, this.withStoredCoverage(event))
       this.deleteUnreferencedObjects()
     })
-    return { removedEvents, changedEvents }
+    return { removedEvents, changedEvents, changedCheckpoint }
   }
 
   /** The whole history as self-contained JSON, for backup or moving to another machine. */
@@ -265,7 +272,7 @@ export class ContextStore implements Mutations {
 
   /** Loads an export into this store, which must be empty. Replaying it gives the exported graph. */
   importHistory(history: HistoryExport): void {
-    if (history.format !== EXPORT_FORMAT || history.version !== EXPORT_VERSION) throw new Error('This file is not a Continuum history export this version can read.')
+    assertValidExport(history)
     if (this.eventCount() > 0 || this.checkpoint()) throw new Error('This store already has history; import only into a freshly initialized repository.')
     this.transaction(() => {
       const { checkpoint } = history
@@ -563,6 +570,41 @@ export class ContextStore implements Mutations {
     }
     this.graphIndex = graph
     this.loadedSeq = this.maxSeq()
+  }
+}
+
+const EVIDENCE = new Set(['verified', 'observed', 'agent-reported'])
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+function isExportedEvent(entry: unknown): entry is FirstEvent {
+  if (!isRecord(entry) || !Number.isSafeInteger(entry.seq) || (entry.seq as number) < 1 || !isRecord(entry.event)) return false
+  const { type, payload, evidence, source, occurredAt } = entry.event
+  return typeof type === 'string' && isRecord(payload) && typeof evidence === 'string' && EVIDENCE.has(evidence) && typeof source === 'string' && typeof occurredAt === 'string'
+}
+
+function isGraphState(state: unknown): state is GraphState {
+  if (!isRecord(state) || !Array.isArray(state.nodes) || !Array.isArray(state.edges)) return false
+  const nodesOk = state.nodes.every(
+    (node) => isRecord(node) && typeof node.key === 'string' && typeof node.kind === 'string' && Array.isArray(node.history) && isRecord(node.props) && typeof node.updatedAt === 'string',
+  )
+  return nodesOk && state.edges.every((edge) => isRecord(edge) && typeof edge.from === 'string' && typeof edge.type === 'string' && typeof edge.to === 'string')
+}
+
+/** Rejects anything that is not a well-formed export, before any of it is written. */
+function assertValidExport(history: unknown): asserts history is HistoryExport {
+  const invalid = (reason: string) => new Error(`This file is not a valid Continuum history export: ${reason}.`)
+  if (!isRecord(history) || history.format !== EXPORT_FORMAT) throw invalid('unknown format')
+  if (history.version !== EXPORT_VERSION) throw invalid(`version ${String(history.version)} is not supported`)
+  if (!Array.isArray(history.events) || !history.events.every(isExportedEvent)) throw invalid('malformed events')
+  const checkpoint = history.checkpoint
+  if (checkpoint !== null) {
+    if (!isRecord(checkpoint) || !Number.isSafeInteger(checkpoint.seq) || typeof checkpoint.createdAt !== 'string') throw invalid('malformed checkpoint')
+    if (!isGraphState(checkpoint.state) || !Array.isArray(checkpoint.firstEvents) || !checkpoint.firstEvents.every(isExportedEvent)) throw invalid('malformed checkpoint')
+  }
+  let previous = checkpoint === null ? 0 : (checkpoint.seq as number)
+  for (const { seq } of history.events) {
+    if (seq <= previous) throw invalid('event sequence numbers must increase and follow the checkpoint')
+    previous = seq
   }
 }
 

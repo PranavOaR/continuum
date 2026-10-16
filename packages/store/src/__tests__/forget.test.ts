@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { ContinuumEvent } from '@continuum/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ContextStore } from '../contextStore'
-import { forgetPath, forgetSession, forgetTextBefore } from '../forget'
+import { forgetPath, forgetSession, forgetTextBefore, InvalidForgetPathError } from '../forget'
 import { ev } from './fixtures'
 
 const dirs: string[] = []
@@ -46,7 +46,7 @@ describe('forgetPath', () => {
 
     const result = store.rewriteHistory(forgetPath(SECRET))
     expect(result.removedEvents).toBe(2)
-    expect(store.vacuum()).toBe(true)
+    expect(store.vacuum()).toEqual({ shrunk: true, walCleared: true })
     store.close()
     expect(rawBytes(path)).not.toContain(SECRET)
 
@@ -76,7 +76,7 @@ describe('forgetPath', () => {
     const { store } = fileStore()
     history(store)
     const before = store.snapshot()
-    expect(store.rewriteHistory(forgetPath('docs/never.md'))).toEqual({ removedEvents: 0, changedEvents: 0 })
+    expect(store.rewriteHistory(forgetPath('docs/never.md'))).toEqual({ removedEvents: 0, changedEvents: 0, changedCheckpoint: false })
     expect(store.snapshot()).toEqual(before)
     store.close()
   })
@@ -106,5 +106,45 @@ describe('forgetTextBefore', () => {
     expect(store.graph.get('session:s2')?.props.lastPrompt).toBe('recent request')
     store.close()
     expect(rawBytes(path)).not.toContain('old private request')
+  })
+})
+
+describe('forget, hardened', () => {
+  it.each(['/', './', '.', '..', 'a', '/etc/passwd', 'src/../secrets'])('refuses to forget %s', (path) => {
+    expect(() => forgetPath(path)).toThrow(InvalidForgetPathError)
+  })
+
+  it('matches paths without regard to case, as macOS does', () => {
+    const { path, store } = fileStore()
+    history(store)
+    store.rewriteHistory(forgetPath('SRC/Secret-Plans.ts'))
+    store.vacuum()
+    store.close()
+    expect(rawBytes(path).toLowerCase()).not.toContain(SECRET)
+  })
+
+  it('scrubs the forgotten path from check names folded into a checkpoint', () => {
+    const { path, store } = fileStore()
+    store.record(on(1, ev.file(SECRET, 'h-1')))
+    store.transact(() => [on(1, ev.checkCovered(`cat ${SECRET}`, store.putCoverage({ [`file:${SECRET}`]: 'h-1' })))])
+    store.record(on(9, ev.sessionStart('later')))
+    store.compact(new Date('2026-10-05T00:00:00Z'))
+    store.rewriteHistory(forgetPath(SECRET))
+    store.vacuum()
+    expect(store.graph.has('check:cat [forgotten]')).toBe(true)
+    store.close()
+    expect(rawBytes(path)).not.toContain(SECRET)
+  })
+
+  it('removes old check output that was folded into a checkpoint', () => {
+    const { path, store } = fileStore()
+    store.transact(() => [on(1, { ...ev.checkCovered('npm test', store.putCoverage({})), payload: { name: 'npm test', command: 'npm test', exitCode: 1, durationMs: 1, coverage: store.putCoverage({}), outputTail: 'stack trace with a private hostname' } } as ContinuumEvent)])
+    store.record(on(9, ev.sessionStart('later')))
+    store.compact(new Date('2026-10-05T00:00:00Z'))
+    const result = store.rewriteHistory(forgetTextBefore(new Date('2026-10-05T00:00:00Z')))
+    expect(result.changedCheckpoint).toBe(true)
+    store.vacuum()
+    store.close()
+    expect(rawBytes(path)).not.toContain('private hostname')
   })
 })

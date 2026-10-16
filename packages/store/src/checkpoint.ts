@@ -51,6 +51,14 @@ export interface HistoryRewrite {
 export interface RewriteResult {
   removedEvents: number
   changedEvents: number
+  /** The compaction checkpoint held matching data and was rewritten. */
+  changedCheckpoint: boolean
+}
+
+/** What a vacuum managed: shrinking the file, and emptying the write-ahead log that may still hold old pages. */
+export interface VacuumResult {
+  shrunk: boolean
+  walCleared: boolean
 }
 
 export const EXPORT_FORMAT = 'continuum-history'

@@ -8,12 +8,14 @@ export const FORGOTTEN = '[forgotten]'
 /** Keys whose values are identifiers or hashes, never free text: they are removed or kept whole, not scrubbed. */
 const STRUCTURAL_KEYS = new Set(['path', 'contentHash', 'sessionId', 'taskId', 'id', 'hash', 'coverage', 'lastRunHash', 'recordHash', 'changedBy', 'files', 'ranAgainst', 'anchors'])
 
-/** Replaces `needle` in every free-text string of a value, leaving identifiers and hashes alone. */
-function scrub<T>(value: T, needle: string): T {
-  if (typeof value === 'string') return value.split(needle).join(FORGOTTEN) as T
-  if (Array.isArray(value)) return value.map((item) => scrub(item, needle)) as T
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Replaces `needle` (ignoring case, as macOS and Windows file systems do) in every free-text string, leaving identifiers and hashes alone. */
+function scrubValue<T>(value: T, needle: string): T {
+  if (typeof value === 'string') return value.replace(new RegExp(escapeRegExp(needle), 'gi'), FORGOTTEN) as T
+  if (Array.isArray(value)) return value.map((item) => scrubValue(item, needle)) as T
   if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, STRUCTURAL_KEYS.has(key) ? item : scrub(item, needle)])) as T
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, STRUCTURAL_KEYS.has(key) ? item : scrubValue(item, needle)])) as T
   }
   return value
 }
@@ -22,17 +24,43 @@ function withoutKeys<T>(record: Readonly<Record<string, T>> | undefined, drop: (
   return Object.fromEntries(Object.entries(record ?? {}).filter(([key]) => !drop(key)))
 }
 
-/** A file, or every file under a directory. */
-function pathMatcher(path: string): (candidate: string) => boolean {
-  const exact = path.replace(/\/+$/, '')
-  return (candidate) => candidate === exact || candidate.startsWith(`${exact}/`)
+/** Shorter paths would scrub text everywhere: `--path a` would mangle every word containing an "a". */
+export const MIN_FORGET_PATH_CHARS = 3
+
+export class InvalidForgetPathError extends Error {
+  constructor(path: string) {
+    super(`"${path}" is not a repository-relative file or directory of at least ${MIN_FORGET_PATH_CHARS} characters (no leading /, no . or ..).`)
+    this.name = 'InvalidForgetPathError'
+  }
+}
+
+/** A repository-relative path without a trailing slash, or an error for values that would forget everything. */
+function forgettablePath(path: string, minChars: number): string {
+  const trimmed = path.replace(/\/+$/, '')
+  const segments = trimmed.split('/')
+  if (trimmed.length < minChars || trimmed.startsWith('/') || segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    throw new InvalidForgetPathError(path)
+  }
+  return trimmed
+}
+
+/** A file, or every file under a directory; case-insensitive, so a differently cased name is not missed. */
+function pathMatcher(exact: string): (candidate: string) => boolean {
+  const lower = exact.toLowerCase()
+  return (candidate) => {
+    const value = candidate.toLowerCase()
+    return value === lower || value.startsWith(`${lower}/`)
+  }
 }
 
 /** Forget a file or directory: its changes, its place in checks, decisions and commits, and its name in any text. */
-export function forgetPath(path: string): HistoryRewrite {
-  const matches = pathMatcher(path)
+export function forgetPath(path: string, options: { scrubText?: boolean } = {}): HistoryRewrite {
+  // Without text scrubbing (e.g. ignored paths on import) any valid path is safe, however short.
+  const scrubText = options.scrubText ?? true
+  const needle = forgettablePath(path, scrubText ? MIN_FORGET_PATH_CHARS : 1)
+  const scrub = scrubText ? scrubValue : <T>(value: T) => value
+  const matches = pathMatcher(needle)
   const isFileKey = (key: IdentityKey) => key.startsWith('file:') && matches(key.slice('file:'.length))
-  const needle = path.replace(/\/+$/, '')
   return {
     event(event) {
       switch (event.type) {
@@ -49,8 +77,16 @@ export function forgetPath(path: string): HistoryRewrite {
       }
     },
     state(state) {
-      const nodes = state.nodes.filter((node) => !isFileKey(node.key)).map((node) => scrubNode(pruneNode(node, isFileKey), needle))
-      return { nodes, edges: state.edges.filter((edge) => !isFileKey(edge.from) && !isFileKey(edge.to)) }
+      // Check names are commands (`cat secrets.env`), so their keys are scrubbed too, along with their edges.
+      const renameKey = (key: IdentityKey) => (key.startsWith('check:') ? scrub(key, needle) : key)
+      const nodes = state.nodes
+        .filter((node) => !isFileKey(node.key))
+        .map((node) => {
+          const pruned = pruneNode(node, isFileKey)
+          return { ...pruned, props: scrub(pruned.props, needle), key: renameKey(node.key) }
+        })
+      const edges = state.edges.filter((edge) => !isFileKey(edge.from) && !isFileKey(edge.to)).map((edge) => ({ ...edge, from: renameKey(edge.from), to: renameKey(edge.to) }))
+      return { nodes, edges }
     },
   }
 }
@@ -64,7 +100,6 @@ function pruneNode(node: GraphNode, isFileKey: (key: IdentityKey) => boolean): G
   return node
 }
 
-const scrubNode = (node: GraphNode, needle: string): GraphNode => ({ ...node, props: scrub(node.props, needle) })
 
 const SESSION_EVENTS = new Set<ContinuumEvent['type']>(['session.started', 'session.progress', 'session.prompted', 'session.task', 'session.ended'])
 
@@ -119,10 +154,40 @@ export function forgetTextBefore(before: Date): HistoryRewrite {
     state(state) {
       return {
         ...state,
-        nodes: state.nodes.map((node) =>
-          node.kind === 'session' && node.updatedAt < cutoff ? { ...node, props: withoutKeys(node.props, (key) => (TEXT_PROPS as readonly string[]).includes(key)) } : node,
-        ),
+        nodes: state.nodes.map((node) => {
+          if (node.updatedAt >= cutoff) return node
+          if (node.kind === 'session') return { ...node, props: withoutKeys(node.props, (key) => (TEXT_PROPS as readonly string[]).includes(key)) }
+          if (node.kind === 'check' && node.props.lastRun) {
+            const { outputTail: _output, ...run } = node.props.lastRun as Record<string, unknown>
+            return { ...node, props: { ...node.props, lastRun: run } }
+          }
+          return node
+        }),
       }
     },
+  }
+}
+
+/** Applies several rewrites in order, in one pass over the history. */
+export function composeRewrites(rewrites: readonly HistoryRewrite[]): HistoryRewrite {
+  return {
+    event: (event) => rewrites.reduce<ContinuumEvent | null>((current, rewrite) => (current ? rewrite.event(current) : null), event),
+    state: (state) => rewrites.reduce((current, rewrite) => rewrite.state(current), state),
+  }
+}
+
+/** Passes every free-text string (notes, prompts, output, messages) through `transform`, e.g. redaction. */
+export function rewriteText(transform: (text: string) => string): HistoryRewrite {
+  const map = <T>(value: T): T => {
+    if (typeof value === 'string') return transform(value) as T
+    if (Array.isArray(value)) return value.map(map) as T
+    if (value !== null && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, STRUCTURAL_KEYS.has(key) ? item : map(item)])) as T
+    }
+    return value
+  }
+  return {
+    event: (event) => ({ ...event, payload: map(event.payload) }) as ContinuumEvent,
+    state: (state) => ({ ...state, nodes: state.nodes.map((node) => ({ ...node, props: map(node.props) })) }),
   }
 }

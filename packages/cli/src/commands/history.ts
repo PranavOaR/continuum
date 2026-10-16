@@ -1,11 +1,13 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { initWorkspace, openWorkspace, scanRepository } from '@continuum/capture'
-import type { HistoryExport } from '@continuum/store'
+import { applyRepositoryRedactions, initWorkspace, loadContinuumIgnore, openWorkspace, redactSecrets, scanRepository } from '@continuum/capture'
+import { composeRewrites, forgetPath, rewriteText, type ContextStore, type HistoryExport } from '@continuum/store'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 export const EXPORT_USAGE = 'Usage: continuum export <file.json>'
 export const IMPORT_USAGE = 'Usage: continuum import <file.json>'
+/** Larger files are refused before they are read: an export of years of history is far smaller. */
+const MAX_IMPORT_BYTES = 512 * 1024 * 1024
 /** The export holds the same private history as the store, so only its owner may read it. */
 const PRIVATE_FILE_MODE = 0o600
 
@@ -43,7 +45,9 @@ export async function importCommand(io: Io, args: readonly string[]): Promise<nu
   }
   let history: HistoryExport
   try {
-    history = JSON.parse(await readFile(resolve(io.cwd, args[0]), 'utf8')) as HistoryExport
+    const file = resolve(io.cwd, args[0])
+    if ((await stat(file)).size > MAX_IMPORT_BYTES) throw new Error(`larger than ${MAX_IMPORT_BYTES / 1024 / 1024} MB`)
+    history = JSON.parse(await readFile(file, 'utf8')) as HistoryExport
   } catch (error) {
     io.err(`continuum: cannot read ${args[0]}: ${error instanceof Error ? error.message : String(error)}`)
     return EXIT_FAILURE
@@ -56,10 +60,28 @@ export async function importCommand(io: Io, args: readonly string[]): Promise<nu
       io.err(`continuum: ${error instanceof Error ? error.message : String(error)} Nothing was changed.`)
       return EXIT_FAILURE
     }
+    await applyThisRepositoryRules(store, workspace.root, history)
     const { changes } = await scanRepository(store, workspace.root, { now: io.now })
     io.out(`Imported ${history.events.length} events into ${workspace.root}; recorded ${changes.length} change${changes.length === 1 ? '' : 's'} since the export.`)
     return EXIT_OK
   } finally {
     store.close()
   }
+}
+
+/**
+ * An export may come from another machine or person: hold it to this
+ * repository's rules. Paths in .continuumignore are forgotten and every free
+ * text is redacted with this repository's patterns.
+ */
+async function applyThisRepositoryRules(store: ContextStore, root: string, history: HistoryExport): Promise<void> {
+  await applyRepositoryRedactions(root)
+  const isIgnored = await loadContinuumIgnore(root)
+  const paths = new Set<string>()
+  for (const { event } of [...history.events, ...(history.checkpoint?.firstEvents ?? [])]) if (event.type === 'file.changed') paths.add(event.payload.path)
+  for (const node of history.checkpoint?.state.nodes ?? []) if (node.key.startsWith('file:')) paths.add(node.key.slice('file:'.length))
+  const ignored = [...paths].filter(isIgnored)
+  store.rewriteHistory(composeRewrites([...ignored.map((path) => forgetPath(path, { scrubText: false })), rewriteText(redactSecrets)]))
+  // The file as imported must not linger in freed pages or the write-ahead log.
+  store.vacuum()
 }

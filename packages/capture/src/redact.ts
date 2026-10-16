@@ -4,7 +4,12 @@
  */
 export const REDACTED = '[redacted]'
 
-const SECRET_NAME = String.raw`[A-Za-z0-9_.-]*(?:token|secret|passw(?:or)?d|pwd|api[_-]?key|access[_-]?key|account[_-]?key|credential|private[_-]?key|client[_-]?secret)[A-Za-z0-9_.-]*`
+// Bounded runs around the keyword: unbounded ones backtrack catastrophically on inputs like `token.token.token…`.
+const SECRET_NAME = String.raw`[A-Za-z0-9_.-]{0,40}(?:token|secret|passw(?:or)?d|pass(?![a-z])|pwd|api[_-]?key|access[_-]?key|account[_-]?key|credential|private[_-]?key|client[_-]?secret)[A-Za-z0-9_.-]{0,40}`
+/** Text is redacted in pieces of at most this many characters (split at line ends), so cost stays linear in its length. */
+const MAX_CHUNK_CHARS = 16_384
+/** Custom patterns come from a repository's config; longer ones are refused rather than risk a pathological pattern. */
+const MAX_CUSTOM_PATTERN_CHARS = 200
 
 /** Shorter values after a secret-looking name are code (TOKEN_BYTES = 24), not credentials. */
 const MIN_VALUE_LENGTH = 6
@@ -19,8 +24,12 @@ const MIN_BITS_PER_CHAR = 4.2
 const RULES: readonly (readonly [RegExp, string])[] = [
   // PEM, OpenSSH and PGP private keys, whole block
   [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|$)/g, REDACTED],
-  // Credentials embedded in URLs: scheme://user:pass@host
-  [/([a-z][a-z0-9+.-]*:\/\/)[^/\s:@]+:[^/\s@]+@/gi, `$1${REDACTED}@`],
+  // Credentials embedded in URLs: scheme://user:pass@host, up to the last @ (passwords may contain @ and /)
+  [/\b([a-z][a-z0-9+.-]{0,20}:\/\/)[^\s/@:]+:\S*@(?![^\s/]*@)/gi, `$1${REDACTED}@`],
+  // curl -u user:password, --user=user:password
+  [/(\s-u\s+|\s--user[=\s]+)([^\s:'"]+):(?!\[redacted\])[^\s'"]+/g, `$1$2:${REDACTED}`],
+  // A raw credential straight after an Authorization header (schemes are handled below)
+  [/(Authorization:\s*)(?!Bearer\b|Basic\b|Token\b|\[redacted\])[A-Za-z0-9._~+/=-]{8,}/gi, `$1${REDACTED}`],
   // HTTP auth schemes. Basic and Token need a credential-like value (with a digit), so prose such as "Token budget" stays.
   [/\b(Bearer)\s+[A-Za-z0-9._~+/=-]{8,}/g, `$1 ${REDACTED}`],
   [/\b(Basic|Token)\s+(?=[A-Za-z0-9._~+/=-]*\d)[A-Za-z0-9._~+/=-]{8,}/g, `$1 ${REDACTED}`],
@@ -34,12 +43,12 @@ const RULES: readonly (readonly [RegExp, string])[] = [
   // --token value, --api-key=value (a real flag: not the "-password" in "email-and-password")
   [new RegExp(String.raw`(?<![\w-])(--?${SECRET_NAME})(=|\s+)(?!\[redacted\])([^\s"']+)`, 'gi'), `$1$2${REDACTED}`],
   // NAME="value" and name: 'value' in configs and shells
-  [new RegExp(String.raw`\b(${SECRET_NAME})(\s*(?:=(?!=)|:)\s*)(["'])(?!\[redacted\])[^"'\n]{${MIN_VALUE_LENGTH},}\3`, 'gi'), `$1$2$3${REDACTED}$3`],
+  [new RegExp(String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(["'])(?!\[redacted\])[^"'\n]{${MIN_VALUE_LENGTH},}\3`, 'gi'), `$1$2$3${REDACTED}$3`],
   // NAME=value and name: value, unquoted. Code is left alone: comparisons (===), type annotations
   // (token: string), short values (TOKEN_BYTES = 24) and expressions (apiToken = link.get('token')).
   [
     new RegExp(
-      String.raw`\b(${SECRET_NAME})(\s*(?:=(?!=)|:)\s*)(?!\[redacted\])(?!(?:${CODE_WORDS})\b)[^\s"'()\[\]{},;<>]{${MIN_VALUE_LENGTH},}(?![^\s"'()\[\]{},;<>]*\()`,
+      String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(?!\[redacted\])(?!(?:${CODE_WORDS})\b)[^\s"'()\[\]{},;<>]{${MIN_VALUE_LENGTH},}(?![^\s"'()\[\]{},;<>]*\()`,
       'gi',
     ),
     `$1$2${REDACTED}`,
@@ -78,6 +87,7 @@ let customRules: readonly RegExp[] = []
  */
 export function setCustomRedactions(patterns: readonly string[]): number {
   customRules = patterns.flatMap((pattern) => {
+    if (pattern.length > MAX_CUSTOM_PATTERN_CHARS) return []
     try {
       return [new RegExp(pattern, 'g')]
     } catch {
@@ -87,8 +97,28 @@ export function setCustomRedactions(patterns: readonly string[]): number {
   return customRules.length
 }
 
-/** Redacts and says how many secrets it replaced. */
+/** Splits long text at line ends into pieces of bounded size; a single huge line is cut where it must be. */
+function chunks(text: string): string[] {
+  if (text.length <= MAX_CHUNK_CHARS) return [text]
+  const pieces: string[] = []
+  let start = 0
+  while (start < text.length) {
+    let end = Math.min(start + MAX_CHUNK_CHARS, text.length)
+    const newline = text.lastIndexOf('\n', end)
+    if (end < text.length && newline > start) end = newline + 1
+    pieces.push(text.slice(start, end))
+    start = end
+  }
+  return pieces
+}
+
+/** Redacts and says how many secrets it replaced. Cost grows linearly with the text, however long. */
 export function redactWithCount(text: string): { text: string; count: number } {
+  const results = chunks(text).map(redactChunk)
+  return { text: results.map((result) => result.text).join(''), count: results.reduce((total, result) => total + result.count, 0) }
+}
+
+function redactChunk(text: string): { text: string; count: number } {
   let count = 0
   const replaceCounting = (current: string, pattern: RegExp, replacement: string) =>
     current.replace(pattern, (...match) => {

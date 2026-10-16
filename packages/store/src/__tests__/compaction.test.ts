@@ -135,7 +135,11 @@ describe('ContextStore export and import', () => {
     history(source)
     const exported = source.exportHistory()
     expect(() => source.importHistory(exported)).toThrow(/already has history/)
-    expect(() => ContextStore.open(':memory:').importHistory({ ...exported, format: 'other' } as never)).toThrow(/not a Continuum history export/)
+    expect(() => ContextStore.open(':memory:').importHistory({ ...exported, format: 'other' } as never)).toThrow(/not a valid Continuum history export: unknown format/)
+    const outOfOrder = { ...exported, events: [...exported.events].reverse() }
+    expect(() => ContextStore.open(':memory:').importHistory(outOfOrder)).toThrow(/sequence numbers must increase/)
+    const malformed = { ...exported, events: [{ seq: 1, event: { type: 'file.changed', payload: 'not an object' } }] }
+    expect(() => ContextStore.open(':memory:').importHistory(malformed as never)).toThrow(/malformed events/)
     source.close()
   })
 })

@@ -100,3 +100,30 @@ describe('false positives on real code', () => {
     expect(hits).toEqual([])
   })
 })
+
+describe('redactSecrets robustness', () => {
+  it.each([
+    ['repeated secret names', 'token.'.repeat(5_000)],
+    ['a long run of letters after a scheme', `x://${'a'.repeat(50_000)}`],
+    ['one huge line', 'A1b2'.repeat(100_000)],
+  ])('stays fast on pathological input: %s', (_name, input) => {
+    const started = performance.now()
+    redactSecrets(input)
+    expect(performance.now() - started).toBeLessThan(2_000)
+  })
+
+  it.each([
+    ['a JSON password', `{"password":"${VALUE}"}`, '{"password":"[redacted]"}'],
+    ['a JSON client secret', `{"client_secret": "${VALUE}"}`, '{"client_secret": "[redacted]"}'],
+    ['pass=', `pass=${VALUE}`, 'pass=[redacted]'],
+    ['curl -u', `curl -u admin:${VALUE} https://example.com`, 'curl -u admin:[redacted] https://example.com'],
+    ['a raw Authorization header', `Authorization: ${VALUE}x9`, 'Authorization: [redacted]'],
+    ['a URL password with @ and /', `postgres://user:p@ss/word@db.internal:5432/app`, 'postgres://[redacted]@db.internal:5432/app'],
+  ])('catches %s', (_name, input, expected) => {
+    expect(redactSecrets(input)).toBe(expected)
+  })
+
+  it('refuses overly long custom patterns', () => {
+    expect(setCustomRedactions(['a'.repeat(500)])).toBe(0)
+  })
+})
