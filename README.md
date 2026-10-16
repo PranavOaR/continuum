@@ -97,7 +97,7 @@ npm workspaces:
 | `packages/cli` | `@continuum/cli` | The `continuum` command |
 | `apps/web` | `@continuum/web` | The web app: landing page and dashboard, reading live data from the daemon or the mock demo dataset |
 
-Upcoming pieces (symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
+Upcoming pieces (symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
 
 Inside `apps/web/src`: `data/` holds the mock dataset, `services/` the mock and HTTP services, `state/` data mode, preferences and handoff history, and `components/` + `pages/` the UI.
 
