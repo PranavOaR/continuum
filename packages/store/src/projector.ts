@@ -1,7 +1,7 @@
 import type { ContentHash, ContinuumEvent, IdentityKey } from '@continuum/core'
 import type { EdgeType, UpsertInput } from './graphIndex'
 import { hashRecord } from './hash'
-import { keys } from './keys'
+import { keys, REPOSITORY_NODE } from './keys'
 
 /** The write operations a projection may perform. ContextStore implements them with write-through persistence. */
 export interface Mutations {
@@ -82,6 +82,11 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const session = keys.session(event.payload.sessionId)
       ensure(store, session, at)
       store.upsertNode(session, { hash: hashRecord('session-prompt', event.payload), props: { lastPrompt: event.payload.prompt, lastActivityAt: at }, at })
+      return
+    }
+    case 'commit.recorded': {
+      const { hash, message } = event.payload
+      store.upsertNode(REPOSITORY_NODE, { hash: null, props: { head: hash, headMessage: message, headRecordedAt: at }, at })
       return
     }
     case 'session.ended': {

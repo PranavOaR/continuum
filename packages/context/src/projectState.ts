@@ -64,6 +64,30 @@ export interface ProjectState {
   tasks: TaskSummary[]
   /** The in-progress or blocked task most recently updated, if any. */
   currentTaskId: string | null
+  /** Commits recorded since Continuum started watching, newest first. */
+  commits: CommitSummary[]
+}
+
+export interface CommitSummary {
+  hash: string
+  message: string
+  files: number
+  recordedAt: string
+}
+
+/** Recent events searched for commits; older ones are in git history. */
+const COMMIT_LOOKBACK_EVENTS = 500
+const MAX_COMMITS = 5
+
+function recentCommits(store: ContextStore): CommitSummary[] {
+  return store
+    .recentEvents(COMMIT_LOOKBACK_EVENTS)
+    .flatMap(({ event }) =>
+      event.type === 'commit.recorded' && !event.payload.baseline
+        ? [{ hash: event.payload.hash, message: event.payload.message, files: event.payload.files.length, recordedAt: event.occurredAt }]
+        : [],
+    )
+    .slice(0, MAX_COMMITS)
 }
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null)
@@ -153,5 +177,6 @@ export function projectState(store: ContextStore, tree: WorkingTree, now: Date):
       .sort((a, b) => newestFirst(a.recordedAt, b.recordedAt)),
     tasks: taskSummaries(store),
     currentTaskId: currentTaskId(store, now) ?? null,
+    commits: recentCommits(store),
   }
 }

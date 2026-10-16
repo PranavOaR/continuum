@@ -70,6 +70,12 @@ export type TaskUpsertedEvent = EventBase<
   }
 >
 
+/**
+ * A commit that appeared in the repository (by anyone). `baseline` marks the
+ * commit that was already HEAD when Continuum started watching: context, not work.
+ */
+export type CommitRecordedEvent = EventBase<'commit.recorded', { hash: string; message: string; files: string[]; baseline?: boolean }>
+
 export type ContinuumEvent =
   | SessionStartedEvent
   | SessionProgressEvent
@@ -80,5 +86,6 @@ export type ContinuumEvent =
   | CheckRecordedEvent
   | MemoryRecordedEvent
   | TaskUpsertedEvent
+  | CommitRecordedEvent
 
 export type ContinuumEventType = ContinuumEvent['type']

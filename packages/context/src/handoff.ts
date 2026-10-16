@@ -85,9 +85,13 @@ function taskSection(state: ProjectState): string[] {
   return ['## Current task', ...describeTask(current)]
 }
 
+function commitLines(state: ProjectState, now: Date): string[] {
+  return state.commits.map((commit) => `Committed [observed]: ${code(commit.hash.slice(0, 7))} ${quote(commit.message)} (${agoFromIso(commit.recordedAt, now)})`)
+}
+
 function leftOffSection(state: ProjectState, now: Date): string[] {
   const [latest] = state.sessions
-  if (!latest) return ['## Where we left off', 'No agent sessions recorded yet.']
+  if (!latest) return ['## Where we left off', 'No agent sessions recorded yet.', ...commitLines(state, now)]
   const lines = ['## Where we left off', `Latest: ${describeSession(latest, now)}.`]
   if (latest.prompt) lines.push(`Last request [said by you]: ${quote(latest.prompt)}`)
   if (latest.note) lines.push(`Last note [agent-reported]: ${quote(latest.note)}`)
@@ -96,7 +100,7 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
     const shown = files.slice(0, MAX_LISTED).join(', ')
     lines.push(`Files it changed: ${files.length > MAX_LISTED ? `${shown} and ${files.length - MAX_LISTED} more` : shown}`)
   }
-  return lines
+  return [...lines, ...commitLines(state, now)]
 }
 
 function describeCheck(check: CheckSummary, now: Date): string {
