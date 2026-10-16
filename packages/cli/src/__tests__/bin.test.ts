@@ -21,7 +21,7 @@ describe('continuum binary', () => {
   it('runs as a real process against a sandbox repository', () => {
     const repo = createSandbox({ 'a.ts': 'a' })
     sandboxes.push(repo)
-    expect(continuum(repo.root, '--version').trim()).toBe('0.0.0')
+    expect(continuum(repo.root, '--version').trim()).toBe('0.0.0-dev')
     expect(continuum(repo.root, 'init')).toContain('Initialized Continuum')
     expect(continuum(repo.root, 'status')).toContain('1 tracked file · all recorded')
   }, 20_000)

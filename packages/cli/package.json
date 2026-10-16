@@ -1,6 +1,6 @@
 {
   "name": "@continuum/cli",
-  "version": "0.0.0",
+  "version": "0.1.0-alpha.0",
   "private": true,
   "description": "The continuum command: init a workspace, capture repository activity and record verified checks.",
   "type": "module",

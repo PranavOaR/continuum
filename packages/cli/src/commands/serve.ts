@@ -3,13 +3,16 @@ import { fileURLToPath } from 'node:url'
 import { isInitialized, locateWorkspace, NotInitializedError } from '@continuum/capture'
 import { createAccessToken, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
 import { basename, resolve } from 'node:path'
+import { BUILD_INFO } from '../build'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 export const SERVE_USAGE = 'Usage: continuum serve [--port <n>] [repository ...]'
 const MAX_PORT = 65_535
 
-/** The web app built from this checkout (`npm run build`). */
-export const WEB_DIST = fileURLToPath(new URL('../../../../apps/web/dist', import.meta.url))
+/** The dashboard shipped next to the release bundle, or the web app built in this checkout (`npm run build`). */
+export const WEB_DIST = BUILD_INFO
+  ? fileURLToPath(new URL('./web', import.meta.url))
+  : fileURLToPath(new URL('../../../../apps/web/dist', import.meta.url))
 
 interface ServeArgs {
   port: number
@@ -70,7 +73,7 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   // The link carries this run's access token; other users on this machine cannot open the dashboard without it.
   io.out(`Continuum dashboard: ${daemon.launchUrl}`)
   for (const workspace of unique) io.out(`  serving ${workspace.root}`)
-  if (!hasDashboard) io.out('  (the web app is not built, so only the API is available; run `npm run build` in the Continuum checkout)')
+  if (!hasDashboard) io.out(`  (the dashboard was not found at ${webDist}, so only the API is available; in a checkout, run \`npm run build\`)`)
   io.out('Open that exact link: it carries a one-time access token. Only this machine can reach the dashboard. Press Ctrl-C to stop.')
   await untilAborted(io.signal)
   await daemon.close()

@@ -12,12 +12,12 @@ import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
+import { VERSION } from './build'
 import { selfInvocation } from './invocation'
 import { EXIT_FAILURE, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE, type Io } from './io'
 import { NotInitializedError } from '@continuum/capture'
 import { StoreVersionError } from '@continuum/store'
 
-export const VERSION = '0.0.0'
 
 export const HELP = `continuum — keep AI coding work continuous across sessions and agents
 
@@ -44,6 +44,8 @@ Options
   -v, --version        Show the version
 
 Everything stays on this machine, in .continuum/ at the repository root.`
+
+export { VERSION }
 
 type Command = (io: Io, args: readonly string[]) => Promise<number>
 

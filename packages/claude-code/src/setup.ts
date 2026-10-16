@@ -8,18 +8,25 @@ import { FILE_EDIT_TOOLS } from './hookPayload'
 export const HOOKS_FILE = '.claude/settings.local.json'
 export const MCP_FILE = '.mcp.json'
 export const MCP_SERVER_NAME = 'continuum'
+/** Marks the .git/info/exclude entries setup adds, so uninstall can remove exactly those. */
+export const GIT_EXCLUDE_COMMENT = 'Continuum: machine-specific Claude Code configuration'
 const INGEST = 'ingest'
 const MCP = 'mcp'
 const SESSION_START_TIMEOUT_S = 20
 const SESSION_END_TIMEOUT_S = 10
 const BACKGROUND_TIMEOUT_S = 30
-/** A path or package that is the Continuum CLI: this checkout's bin.ts, a `continuum` binary, or an npm package named continuum. */
-const CONTINUUM_PROGRAM = /(^|[\\/])packages[\\/]cli[\\/]src[\\/]bin\.ts$|(^|[\\/@])continuum(@[\w.-]+)?$/
+/**
+ * A path or package that is the Continuum CLI: this checkout's bin.ts, a
+ * `continuum` binary, the release bundle, or an npm package named continuum.
+ */
+const CONTINUUM_PROGRAM = /(^|[\\/])packages[\\/]cli[\\/]src[\\/]bin\.ts$|(^|[\\/@])continuum(@[\w.-]+)?$|(^|[\\/])continuum\.js$/
 
 /** How to run this CLI, e.g. `node --import tsx …/bin.ts` during development or `npx …` once published. */
 export interface Invocation {
   command: string
   args: string[]
+  /** True when it works on any machine (npx), so .mcp.json can be committed and shared. */
+  portable: boolean
 }
 
 export type FileAction = 'created' | 'updated' | 'unchanged' | 'removed' | 'skipped'
@@ -145,9 +152,10 @@ export async function setupClaudeCode(root: string, invocation: Invocation): Pro
   const nextMcp = mcpTracked ? null : mergeMcp(mcpConfig ?? {}, server)
 
   const files: SetupResult['files'] = []
-  files.push({ path: HOOKS_FILE, action: await apply(root, HOOKS_FILE, settings, nextSettings) })
+  files.push({ path: HOOKS_FILE, action: await apply(root, HOOKS_FILE, settings, nextSettings, true) })
   if (nextMcp) {
-    files.push({ path: MCP_FILE, action: await apply(root, MCP_FILE, mcpConfig, nextMcp) })
+    // A portable server entry works for everyone, so .mcp.json may be committed; a machine-specific one is kept out of git.
+    files.push({ path: MCP_FILE, action: await apply(root, MCP_FILE, mcpConfig, nextMcp, !invocation.portable) })
   } else {
     files.push({
       path: MCP_FILE,
@@ -158,10 +166,10 @@ export async function setupClaudeCode(root: string, invocation: Invocation): Pro
   return { files }
 }
 
-async function apply(root: string, file: string, before: Json | null, after: Json): Promise<FileAction> {
+async function apply(root: string, file: string, before: Json | null, after: Json, keepOutOfGit: boolean): Promise<FileAction> {
   if (before && JSON.stringify(before) === JSON.stringify(after)) return 'unchanged'
   await writeAtomically(join(root, file), after)
-  if (before === null) await addGitExclude(root, `/${file}`, 'Continuum: machine-specific Claude Code configuration')
+  if (before === null && keepOutOfGit) await addGitExclude(root, `/${file}`, GIT_EXCLUDE_COMMENT)
   return before === null ? 'created' : 'updated'
 }
 
