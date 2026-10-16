@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NotFoundError } from '@continuum/core'
+import { QueryCache } from '../services/queryCache'
 
 export interface QueryState<T> {
   data: T | undefined
@@ -7,48 +8,43 @@ export interface QueryState<T> {
   isLoading: boolean
 }
 
-// The demo dataset is static, so results are cached for the session to keep navigation instant.
-// Live local data changes, so entries then go stale after a few seconds and are refetched
-// on the next visit, while the stale copy keeps showing (stale-while-revalidate).
-const cache = new Map<string, { data: unknown; at: number }>()
-let cacheTtlMs = Number.POSITIVE_INFINITY
-
+/** Live local data goes stale after this long and is refreshed on the next visit. */
 export const LIVE_CACHE_TTL_MS = 5_000
+const MAX_CACHED_QUERIES = 100
+
+// The demo dataset is static, so by default results stay fresh for the whole session.
+const cache = new QueryCache({ ttlMs: Number.POSITIVE_INFINITY, maxEntries: MAX_CACHED_QUERIES })
 
 export function setQueryCacheTtl(ttlMs: number): void {
-  cacheTtlMs = ttlMs
+  cache.setTtl(ttlMs)
 }
 
-const isFresh = (key: string) => {
-  const entry = cache.get(key)
-  return entry !== undefined && Date.now() - entry.at < cacheTtlMs
-}
-
-interface Settled<T> {
+interface Settled {
   key: string
-  data?: T
   error?: Error
+  /** Bumped to re-render when a request for this key completes. */
+  version: number
 }
 
 /**
  * Loads data from the service layer with loading and error states.
  * `key` must uniquely identify the request; the fetcher is only re-run when it changes.
+ * Cached data always wins over an error: a failed refresh keeps showing the last good result.
  */
 export function useServiceQuery<T>(key: string, fetcher: () => Promise<T>): QueryState<T> {
-  const [settled, setSettled] = useState<Settled<T> | undefined>(undefined)
+  const [settled, setSettled] = useState<Settled | undefined>(undefined)
 
   useEffect(() => {
-    if (isFresh(key)) return
+    if (cache.isFresh(key)) return
     let isCancelled = false
-    fetcher().then(
-      (data) => {
-        cache.set(key, { data, at: Date.now() })
-        if (!isCancelled) setSettled({ key, data })
+    cache.load(key, fetcher).then(
+      () => {
+        if (!isCancelled) setSettled((previous) => ({ key, version: (previous?.version ?? 0) + 1 }))
       },
       (error: unknown) => {
         // Not-found is an expected, user-facing state; anything else is unexpected and worth logging.
         if (!(error instanceof NotFoundError)) console.error(`[continuum] Request "${key}" failed`, error)
-        if (!isCancelled) setSettled({ key, error: error instanceof Error ? error : new Error(String(error)) })
+        if (!isCancelled) setSettled((previous) => ({ key, error: error instanceof Error ? error : new Error(String(error)), version: (previous?.version ?? 0) + 1 }))
       },
     )
     return () => {
@@ -58,8 +54,7 @@ export function useServiceQuery<T>(key: string, fetcher: () => Promise<T>): Quer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  if (cache.has(key)) return { data: cache.get<T>(key), error: undefined, isLoading: false }
   const current = settled?.key === key ? settled : undefined
-  const cached = cache.get(key)
-  if (cached && !current?.error) return { data: (current?.data ?? cached.data) as T, error: undefined, isLoading: false }
-  return { data: current?.data, error: current?.error, isLoading: current === undefined }
+  return { data: undefined, error: current?.error, isLoading: current === undefined }
 }

@@ -1,12 +1,10 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { LIVE_CACHE_TTL_MS, setQueryCacheTtl } from '../hooks/useServiceQuery'
 import { dataMode, type DataMode } from '../services'
 
 const DataModeContext = createContext<DataMode>('demo')
 
 export function DataModeProvider({ children }: { children: ReactNode }) {
   const mode = dataMode()
-  if (mode === 'local') setQueryCacheTtl(LIVE_CACHE_TTL_MS)
   return <DataModeContext.Provider value={mode}>{children}</DataModeContext.Provider>
 }
 
