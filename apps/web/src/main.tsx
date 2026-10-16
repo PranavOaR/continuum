@@ -9,9 +9,15 @@ import './styles/globals.css'
 // Live local data changes under the dashboard; the demo dataset never does.
 if (dataMode() === 'local') {
   setQueryCacheTtl(LIVE_CACHE_TTL_MS)
+  let hasConnected = false
   connectLiveUpdates({
     onChange: invalidateQueries,
-    onConnected: () => setQueryCacheTtl(PUSHED_CACHE_TTL_MS),
+    onConnected: () => {
+      setQueryCacheTtl(PUSHED_CACHE_TTL_MS)
+      // After a reconnect, changes made while the stream was down were never pushed.
+      if (hasConnected) invalidateQueries()
+      hasConnected = true
+    },
     onDisconnected: () => setQueryCacheTtl(LIVE_CACHE_TTL_MS),
   })
 }

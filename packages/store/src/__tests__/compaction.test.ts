@@ -1,5 +1,10 @@
 import type { ContinuumEvent } from '@continuum/core'
-import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, onTestFinished } from 'vitest'
+
+const { DatabaseSync } = process.getBuiltinModule('node:sqlite')
 import { ContextStore } from '../contextStore'
 import { ev } from './fixtures'
 
@@ -66,6 +71,34 @@ describe('ContextStore.compact', () => {
     expect(store.firstEvent({ type: 'file.changed' })).toEqual(first)
     expect(store.firstEvent({ type: 'session.started' })).toEqual(firstSession)
     expect(store.firstEvent({ source: 'nowhere' })).toBeUndefined()
+    store.close()
+  })
+
+  it('keeps checks recorded by an earlier version readable after they are folded', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'continuum-compact-'))
+    const path = join(dir, 'context.db')
+    const store = ContextStore.open(path)
+    store.record(on(1, ev.file('src/a.ts', 'h-a1')))
+    store.record(on(2, ev.check('legacy', 0, { 'file:src/a.ts': 'h-a1' })))
+    store.record(on(20, ev.sessionStart('s1')))
+    // An earlier version stored the run record in another shape: the replay's record is not in this store.
+    const raw = new DatabaseSync(path)
+    raw.exec("DELETE FROM objects WHERE kind = 'check-run'")
+    raw.close()
+    store.compact(new Date('2026-10-10T00:00:00Z'))
+    onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
+    expect(store.checkRun('legacy')?.ranAgainst).toEqual({ 'file:src/a.ts': 'h-a1' })
+    expect(store.checkStatus('legacy').status).toBe('passed')
+    store.close()
+  })
+
+  it('never removes an event inside the window, even when an older-dated one follows it', () => {
+    const store = ContextStore.open(':memory:')
+    store.record(on(1, ev.file('src/a.ts', 'h-a1')))
+    store.record(on(20, ev.sessionStart('recent')))
+    store.record(on(2, ev.file('src/a.ts', 'h-a2')))
+    expect(store.compact(new Date('2026-10-10T00:00:00Z')).removedEvents).toBe(1)
+    expect(store.eventCount()).toBe(2)
     store.close()
   })
 

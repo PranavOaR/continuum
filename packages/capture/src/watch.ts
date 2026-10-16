@@ -132,7 +132,7 @@ export async function startCapture(store: ContextStore, root: string, options: C
 
   /** Out of inotify watches (or no recursive watch at all): keep capturing by scanning on a short interval. */
   const fallBackToPolling = (error: unknown) => {
-    if (mode === 'polling') return
+    if (mode === 'polling' || closed) return
     mode = 'polling'
     watcher?.close()
     watcher = null

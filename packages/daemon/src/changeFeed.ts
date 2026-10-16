@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises'
+import { openChangeProbe, type ChangeProbe } from '@continuum/store'
 
 /** How often a connected dashboard's repositories are checked for new records. */
 export const CHANGE_POLL_MS = 750
@@ -17,40 +17,44 @@ export interface ChangeFeed {
   close(): void
 }
 
-/** Size and modification time of the store and its write-ahead log: changes whenever anything is recorded. */
-async function fingerprint(storePath: string): Promise<string> {
-  const parts = await Promise.all(
-    [storePath, `${storePath}-wal`].map(async (path) => {
-      try {
-        const info = await stat(path)
-        return `${info.size}:${info.mtimeMs}`
-      } catch {
-        return 'missing'
-      }
-    }),
-  )
-  return parts.join('|')
-}
-
 /**
  * Notices new records in the served repositories (from hooks, `continuum run`,
- * a watcher or an agent) by polling file metadata only: no database reads
- * and nothing at all while no dashboard is open.
+ * a watcher or an agent) through SQLite's data_version on one read-only
+ * connection per store. The dashboard's own reads never register as changes.
+ * Nothing runs, and no connection is held, while no dashboard is open.
  */
 export function createChangeFeed(stores: readonly WatchedStore[], options: { pollMs?: number; onChange?: ChangeListener } = {}): ChangeFeed {
   const pollMs = options.pollMs ?? CHANGE_POLL_MS
   const listeners = new Set<ChangeListener>()
-  const last = new Map<string, string>()
+  const last = new Map<string, number>()
+  const probes = new Map<string, ChangeProbe>()
+
+  /** The store's commit counter, or null while it cannot be opened (e.g. the repository was removed). */
+  const versionOf = (store: WatchedStore): number | null => {
+    try {
+      let probe = probes.get(store.projectId)
+      if (!probe) {
+        probe = openChangeProbe(store.storePath)
+        probes.set(store.projectId, probe)
+      }
+      return probe.version()
+    } catch {
+      probes.get(store.projectId)?.close()
+      probes.delete(store.projectId)
+      return null
+    }
+  }
   let timer: NodeJS.Timeout | undefined
   let checking = false
 
-  const check = async () => {
+  const check = () => {
     if (checking) return
     checking = true
     try {
       const changed: string[] = []
       for (const store of stores) {
-        const current = await fingerprint(store.storePath)
+        const current = versionOf(store)
+        if (current === null) continue
         if (last.has(store.projectId) && last.get(store.projectId) !== current) changed.push(store.projectId)
         last.set(store.projectId, current)
       }
@@ -67,14 +71,16 @@ export function createChangeFeed(stores: readonly WatchedStore[], options: { pol
     clearInterval(timer)
     timer = undefined
     last.clear()
+    for (const probe of probes.values()) probe.close()
+    probes.clear()
   }
 
   return {
     subscribe(listener) {
       listeners.add(listener)
       if (!timer) {
-        void check()
-        timer = setInterval(() => void check(), pollMs)
+        check()
+        timer = setInterval(check, pollMs)
         timer.unref()
       }
       return () => {

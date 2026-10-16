@@ -46,3 +46,19 @@ export function isStoreBusy(path: string): boolean {
     db.close()
   }
 }
+
+export interface ChangeProbe {
+  /** Changes whenever another connection commits to the store; reads never change it. */
+  version(): number
+  close(): void
+}
+
+/** A read-only connection kept open to notice commits by hooks, the CLI or a watcher. */
+export function openChangeProbe(path: string): ChangeProbe {
+  const db = new DatabaseSync(path, { readOnly: true })
+  const query = db.prepare('PRAGMA data_version')
+  return {
+    version: () => (query.get() as { data_version: number }).data_version,
+    close: () => db.close(),
+  }
+}

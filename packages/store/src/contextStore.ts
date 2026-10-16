@@ -39,6 +39,12 @@ interface NodeRow {
   updated_at: string
 }
 
+interface ObjectRow {
+  hash: string
+  kind: string
+  body: string
+}
+
 interface EventRow {
   seq?: number
   type: string
@@ -141,7 +147,7 @@ export class ContextStore implements Mutations {
   /** The oldest event ever recorded, optionally the oldest from one source and of one type, including events compacted away. */
   firstEvent(filter: { source?: string; type?: ContinuumEvent['type'] } = {}): ContinuumEvent | undefined {
     const matches = (event: ContinuumEvent) => (filter.source === undefined || event.source === filter.source) && (filter.type === undefined || event.type === filter.type)
-    const compacted = this.checkpoint()?.firstEvents.find((entry) => matches(entry.event))
+    const compacted = this.compactedFirstEvents().find((entry) => matches(entry.event))
     if (compacted) return compacted.event
     const row = this.db
       .prepare(
@@ -189,6 +195,12 @@ export class ContextStore implements Mutations {
   }
 
   /** The latest compaction checkpoint, if the log was ever compacted. */
+  /** Just the first events kept by compaction, without unpacking the graph state. */
+  private compactedFirstEvents(): FirstEvent[] {
+    const row = this.db.prepare('SELECT first_events FROM checkpoints WHERE id = 1').get() as { first_events: string } | undefined
+    return row ? JSON.parse(row.first_events) : []
+  }
+
   checkpoint(): Checkpoint | undefined {
     const row = this.db.prepare('SELECT seq, created_at, state, first_events FROM checkpoints WHERE id = 1').get() as
       | { seq: number; created_at: string; state: Uint8Array; first_events: string }
@@ -207,7 +219,10 @@ export class ContextStore implements Mutations {
   compact(before: Date, at: Date = new Date()): CompactionResult {
     const previous = this.checkpoint()
     const fromSeq = previous?.seq ?? 0
-    const { cutoff } = this.db.prepare('SELECT MAX(seq) AS cutoff FROM events WHERE occurred_at < ?').get(before.toISOString()) as { cutoff: number | null }
+    // Everything before the first event inside the window: occurred_at is not strictly ordered by seq.
+    const { cutoff } = this.db
+      .prepare('SELECT COALESCE((SELECT MIN(seq) - 1 FROM events WHERE occurred_at >= ?1), (SELECT MAX(seq) FROM events)) AS cutoff')
+      .get(before.toISOString()) as { cutoff: number | null }
     if (cutoff === null || cutoff <= fromSeq) return { removedEvents: 0, checkpointSeq: previous?.seq ?? null }
 
     const rows = this.db
@@ -216,10 +231,13 @@ export class ContextStore implements Mutations {
     const folded = rows.map((row) => ({ seq: row.seq, event: toEvent(row) }))
     const scratch = ContextStore.open(':memory:')
     let state: GraphState
+    let objects: ObjectRow[]
     try {
       scratch.transaction(() => scratch.writeState(previous?.state ?? { nodes: [], edges: [] }))
       scratch.recordAll(folded.map(({ event }) => this.selfContained(event)))
       state = scratch.captureState()
+      // The replay may create objects the live store lacks (e.g. run records of legacy inline-coverage checks).
+      objects = scratch.db.prepare('SELECT hash, kind, body FROM objects').all() as unknown as ObjectRow[]
     } finally {
       scratch.close()
     }
@@ -229,6 +247,8 @@ export class ContextStore implements Mutations {
     this.transaction(() => {
       // Another process compacted meanwhile: its checkpoint wins and this one is discarded.
       if ((this.checkpoint()?.seq ?? 0) !== fromSeq) return
+      const insertObject = this.db.prepare('INSERT OR IGNORE INTO objects (hash, kind, body) VALUES (?, ?, ?)')
+      for (const object of objects) insertObject.run(object.hash, object.kind, object.body)
       this.db
         .prepare('INSERT OR REPLACE INTO checkpoints (id, seq, created_at, state, first_events) VALUES (1, ?, ?, ?, ?)')
         .run(cutoff, at.toISOString(), gzipSync(JSON.stringify(state)), JSON.stringify(firstEvents))

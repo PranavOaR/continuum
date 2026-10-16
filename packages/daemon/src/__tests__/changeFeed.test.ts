@@ -1,8 +1,9 @@
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ContinuumService } from '@continuum/core'
+import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createChangeFeed } from '../changeFeed'
 import { startDaemon, type RunningDaemon } from '../server'
@@ -18,8 +19,15 @@ function storeFile() {
   const dir = mkdtempSync(join(tmpdir(), 'continuum-feed-'))
   dirs.push(dir)
   const path = join(dir, 'context.db')
-  writeFileSync(path, 'v1')
+  ContextStore.open(path).close()
   return path
+}
+
+/** A commit from another process, as a hook or `continuum run` would make. */
+function recordSomething(path: string) {
+  const store = ContextStore.open(path)
+  store.record({ type: 'session.started', payload: { sessionId: `s-${Math.random()}`, agent: 'claude-code' }, evidence: 'observed', source: 'test', occurredAt: new Date().toISOString() })
+  store.close()
 }
 
 describe('createChangeFeed', () => {
@@ -39,9 +47,24 @@ describe('createChangeFeed', () => {
       seen.push(ids)
     })
     await new Promise((done) => setTimeout(done, 60))
-    appendFileSync(`${b}-wal`, 'record')
+    recordSomething(b)
     await vi.waitFor(() => expect(seen).toEqual([['b']]))
     expect(order).toEqual(['onChange', 'listener'])
+    unsubscribe()
+  })
+
+  it('ignores connections that only read, like the dashboard loading a snapshot', async () => {
+    const path = storeFile()
+    const onChange = vi.fn()
+    const feed = createChangeFeed([{ projectId: 'a', storePath: path }], { pollMs: 10, onChange })
+    const unsubscribe = feed.subscribe(() => {})
+    for (let read = 0; read < 5; read += 1) {
+      const reader = ContextStore.open(path)
+      reader.eventCount()
+      reader.close()
+      await new Promise((done) => setTimeout(done, 15))
+    }
+    expect(onChange).not.toHaveBeenCalled()
     unsubscribe()
   })
 
@@ -50,7 +73,7 @@ describe('createChangeFeed', () => {
     const onChange = vi.fn()
     const feed = createChangeFeed([{ projectId: 'a', storePath: path }], { pollMs: 10, onChange })
     feed.subscribe(() => {})()
-    appendFileSync(path, 'changed while unobserved')
+    recordSomething(path)
     await new Promise((done) => setTimeout(done, 60))
     expect(onChange).not.toHaveBeenCalled()
   })
@@ -79,7 +102,7 @@ describe('GET /api/events', () => {
     let received = ''
     expect(await openStream(daemon, (text) => (received += text))).toBe(200)
     await new Promise((done) => setTimeout(done, 60))
-    appendFileSync(path, 'new record')
+    recordSomething(path)
     await vi.waitFor(() => expect(received).toContain('event: change\ndata: {"projectIds":["acme"]}'))
   })
 
