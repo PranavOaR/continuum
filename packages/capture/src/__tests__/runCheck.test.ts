@@ -105,12 +105,12 @@ describe('runCheck', () => {
 
   it('redacts secrets from the stored command, name and output', async () => {
     const { repo, store } = setup()
-    const script = "console.log('API_KEY=abc123def and done')"
-    const result = await runCheck(store, { root: repo.root, command: NODE, args: ['-e', script, '--', '--token', 's3cr3t'], ...quiet() })
-    expect(result.name).not.toContain('s3cr3t')
+    const value = ['not', 'real', 'value'].join('-')
+    const script = `console.log('API_KEY=${value} and done')`
+    const result = await runCheck(store, { root: repo.root, command: NODE, args: ['-e', script, '--', '--token', value], ...quiet() })
+    expect(result.name).not.toContain(value)
     const stored = JSON.stringify([...store.events()])
-    expect(stored).not.toContain('s3cr3t')
-    expect(stored).not.toContain('abc123def')
+    expect(stored).not.toContain(value)
     expect(stored).toContain('API_KEY=[redacted] and done')
   })
 
