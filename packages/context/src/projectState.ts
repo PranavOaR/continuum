@@ -34,6 +34,8 @@ export interface CheckSummary {
   ranAt: string | null
   /** Paths whose content changed since the check ran. */
   changed: string[]
+  /** verified: run by `continuum run`; observed: an agent ran it and Claude Code reported the exit code. */
+  evidence: EvidenceType
 }
 
 export interface DecisionSummary {
@@ -107,6 +109,8 @@ function summarizeCheck(store: ContextStore, node: GraphNode, current: CurrentHa
     exitCode: typeof node.props.exitCode === 'number' ? node.props.exitCode : null,
     ranAt: text(node.props.ranAt),
     changed: changed.map(pathOf),
+    // Runs recorded before evidence was stored on the node all came from `continuum run`.
+    evidence: (text(node.props.evidence) ?? 'verified') as EvidenceType,
   }
 }
 

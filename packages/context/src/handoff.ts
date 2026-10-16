@@ -99,15 +99,16 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
 }
 
 function describeCheck(check: CheckSummary, now: Date): string {
+  const tag = check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'
   const ran = `Ran ${agoFromIso(check.ranAt, now)}`
   const label = `${code(check.name)} (${code(check.command)})`
   switch (check.status) {
     case 'out-of-date':
-      return `- [verified] OUT OF DATE: ${label}. ${ran}; changed since: ${listPaths(check.changed)}`
+      return `- ${tag} OUT OF DATE: ${label}. ${ran}; changed since: ${listPaths(check.changed)}`
     case 'failed':
-      return `- [verified] FAILED: ${label}, exit ${check.exitCode ?? '?'}. ${ran}`
+      return `- ${tag} FAILED: ${label}, exit ${check.exitCode ?? '?'}. ${ran}`
     case 'passed':
-      return `- [verified] passed: ${label}. ${ran}`
+      return `- ${tag} passed: ${label}. ${ran}`
     default:
       return `- ${check.status}: ${label}`
   }
@@ -174,7 +175,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
   const header = [
     `# Continuum handoff: ${basename(state.root)}`,
     `Generated ${state.generatedAt}, revision ${state.revision ?? 'none (no commits yet)'}, ${state.files.tracked} tracked files.`,
-    'Evidence labels: [verified] = recorded check run, [agent-reported] = an agent said so, not proof.',
+    'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof.',
   ]
   return fit(
     [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), unrecordedSection(state), earlierSection(state, now)],

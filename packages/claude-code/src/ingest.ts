@@ -7,12 +7,16 @@ import {
   isRegularFileInRepo,
   locateWorkspace,
   NotAGitRepositoryError,
+  readConfig,
   readWorkingTree,
+  scanRepository,
+  coverage,
   type Workspace,
 } from '@continuum/capture'
 import { currentTaskId, projectState, renderHandoff } from '@continuum/context'
 import { ContextStore, keys, normalizePath } from '@continuum/store'
-import { editedPath, parseHookPayload, type HookPayload } from './hookPayload'
+import { agentCheckOf } from './agentCheck'
+import { editedPath, parseHookPayload, SHELL_TOOL, type HookPayload } from './hookPayload'
 import { translateHook, type FileEdit } from './translate'
 
 /** SessionStart context is capped at 10,000 characters by Claude Code; stay well inside it. */
@@ -75,6 +79,9 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
   const workspace = await findWorkspace(payload.cwd)
   if (!workspace) return { status: 'ignored', reason: 'Continuum is not set up in this repository' }
 
+  if ('tool_name' in payload && payload.tool_name === SHELL_TOOL) return recordAgentCheck(payload, workspace, now)
+  if (payload.hook_event_name === 'PostToolUseFailure') return { status: 'ignored', reason: 'only failed Bash checks are recorded' }
+
   const edit = await resolveEdit(workspace.root, payload)
   if (editedPath(payload) && !edit) return { status: 'ignored', reason: 'edited file is outside what Continuum captures' }
   const revision = await headRevision(workspace.root)
@@ -93,6 +100,34 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
     const additionalContext =
       payload.hook_event_name === 'SessionStart' ? await sessionStartContext(store, workspace.root, payload.session_id, now) : undefined
     return { status: 'recorded', events: recorded.length, ...(additionalContext ? { additionalContext } : {}) }
+  } finally {
+    store.close()
+  }
+}
+
+/**
+ * A test, lint, typecheck or build command the agent ran through Bash,
+ * recorded against the working tree as it is now, with the exit code Claude
+ * Code observed. Turned off with `continuum config agent-checks off`.
+ */
+async function recordAgentCheck(payload: HookPayload, workspace: Workspace, now: Date): Promise<IngestOutcome> {
+  const check = agentCheckOf(payload)
+  if (!check) return { status: 'ignored', reason: 'not a recognized check command' }
+  if (!(await readConfig(workspace.root)).agentChecks) return { status: 'ignored', reason: 'agent checks are turned off for this repository' }
+  const revision = await headRevision(workspace.root)
+  const store = ContextStore.open(workspace.storePath)
+  try {
+    // Record what changed first, so the check's coverage matches the recorded file state.
+    const { tree } = await scanRepository(store, workspace.root, { now: () => now })
+    const recorded = store.transact(() =>
+      translateHook(payload, {
+        now,
+        revision,
+        knownSession: store.graph.has(keys.session(payload.session_id)),
+        check: { ...check, coverage: store.putCoverage(coverage(tree.files)) },
+      }),
+    )
+    return { status: 'recorded', events: recorded.length }
   } finally {
     store.close()
   }

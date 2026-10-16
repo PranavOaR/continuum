@@ -21,7 +21,18 @@ const postToolUse = z.looseObject({
   tool_response: z.unknown().optional(),
 })
 
-export const hookPayloadSchema = z.discriminatedUnion('hook_event_name', [sessionStart, sessionEnd, stop, postToolUse])
+/** A tool call that failed; for Bash, `error` starts with "Exit code N" when the command ran. */
+const postToolUseFailure = z.looseObject({
+  ...common,
+  hook_event_name: z.literal('PostToolUseFailure'),
+  tool_name: z.string(),
+  tool_input: z.record(z.string(), z.unknown()),
+  error: z.string().optional(),
+  is_interrupt: z.boolean().optional(),
+  duration_ms: z.number().optional(),
+})
+
+export const hookPayloadSchema = z.discriminatedUnion('hook_event_name', [sessionStart, sessionEnd, stop, postToolUse, postToolUseFailure])
 export type HookPayload = z.infer<typeof hookPayloadSchema>
 
 export class InvalidHookPayloadError extends Error {
@@ -53,6 +64,9 @@ export const FILE_EDIT_TOOLS: Readonly<Record<string, string>> = {
   MultiEdit: 'file_path',
   NotebookEdit: 'notebook_path',
 }
+
+/** The shell tool whose test, lint and build runs are recorded as agent checks. */
+export const SHELL_TOOL = 'Bash'
 
 /** The absolute path a file-editing tool call wrote, if this payload is one. */
 export function editedPath(payload: HookPayload): string | null {

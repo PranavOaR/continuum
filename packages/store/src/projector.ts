@@ -97,7 +97,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const runHash = store.putObject('check-run', { ...run, coverage: coverageHash, ranAt: at, revision: event.revision })
       store.upsertNode(check, {
         hash: runHash,
-        props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at },
+        props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at, evidence: event.evidence, source: event.source },
         at,
       })
       for (const covered of ensureAnchors(store, ranAgainst, at)) store.link(check, 'ran_against', covered)

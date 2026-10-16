@@ -32,9 +32,10 @@ describe('setupClaudeCode', () => {
       { path: MCP_FILE, action: 'created' },
     ])
     const { hooks } = readJson(root, HOOKS_FILE)
-    expect(Object.keys(hooks).sort()).toEqual(['PostToolUse', 'SessionEnd', 'SessionStart', 'Stop'])
+    expect(Object.keys(hooks).sort()).toEqual(['PostToolUse', 'PostToolUseFailure', 'SessionEnd', 'SessionStart', 'Stop'])
     expect(hooks.SessionStart[0].hooks[0]).toEqual({ type: 'command', command: INVOCATION.command, args: [...INVOCATION.args, 'ingest'], timeout: 20 })
-    expect(hooks.PostToolUse[0]).toMatchObject({ matcher: 'Write|Edit|MultiEdit|NotebookEdit', hooks: [{ async: true }] })
+    expect(hooks.PostToolUse[0]).toMatchObject({ matcher: 'Write|Edit|MultiEdit|NotebookEdit|Bash', hooks: [{ async: true }] })
+    expect(hooks.PostToolUseFailure[0]).toMatchObject({ matcher: 'Bash', hooks: [{ async: true }] })
     expect(hooks.Stop[0].hooks[0].async).toBeUndefined()
     expect(readJson(root, MCP_FILE)).toEqual({ mcpServers: { continuum: { command: INVOCATION.command, args: [...INVOCATION.args, 'mcp'] } } })
     expect(git('status', '--porcelain')).toBe('?? a.ts')

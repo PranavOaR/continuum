@@ -133,3 +133,57 @@ describe('ingestHook', () => {
     expect(first).toEqual({ status: 'recorded', events: 1 })
   })
 })
+
+describe('ingestHook for checks the agent runs', () => {
+  const bash = (command: string) => ({ tool_name: 'Bash', tool_input: { command, description: 'run tests' } })
+
+  it('records a passing test run as observed, against the files as they are now', async () => {
+    const { repo, storePath } = await initialized()
+    repo.write('src/a.ts', 'a2')
+    const outcome = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { stdout: '3 passed', stderr: '', interrupted: false }, duration_ms: 1500 }), { now: () => NOW })
+    expect(outcome).toEqual({ status: 'recorded', events: 1 })
+    withStore(storePath, (store) => {
+      expect(store.checkStatus('npm test').status).toBe('passed')
+      expect(store.graph.get('check:npm test')?.props).toMatchObject({ evidence: 'observed', source: 'adapter:claude-code', exitCode: 0 })
+      expect(store.checkRun('npm test')?.ranAgainst).toHaveProperty('file:src/a.ts')
+    })
+  })
+
+  it('records a failing run with the exit code Claude Code reported', async () => {
+    const { repo, storePath } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUseFailure', ...bash('npx vitest run'), error: 'Exit code 1\nFAIL src/a.test.ts' }), { now: () => NOW })
+    withStore(storePath, (store) => {
+      expect(store.checkStatus('npx vitest run').status).toBe('failed')
+      expect(store.graph.get('check:npx vitest run')?.props.exitCode).toBe(1)
+    })
+  })
+
+  it('ignores other commands, interrupted runs and failures without an exit code', async () => {
+    const { repo, storePath } = await initialized()
+    const events = withStore(storePath, (store) => store.eventCount())
+    const ignored = [
+      { hook_event_name: 'PostToolUse', ...bash('ls -la'), tool_response: { stdout: '' } },
+      { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { interrupted: true } },
+      { hook_event_name: 'PostToolUseFailure', ...bash('npm test'), error: 'Command timed out' },
+      { hook_event_name: 'PostToolUseFailure', ...bash('npm test'), error: 'Exit code 130', is_interrupt: true },
+      { hook_event_name: 'PostToolUseFailure', tool_name: 'Write', tool_input: { file_path: join(repo.root, 'src/a.ts') }, error: 'denied' },
+    ]
+    for (const fields of ignored) expect((await ingestHook(hook(repo, fields), { now: () => NOW })).status).toBe('ignored')
+    expect(withStore(storePath, (store) => store.eventCount())).toBe(events)
+  })
+
+  it('respects agent checks being turned off', async () => {
+    const { repo } = await initialized()
+    const { updateConfig } = await import('@continuum/capture')
+    await updateConfig(repo.root, { agentChecks: false })
+    const outcome = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { stdout: 'ok' } }), { now: () => NOW })
+    expect(outcome).toEqual({ status: 'ignored', reason: 'agent checks are turned off for this repository' })
+  })
+
+  it('labels agent runs differently from verified runs in the next briefing', async () => {
+    const { repo } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { stdout: 'ok' } }), { now: () => NOW })
+    const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: () => NOW })
+    expect(next.status === 'recorded' && next.additionalContext).toContain('[observed: run by an agent] passed: `npm test`')
+  })
+})
