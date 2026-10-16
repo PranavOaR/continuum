@@ -26,6 +26,7 @@ export async function cli(cwd: string, argv: string[], extra: Partial<Io> = {}) 
     stdout: sink(raw),
     stderr: sink(raw),
     signal: new AbortController().signal,
+    readStdin: async () => '',
     ...extra,
   })
   return { code, out: out.join('\n'), err: err.join('\n'), raw: raw.join('') }

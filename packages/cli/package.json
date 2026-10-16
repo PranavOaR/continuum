@@ -16,9 +16,12 @@
   },
   "dependencies": {
     "@continuum/capture": "*",
+    "@continuum/claude-code": "*",
     "@continuum/context": "*",
     "@continuum/core": "*",
-    "@continuum/store": "*"
+    "@continuum/mcp": "*",
+    "@continuum/store": "*",
+    "tsx": "^4.23.15"
   },
   "engines": {
     "node": ">=22.5"

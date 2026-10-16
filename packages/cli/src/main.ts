@@ -1,10 +1,16 @@
 import { resolve } from 'node:path'
 import { CommandNotFoundError, NotAGitRepositoryError, WatchUnavailableError } from '@continuum/capture'
+import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
+import { handoffCommand } from './commands/handoff'
+import { ingestCommand } from './commands/ingest'
 import { initCommand } from './commands/init'
+import { mcpCommand } from './commands/mcp'
 import { RUN_USAGE, runCommand } from './commands/run'
 import { scanCommand } from './commands/scan'
+import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
+import { selfInvocation } from './invocation'
 import { EXIT_FAILURE, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE, type Io } from './io'
 import { NotInitializedError } from '@continuum/capture'
 
@@ -21,6 +27,12 @@ Commands
   status               Show tracked files, unrecorded changes and check results
   run -- <command>     Run a check (tests, lint, build) and record it as verified
                        ${RUN_USAGE.replace('Usage: ', '')}
+  handoff              Print where the project left off, for any agent or chat
+  setup claude-code    Connect Claude Code to this repository (--remove to undo)
+
+Used by agents
+  mcp                  Serve the Continuum MCP server on stdio
+  ingest               Record one Claude Code hook payload from stdin
 
 Options
   -C, --cwd <dir>      Run as if started in <dir>
@@ -37,6 +49,10 @@ const COMMANDS: Record<string, Command> = {
   scan: (io) => scanCommand(io),
   status: (io) => statusCommand(io),
   run: (io, args) => runCommand(io, args),
+  handoff: (io, args) => handoffCommand(io, args),
+  setup: (io, args) => setupCommand(io, args, selfInvocation()),
+  mcp: (io) => mcpCommand(io, VERSION),
+  ingest: (io) => ingestCommand(io),
 }
 
 interface GlobalArgs {
@@ -77,7 +93,9 @@ function isExpected(error: unknown): error is Error {
     error instanceof NotAGitRepositoryError ||
     error instanceof NotInitializedError ||
     error instanceof CommandNotFoundError ||
-    error instanceof WatchUnavailableError
+    error instanceof WatchUnavailableError ||
+    error instanceof SetupError ||
+    error instanceof InvalidHookPayloadError
   )
 }
 
