@@ -45,6 +45,7 @@ describe('continuum setup claude-code', () => {
     expect(setup.out).toContain('created   .claude/settings.local.json')
     expect(setup.out).toContain('created   .mcp.json')
     expect(repo.git('status', '--porcelain')).not.toMatch(/\.mcp\.json|\.claude|\.continuum/)
+    expect((await cli(repo.root, ['status'])).out).toContain('2 tracked files · all recorded')
 
     const removed = await cli(repo.root, ['setup', 'claude-code', '--remove'])
     expect(removed.out).toContain('removed   .claude/settings.local.json')

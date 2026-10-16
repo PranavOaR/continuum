@@ -83,8 +83,10 @@ function ourHooks(invocation: Invocation): Record<string, HookGroup[]> {
     // Synchronous: its output is injected as context before Claude's first turn.
     SessionStart: [{ hooks: [handler({ timeout: SESSION_START_TIMEOUT_S })] }],
     SessionEnd: [{ hooks: [handler({ timeout: SESSION_END_TIMEOUT_S })] }],
-    // In the background, so capture never slows Claude down.
-    Stop: [{ hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
+    // Synchronous too: Claude Code can exit right after the last turn (always with -p),
+    // which kills background hooks before the final message is recorded.
+    Stop: [{ hooks: [handler({ timeout: SESSION_END_TIMEOUT_S })] }],
+    // In the background, so capture never slows editing down; the session keeps running meanwhile.
     PostToolUse: [{ matcher: Object.keys(FILE_EDIT_TOOLS).join('|'), hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
   }
 }
