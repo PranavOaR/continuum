@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import { currentBranch, openWorkspace, readWorkingTree, type WorkingTree } from '@continuum/capture'
+import { currentBranch, openWorkspace, readWorkingTree, uncommittedChanges, type UncommittedDiff, type WorkingTree } from '@continuum/capture'
 import { liveHashes, projectState, type ProjectState } from '@continuum/context'
 import type { ContinuumEvent, CurrentHashes } from '@continuum/core'
 import type { GraphNode, ContextStore, Edge } from '@continuum/store'
@@ -15,6 +15,8 @@ export interface RepoSnapshot {
   branch: string | null
   state: ProjectState
   tree: WorkingTree
+  /** Uncommitted change per path against the last commit, read live from git. */
+  diffs: ReadonlyMap<string, UncommittedDiff>
   current: CurrentHashes
   /** When the first scan recorded the existing files; those baseline events are not "work". */
   baselineAt: string | null
@@ -69,13 +71,14 @@ function snapshotGraph(store: ContextStore): Pick<RepoSnapshot, 'nodes' | 'edges
 export async function loadSnapshot(projectId: string, cwd: string, now: Date): Promise<RepoSnapshot> {
   const { workspace, store } = await openWorkspace(cwd)
   try {
-    const [tree, branch] = await Promise.all([readWorkingTree(workspace.root), currentBranch(workspace.root)])
+    const [tree, branch, diffs] = await Promise.all([readWorkingTree(workspace.root), currentBranch(workspace.root), uncommittedChanges(workspace.root)])
     return {
       projectId,
       root: workspace.root,
       name: basename(workspace.root),
       branch,
       tree,
+      diffs,
       state: projectState(store, tree, now),
       current: liveHashes(store, tree),
       baselineAt: firstScanTime(store),

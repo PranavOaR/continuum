@@ -3,6 +3,7 @@ import { CommandNotFoundError, NotAGitRepositoryError, WatchUnavailableError } f
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
 import { PortInUseError } from '@continuum/daemon'
 import { compactCommand } from './commands/compact'
+import { configCommand } from './commands/config'
 import { doctorCommand } from './commands/doctor'
 import { handoffCommand } from './commands/handoff'
 import { ingestCommand } from './commands/ingest'
@@ -36,6 +37,7 @@ Commands
   handoff              Print where the project left off, for any agent or chat
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
+  config [name on|off] Show or change settings: agent-checks, prompts
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
   doctor               Check the install and this repository's setup, with fixes
   uninstall [--purge]  Disconnect Claude Code; --purge also deletes .continuum/
@@ -67,6 +69,7 @@ const COMMANDS: Record<string, Command> = {
   mcp: (io) => mcpCommand(io, VERSION),
   ingest: (io) => ingestCommand(io),
   compact: (io, args) => compactCommand(io, args),
+  config: (io, args) => configCommand(io, args),
   doctor: (io, args) => doctorCommand(io, args, selfInvocation()),
   uninstall: (io, args) => uninstallCommand(io, args),
 }

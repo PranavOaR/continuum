@@ -69,6 +69,7 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   'test-result': 'Test result',
   handoff: 'Handoff',
   session: 'Session',
+  commit: 'Commit',
 }
 
 export const HANDOFF_STATUS_LABEL: Record<HandoffStatus, string> = {

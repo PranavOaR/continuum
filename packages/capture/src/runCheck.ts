@@ -126,7 +126,8 @@ function execute(options: RunCheckOptions): Promise<ProcessOutcome> {
   })
 }
 
-function coverage(files: ReadonlyMap<string, ContentHash>): Record<IdentityKey, ContentHash> {
+/** Identity → content hash of every file in a working tree: what a check ran against. */
+export function coverage(files: ReadonlyMap<string, ContentHash>): Record<IdentityKey, ContentHash> {
   return Object.fromEntries([...files].map(([path, hash]) => [keys.file(path), hash]))
 }
 

@@ -1,7 +1,7 @@
 export { ContextStore, type StoreSnapshot } from './contextStore'
 export { EDGE_TYPES, GraphIndex, type Direction, type Edge, type EdgeType, type GraphNode } from './graphIndex'
 export { canonicalJson, hashContent, hashRecord } from './hash'
-export { NODE_KINDS, keys, kindOf, normalizePath, type NodeKind } from './keys'
+export { NODE_KINDS, keys, kindOf, normalizePath, REPOSITORY_NODE, type NodeKind } from './keys'
 export { project, type Mutations } from './projector'
 export { LATEST_SCHEMA_VERSION, migrate, MIGRATIONS, readSchemaVersion, StoreVersionError, type Migration } from './migrations'
 export { inspectStore, isCorruptStoreError, isStoreBusy, openChangeProbe, type ChangeProbe, type StoreInfo } from './inspect'

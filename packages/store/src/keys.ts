@@ -20,6 +20,9 @@ export const keys = {
   memory: (id: string): IdentityKey => `memory:${id}`,
 }
 
+/** The repository itself: holds repository-wide facts such as the last recorded HEAD. */
+export const REPOSITORY_NODE: IdentityKey = keys.project('repository')
+
 export function kindOf(key: IdentityKey): NodeKind {
   const kind = key.slice(0, key.indexOf(':'))
   if (!KIND_SET.has(kind)) throw new Error(`Invalid identity key "${key}"`)

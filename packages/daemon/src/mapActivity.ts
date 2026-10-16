@@ -15,6 +15,7 @@ function sessionAgent(snapshot: RepoSnapshot, sessionId: string | undefined) {
 }
 
 function isBaseline(snapshot: RepoSnapshot, event: ContinuumEvent): boolean {
+  if (event.type === 'commit.recorded') return event.payload.baseline === true
   return event.type === 'file.changed' && event.source === 'watcher:git' && event.occurredAt === snapshot.baselineAt
 }
 
@@ -45,7 +46,7 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
       return {
         type: 'test-result',
         title: `${name} ${exitCode === 0 ? 'passed' : 'failed'}`,
-        description: `\`${command}\` exited ${exitCode} after ${(durationMs / 1000).toFixed(1)}s.`,
+        description: `${event.evidence === 'verified' ? '' : 'Run by an agent: '}\`${command}\` exited ${exitCode}${durationMs > 0 ? ` after ${(durationMs / 1000).toFixed(1)}s` : ''}.`,
       }
     }
     case 'memory.recorded':
@@ -67,6 +68,18 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
         ...(agent ? { agent } : {}),
         ...withTask(sessionTask(snapshot, event.payload.sessionId)),
       }
+    }
+    case 'session.task': {
+      const agent = sessionAgent(snapshot, event.payload.sessionId)
+      return { type: 'session', title: 'Session took up a task', description: 'Edits in this session are attributed to this task.', ...(agent ? { agent } : {}), taskId: event.payload.taskId }
+    }
+    case 'session.prompted': {
+      const agent = sessionAgent(snapshot, event.payload.sessionId)
+      return { type: 'session', title: 'You asked', description: clip(event.payload.prompt), ...(agent ? { agent } : {}), ...withTask(sessionTask(snapshot, event.payload.sessionId)) }
+    }
+    case 'commit.recorded': {
+      const { hash, message, files } = event.payload
+      return { type: 'commit', title: clip(message) || `Commit ${hash.slice(0, 7)}`, description: `Committed as ${hash.slice(0, 7)}; ${files.length} file${files.length === 1 ? '' : 's'}.` }
     }
     case 'task.upserted':
       return {

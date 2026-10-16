@@ -1,7 +1,7 @@
 import type { ContentHash, ContinuumEvent, IdentityKey } from '@continuum/core'
 import type { EdgeType, UpsertInput } from './graphIndex'
 import { hashRecord } from './hash'
-import { keys } from './keys'
+import { keys, REPOSITORY_NODE } from './keys'
 
 /** The write operations a projection may perform. ContextStore implements them with write-through persistence. */
 export interface Mutations {
@@ -69,6 +69,26 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       store.upsertNode(session, { hash: hashRecord('session-progress', event.payload), props: { lastNote: event.payload.note, lastActivityAt: at }, at })
       return
     }
+    case 'session.task': {
+      const { sessionId, taskId } = event.payload
+      const session = keys.session(sessionId)
+      ensure(store, session, at)
+      ensure(store, keys.task(taskId), at)
+      store.upsertNode(session, { hash: hashRecord('session-task', event.payload), props: { taskId, lastActivityAt: at }, at })
+      store.link(session, 'worked_on', keys.task(taskId))
+      return
+    }
+    case 'session.prompted': {
+      const session = keys.session(event.payload.sessionId)
+      ensure(store, session, at)
+      store.upsertNode(session, { hash: hashRecord('session-prompt', event.payload), props: { lastPrompt: event.payload.prompt, lastActivityAt: at }, at })
+      return
+    }
+    case 'commit.recorded': {
+      const { hash, message } = event.payload
+      store.upsertNode(REPOSITORY_NODE, { hash: null, props: { head: hash, headMessage: message, headRecordedAt: at }, at })
+      return
+    }
     case 'session.ended': {
       const session = keys.session(event.payload.sessionId)
       ensure(store, session, at)
@@ -78,7 +98,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
     case 'file.changed': {
       const { path, contentHash, changeType, additions, deletions, sessionId, taskId } = event.payload
       const file = keys.file(path)
-      store.upsertNode(file, { hash: contentHash, props: { path: file.slice('file:'.length), changeType, additions, deletions, revision: event.revision }, at })
+      store.upsertNode(file, { hash: contentHash, props: { path: file.slice('file:'.length), changeType, additions, deletions, revision: event.revision, changedBy: sessionId ?? null }, at })
       if (sessionId) {
         ensure(store, keys.session(sessionId), at)
         store.link(keys.session(sessionId), 'modified', file)
@@ -97,7 +117,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const runHash = store.putObject('check-run', { ...run, coverage: coverageHash, ranAt: at, revision: event.revision })
       store.upsertNode(check, {
         hash: runHash,
-        props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at },
+        props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at, evidence: event.evidence, source: event.source },
         at,
       })
       for (const covered of ensureAnchors(store, ranAgainst, at)) store.link(check, 'ran_against', covered)
