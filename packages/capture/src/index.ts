@@ -7,3 +7,4 @@ export { addGitExclude, excludeFromGit, includeInGit, initWorkspace, isInitializ
 export { MAX_EXCERPT_LINES, MAX_PATCH_LINES, uncommittedChanges, type UncommittedDiff } from './diff'
 export { CONFIG_FILE, DEFAULT_CONFIG, readConfig, updateConfig, type ContinuumConfig } from './config'
 export { commitsSince, MAX_COMMITS_PER_SCAN, recordedHead, type CommitInfo } from './commits'
+export { IGNORE_FILE, loadContinuumIgnore, type IgnorePredicate } from './continuumIgnore'
