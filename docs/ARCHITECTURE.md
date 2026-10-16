@@ -124,3 +124,19 @@ Milestones are sequential; each ends with something demonstrable. Detailed tasks
 | M6 | **Second agent + release** | Codex or Cursor over MCP; redaction, ignore rules, `forget`; packaged `v0.1` |
 
 **The proof point** is reached at M3: you work in Claude Code, stop mid-task, open a fresh session, and it resumes from Continuum's state without you re-explaining anything.
+
+---
+
+## 4. Distribution: anyone can try it
+
+The goal is that any developer can try Continuum in minutes, without an account.
+
+| Surface | How people get it | Notes |
+| --- | --- | --- |
+| **CLI + daemon** | `npx <scope>/continuum init` inside any git repo | Published to npm under a scope we own (the unscoped `continuum` name is taken). Requires Node 22.5+ for built-in SQLite. |
+| **Web dashboard** | Served locally by the daemon at `http://127.0.0.1:<port>` | The `apps/web` build ships inside the npm package; no separate install. |
+| **Claude Code integration** | One plugin install that bundles the MCP server, hooks and `/handoff` | Project-scoped by default; nothing written to global settings without consent. |
+| **Other agents** | `continuum mcp` registered in Codex or Cursor settings | Same MCP server. |
+| **Public demo** | Landing page plus mock-data demo hosted on a static host | No backend; shows the product before install. |
+
+Release checklist (M6): npm scope and name reserved, `npx` path tested on clean macOS and Linux machines, plugin install tested in a fresh repo, public demo deployed, and an "Uninstall / forget my data" section in the README.
