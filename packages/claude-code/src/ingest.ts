@@ -87,7 +87,7 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
         revision,
         knownSession: store.graph.has(keys.session(payload.session_id)),
         ...(edit ? { edit } : {}),
-        ...withTask(currentTaskId(store)),
+        ...withTask(currentTaskId(store, now)),
       }),
     )
     const additionalContext =

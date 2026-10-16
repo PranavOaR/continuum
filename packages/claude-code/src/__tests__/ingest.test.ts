@@ -115,7 +115,7 @@ describe('ingestHook', () => {
     )
     await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'one'), { now: () => NOW })
     repo.write('src/a.ts', 'oauth work')
-    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/a.ts') } }, 'one'))
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/a.ts') } }, 'one'), { now: () => NOW })
     withStore(storePath, (store) => {
       expect(store.graph.neighbors('task:oauth', { direction: 'out', types: ['touches'] })).toEqual(['file:src/a.ts'])
       expect(store.graph.neighbors('session:one', { direction: 'out', types: ['worked_on'] })).toEqual(['task:oauth'])

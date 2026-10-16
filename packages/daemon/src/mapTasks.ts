@@ -1,6 +1,7 @@
 import type { ProjectTask } from '@continuum/core'
 import type { TaskSummary } from '@continuum/context'
 import { ids } from './ids'
+import { toFiles } from './mapProject'
 import type { RepoSnapshot } from './snapshot'
 
 const AGENT_REPORTED = 'Reported by the agent through update_task; not verified.'
@@ -13,6 +14,9 @@ function checksCovering(snapshot: RepoSnapshot, files: readonly string[]): strin
 }
 
 export function toTask(snapshot: RepoSnapshot, task: TaskSummary): ProjectTask {
+  // Only files the dashboard lists (changed, within the cap) can be linked.
+  const listed = new Set(toFiles(snapshot).map((file) => file.path))
+  const files = task.files.filter((path) => listed.has(path))
   return {
     id: task.id,
     projectId: snapshot.projectId,
@@ -29,8 +33,8 @@ export function toTask(snapshot: RepoSnapshot, task: TaskSummary): ProjectTask {
     completedSteps: task.completedSteps,
     remainingSteps: task.remainingSteps,
     ...(task.nextAction ? { nextAction: task.nextAction } : {}),
-    relatedFileIds: task.files.map((path) => ids.file(snapshot.projectId, path)),
-    verificationIds: checksCovering(snapshot, task.files),
+    relatedFileIds: files.map((path) => ids.file(snapshot.projectId, path)),
+    verificationIds: checksCovering(snapshot, files),
     updatedAt: task.updatedAt,
   }
 }

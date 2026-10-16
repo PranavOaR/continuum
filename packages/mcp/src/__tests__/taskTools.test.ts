@@ -67,6 +67,28 @@ describe('task tools', () => {
     expect((await call('get_handoff', {})).text).not.toContain('## Current task')
   })
 
+  it('pauses the previous in-progress task when a new one starts', async () => {
+    const { repo, call } = await connect()
+    await call('start_task', { title: 'Abandoned' })
+    await call('start_task', { title: 'Fresh' })
+    const { store } = await openWorkspace(repo.root)
+    try {
+      const statuses = Object.fromEntries(store.graph.keysOfKind('task').map((key) => [store.graph.get(key)?.props.title, store.graph.get(key)?.props.status]))
+      expect(statuses).toEqual({ Abandoned: 'planned', Fresh: 'in-progress' })
+    } finally {
+      store.close()
+    }
+    await call('update_task', { status: 'completed' })
+    expect((await call('get_handoff', {})).text).not.toContain('## Current task')
+  })
+
+  it('records each finished step once', async () => {
+    const { call } = await connect()
+    await call('start_task', { title: 'Steps', steps: ['a', 'b'] })
+    expect((await call('update_task', { completed_steps: ['a', 'a'] })).text).toContain('1 step(s) remaining')
+    expect((await call('get_handoff', {})).text).toContain('Done:\n  - a\nRemaining:\n  - b')
+  })
+
   it('attaches decisions to the current task', async () => {
     const { repo, call } = await connect()
     await call('start_task', { title: 'Sessions' })
@@ -85,7 +107,8 @@ describe('task tools', () => {
     expect(await call('update_task', { status: 'blocked' })).toEqual({ text: 'No current task. Start one with start_task first.', isError: true })
     await call('start_task', { title: 'X', acceptance_criteria: ['Works'] })
     expect((await call('update_task', { criteria_met: ['works?'] })).text).toContain('Unknown acceptance criteria: works?')
-    expect((await call('update_task', { task_id: 'nope' })).text).toBe('No task "nope".')
+    expect((await call('update_task', { task_id: 'nope', status: 'blocked' })).text).toBe('No task "nope".')
+    expect((await call('update_task', {})).text).toContain('Nothing to update')
     expect((await call('start_task', { title: '' })).isError).toBe(true)
   })
 

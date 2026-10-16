@@ -154,7 +154,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
           const id = randomUUID()
           // Decisions belong to the task being worked on, read under the same lock that records them.
           store.transact(() => {
-            const taskId = currentTaskId(store)
+            const taskId = currentTaskId(store, now())
             const event: MemoryRecordedEvent = {
               type: 'memory.recorded',
               payload: { id, kind, title: redactSecrets(title), body: redactSecrets(body), anchors, ...(taskId ? { taskId } : {}) },

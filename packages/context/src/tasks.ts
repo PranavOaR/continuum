@@ -3,6 +3,8 @@ import type { ContextStore, GraphNode } from '@continuum/store'
 
 export type TaskStatus = 'planned' | 'in-progress' | 'blocked' | 'completed'
 const ACTIVE: ReadonlySet<string> = new Set(['in-progress', 'blocked'])
+/** A task nobody has touched for this long is no longer "current": new work is not attributed to it. */
+export const STALE_TASK_MS = 14 * 24 * 60 * 60 * 1000
 const STATUSES: ReadonlySet<string> = new Set(['planned', 'in-progress', 'blocked', 'completed'])
 
 export interface TaskSummary {
@@ -31,22 +33,35 @@ function criteria(value: unknown): RecordedCriterion[] {
   )
 }
 
+/** Recorded tasks only: placeholder nodes created by references have no title. */
 function taskNodes(store: ContextStore): GraphNode[] {
   return store.graph
     .keysOfKind('task')
     .map((key) => store.graph.get(key))
-    .filter((node): node is GraphNode => node !== undefined)
+    .filter((node): node is GraphNode => node !== undefined && typeof node.props.title === 'string')
 }
 
-/** The task being worked on: the most recently updated one that is in progress or blocked. */
-export function currentTaskNode(store: ContextStore): GraphNode | undefined {
-  return taskNodes(store)
+/** Newest first, with the key as tie-break so live and restored graphs agree. */
+const newestFirst = (a: GraphNode, b: GraphNode) => b.updatedAt.localeCompare(a.updatedAt) || a.key.localeCompare(b.key)
+
+export function isTaskNode(node: GraphNode | undefined): node is GraphNode {
+  return node !== undefined && node.kind === 'task' && typeof node.props.title === 'string'
+}
+
+/**
+ * The task being worked on: the most recently updated one that is in progress
+ * or blocked, unless it has gone untouched for STALE_TASK_MS.
+ */
+export function currentTaskNode(store: ContextStore, now: Date = new Date()): GraphNode | undefined {
+  const [latest] = taskNodes(store)
     .filter((node) => ACTIVE.has(String(node.props.status)))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+    .sort(newestFirst)
+  if (!latest || now.getTime() - Date.parse(latest.updatedAt) > STALE_TASK_MS) return undefined
+  return latest
 }
 
-export function currentTaskId(store: ContextStore): string | undefined {
-  return currentTaskNode(store)?.key.slice('task:'.length)
+export function currentTaskId(store: ContextStore, now?: Date): string | undefined {
+  return currentTaskNode(store, now)?.key.slice('task:'.length)
 }
 
 export function summarizeTask(store: ContextStore, node: GraphNode): TaskSummary {
@@ -71,6 +86,6 @@ export function summarizeTask(store: ContextStore, node: GraphNode): TaskSummary
 /** Every task, most recently updated first. */
 export function taskSummaries(store: ContextStore): TaskSummary[] {
   return taskNodes(store)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .sort(newestFirst)
     .map((node) => summarizeTask(store, node))
 }

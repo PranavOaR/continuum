@@ -50,10 +50,20 @@ function describeSession(session: SessionSummary, now: Date): string {
 
 const MAX_STEPS = 8
 
-function stepList(label: string, steps: readonly string[]): string[] {
+const step = (text: string) => `  - ${quote(text, 200).slice(1, -1)}`
+
+/** Remaining steps: the next ones first. */
+function upcoming(label: string, steps: readonly string[]): string[] {
   if (steps.length === 0) return []
-  const shown = steps.slice(0, MAX_STEPS).map((step) => `  - ${quote(step, 200).slice(1, -1)}`)
-  return [`${label}:`, ...shown, ...(steps.length > MAX_STEPS ? [`  - …and ${steps.length - MAX_STEPS} more`] : [])]
+  const more = steps.length > MAX_STEPS ? [`  - …and ${steps.length - MAX_STEPS} more`] : []
+  return [`${label}:`, ...steps.slice(0, MAX_STEPS).map(step), ...more]
+}
+
+/** Completed steps: the most recent ones, since those say where work stopped. */
+function recent(label: string, steps: readonly string[]): string[] {
+  if (steps.length === 0) return []
+  const earlier = steps.length > MAX_STEPS ? [`  - …${steps.length - MAX_STEPS} earlier`] : []
+  return [`${label}:`, ...earlier, ...steps.slice(-MAX_STEPS).map(step)]
 }
 
 function describeTask(task: TaskSummary): string[] {
@@ -64,7 +74,7 @@ function describeTask(task: TaskSummary): string[] {
     lines.push('Acceptance criteria:')
     for (const criterion of task.acceptanceCriteria.slice(0, MAX_STEPS)) lines.push(`  - [${criterion.met ? 'x' : ' '}] ${quote(criterion.text, 200).slice(1, -1)}`)
   }
-  lines.push(...stepList('Done', task.completedSteps), ...stepList('Remaining', task.remainingSteps))
+  lines.push(...recent('Done', task.completedSteps), ...upcoming('Remaining', task.remainingSteps))
   if (task.files.length > 0) lines.push(`Files touched: ${listPaths(task.files)}`)
   return lines
 }

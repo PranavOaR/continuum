@@ -84,11 +84,16 @@ function attentionFor(snapshot: RepoSnapshot): AttentionItem[] {
 function summarize(snapshot: RepoSnapshot): ProjectSummary {
   const task = currentTask(snapshot)
   const criteria = task?.acceptanceCriteria ?? []
+  // Progress follows acceptance criteria when there are any, otherwise steps.
+  const progress =
+    criteria.length > 0
+      ? { done: criteria.filter((criterion) => criterion.status === 'complete').length, total: criteria.length }
+      : { done: task?.completedSteps.length ?? 0, total: (task?.completedSteps.length ?? 0) + (task?.remainingSteps.length ?? 0) }
   return {
     project: toProject(snapshot),
     ...(task ? { currentTask: task } : {}),
     status: task?.status ?? 'idle',
-    progress: { done: criteria.filter((criterion) => criterion.status === 'complete').length, total: criteria.length },
+    progress,
     changedFileCount: allChangedFileNodes(snapshot).length,
   }
 }

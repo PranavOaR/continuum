@@ -145,6 +145,6 @@ export function projectState(store: ContextStore, tree: WorkingTree, now: Date):
       .map((node) => summarizeDecision(node, current))
       .sort((a, b) => newestFirst(a.recordedAt, b.recordedAt)),
     tasks: taskSummaries(store),
-    currentTaskId: currentTaskId(store) ?? null,
+    currentTaskId: currentTaskId(store, now) ?? null,
   }
 }

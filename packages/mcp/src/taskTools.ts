@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { redactSecrets } from '@continuum/capture'
-import { currentTaskNode, summarizeTask, type TaskSummary } from '@continuum/context'
+import { currentTaskNode, isTaskNode, summarizeTask, taskSummaries, type TaskSummary } from '@continuum/context'
 import type { TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
 
 const MAX_ITEMS = 30
+/** Completed steps kept per task; the handoff shows the most recent anyway. */
+const MAX_COMPLETED_STEPS = 100
 const MAX_TEXT = 500
 const item = z.string().trim().min(1).max(MAX_TEXT)
 const items = z.array(item).max(MAX_ITEMS)
@@ -51,7 +53,7 @@ export const startTaskInput = {
 }
 
 export const updateTaskInput = {
-  task_id: z.string().min(1).optional().describe('Defaults to the current task'),
+  task_id: z.string().trim().min(1).max(100).optional().describe('Defaults to the current task'),
   status: z.enum(['planned', 'in-progress', 'blocked', 'completed']).optional(),
   next_action: z.string().trim().max(MAX_TEXT).optional().describe('The single next thing to do; an empty string clears it'),
   completed_steps: items.default([]).describe('Steps just finished; removed from the remaining steps if listed there'),
@@ -62,7 +64,13 @@ export const updateTaskInput = {
 type StartInput = z.infer<z.ZodObject<typeof startTaskInput>>
 type UpdateInput = z.infer<z.ZodObject<typeof updateTaskInput>>
 
-/** Creates a task and makes it current (in progress). */
+const unique = (values: readonly string[]) => [...new Set(values)]
+
+/**
+ * Creates a task and makes it current. Other in-progress tasks are paused
+ * (back to planned) so an abandoned task cannot keep absorbing new work;
+ * blocked tasks stay blocked.
+ */
 export function startTask(store: ContextStore, input: StartInput, now: Date): Snapshot {
   const title = clean(input.title)
   const payload: Snapshot = {
@@ -72,27 +80,43 @@ export function startTask(store: ContextStore, input: StartInput, now: Date): Sn
     ...(input.objective ? { objective: clean(input.objective) } : {}),
     acceptanceCriteria: input.acceptance_criteria.map((text) => ({ text: clean(text), met: false })),
     completedSteps: [],
-    remainingSteps: input.steps.map(clean),
+    remainingSteps: unique(input.steps.map(clean)),
   }
-  store.transact(() => [event(payload, now)])
+  store.transact(() => {
+    const paused = taskSummaries(store)
+      .filter((task) => task.status === 'in-progress')
+      .map((task) => event({ ...snapshotOf(task), status: 'planned' }, now))
+    return [...paused, event(payload, now)]
+  })
   return payload
+}
+
+function hasChanges(input: UpdateInput): boolean {
+  return (
+    input.status !== undefined ||
+    input.next_action !== undefined ||
+    input.remaining_steps !== undefined ||
+    input.completed_steps.length > 0 ||
+    input.criteria_met.length > 0
+  )
 }
 
 /** Applies a partial update to a task as one new snapshot, read and written under the store lock. */
 export function updateTask(store: ContextStore, input: UpdateInput, now: Date): Snapshot {
+  if (!hasChanges(input)) throw new TaskToolError('Nothing to update: pass a status, next_action, completed_steps, remaining_steps or criteria_met.')
   let next: Snapshot | undefined
   store.transact(() => {
-    const node = input.task_id ? store.graph.get(`task:${input.task_id}`) : currentTaskNode(store)
-    if (!node || node.kind !== 'task') {
+    const node = input.task_id ? store.graph.get(`task:${input.task_id}`) : currentTaskNode(store, now)
+    if (!isTaskNode(node)) {
       throw new TaskToolError(input.task_id ? `No task "${input.task_id}".` : 'No current task. Start one with start_task first.')
     }
     const current = snapshotOf(summarizeTask(store, node))
-    const done = input.completed_steps.map(clean)
+    const done = unique(input.completed_steps.map(clean))
     const metTexts = input.criteria_met.map(clean)
     const criteria = current.acceptanceCriteria ?? []
     const unknown = metTexts.filter((text) => !criteria.some((criterion) => criterion.text === text))
     if (unknown.length > 0) throw new TaskToolError(`Unknown acceptance criteria: ${unknown.join('; ')}. Use the exact text.`)
-    const remaining = input.remaining_steps ? input.remaining_steps.map(clean) : (current.remainingSteps ?? [])
+    const remaining = input.remaining_steps ? unique(input.remaining_steps.map(clean)) : (current.remainingSteps ?? [])
     const nextAction = input.next_action === undefined ? current.nextAction : clean(input.next_action) || undefined
     const { nextAction: _previous, ...rest } = current
     next = {
@@ -100,7 +124,7 @@ export function updateTask(store: ContextStore, input: UpdateInput, now: Date): 
       ...(input.status ? { status: input.status } : {}),
       ...(nextAction ? { nextAction } : {}),
       acceptanceCriteria: criteria.map((criterion) => (metTexts.includes(criterion.text) ? { ...criterion, met: true } : criterion)),
-      completedSteps: [...(current.completedSteps ?? []), ...done.filter((step) => !(current.completedSteps ?? []).includes(step))],
+      completedSteps: [...(current.completedSteps ?? []), ...done.filter((step) => !(current.completedSteps ?? []).includes(step))].slice(-MAX_COMPLETED_STEPS),
       remainingSteps: remaining.filter((step) => !done.includes(step)),
     }
     return [event(next, now)]
@@ -141,7 +165,7 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date):
     {
       title: 'Update task',
       description:
-        'Update the current task (or task_id): status, next action, steps finished, remaining steps, acceptance criteria met. Call it when you finish a step, get blocked, or stop working, so the next session knows exactly where things stand.',
+        'Update the current task (or task_id): status, next action, steps finished, remaining steps, acceptance criteria met. Call it when you finish a step, get blocked, or stop working, so the next session knows exactly where things stand. Starting another task pauses this one; a task untouched for 14 days stops being current.',
       inputSchema: updateTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
