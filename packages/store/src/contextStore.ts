@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import {
@@ -16,6 +16,9 @@ import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
 import { project, type Mutations } from './projector'
 import { SCHEMA } from './schema'
+
+const PRIVATE_DIR_MODE = 0o700
+const PRIVATE_FILE_MODE = 0o600
 
 export interface StoreSnapshot {
   nodes: GraphNode[]
@@ -49,6 +52,8 @@ interface EventRow {
 export class ContextStore implements Mutations {
   private readonly db: DatabaseSync
   private graphIndex = new GraphIndex()
+  /** Highest event sequence reflected in `graphIndex`; detects writes by other connections. */
+  private loadedSeq = 0
 
   private constructor(db: DatabaseSync) {
     this.db = db
@@ -57,8 +62,12 @@ export class ContextStore implements Mutations {
   }
 
   static open(path: string): ContextStore {
-    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
-    return new ContextStore(new DatabaseSync(path))
+    if (path === ':memory:') return new ContextStore(new DatabaseSync(path))
+    mkdirSync(dirname(path), { recursive: true, mode: PRIVATE_DIR_MODE })
+    const db = new DatabaseSync(path)
+    // Captured output and commands can be sensitive; SQLite gives -wal/-shm the same mode.
+    chmodSync(path, PRIVATE_FILE_MODE)
+    return new ContextStore(db)
   }
 
   /** Read-only view of the identity map and its graph. Mutate only through `record`. */
@@ -72,12 +81,38 @@ export class ContextStore implements Mutations {
 
   /** Appends an event and projects it, atomically. On failure nothing is persisted and memory is restored. */
   record(event: ContinuumEvent): void {
+    this.recordAll([event])
+  }
+
+  /** Appends and projects several events in one transaction: all of them are recorded, or none. */
+  recordAll(events: readonly ContinuumEvent[]): void {
+    this.transact(() => events)
+  }
+
+  /**
+   * Holds the write lock, brings the graph up to date with other connections
+   * (e.g. a running watcher and a `continuum run`), then records whatever
+   * `build` derives from that current graph. Read-decide-write is atomic.
+   */
+  transact(build: () => readonly ContinuumEvent[]): readonly ContinuumEvent[] {
+    let events: readonly ContinuumEvent[] = []
     this.transaction(() => {
-      this.db
-        .prepare('INSERT INTO events (type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(event.type, canonicalJson(event.payload), event.evidence, event.source, event.occurredAt, event.revision ?? null)
-      project(this, event)
+      this.refresh()
+      events = build()
+      const insert = this.db.prepare('INSERT INTO events (type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?)')
+      for (const event of events) {
+        insert.run(event.type, canonicalJson(event.payload), event.evidence, event.source, event.occurredAt, event.revision ?? null)
+        project(this, event)
+      }
     })
+    return events
+  }
+
+  /** Reloads the graph if another connection appended events. Returns whether it reloaded. */
+  refresh(): boolean {
+    if (this.maxSeq() === this.loadedSeq) return false
+    this.loadGraph()
+    return true
   }
 
   eventCount(): number {
@@ -179,11 +214,18 @@ export class ContextStore implements Mutations {
 
   // ── internals ──────────────────────────────────────────────────
 
+  private maxSeq(): number {
+    const row = this.db.prepare('SELECT COALESCE(MAX(seq), 0) AS seq FROM events').get() as { seq: number }
+    return row.seq
+  }
+
+  /** IMMEDIATE takes the write lock up front, so concurrent writers queue on busy_timeout instead of failing mid-way. */
   private transaction(work: () => void): void {
-    this.db.exec('BEGIN')
+    this.db.exec('BEGIN IMMEDIATE')
     try {
       work()
       this.db.exec('COMMIT')
+      this.loadedSeq = this.maxSeq()
     } catch (error) {
       this.db.exec('ROLLBACK')
       this.loadGraph()
@@ -211,6 +253,7 @@ export class ContextStore implements Mutations {
       graph.link(row.from_key, row.type, row.to_key)
     }
     this.graphIndex = graph
+    this.loadedSeq = this.maxSeq()
   }
 }
 

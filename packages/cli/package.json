@@ -1,0 +1,25 @@
+{
+  "name": "@continuum/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The continuum command: init a workspace, capture repository activity and record verified checks.",
+  "type": "module",
+  "bin": {
+    "continuum": "./src/bin.ts"
+  },
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@continuum/capture": "*",
+    "@continuum/core": "*",
+    "@continuum/store": "*"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

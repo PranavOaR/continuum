@@ -1,5 +1,7 @@
 /** SQLite schema for a workspace's context store. Idempotent; safe to run on every open. */
 export const SCHEMA = `
+-- Wait for another process (watcher, CLI) to finish writing instead of failing with SQLITE_BUSY.
+PRAGMA busy_timeout = 5000;
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 

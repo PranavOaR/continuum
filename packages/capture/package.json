@@ -1,0 +1,19 @@
+{
+  "name": "@continuum/capture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Repository capture: git working-tree hashing, file change detection, a file watcher and verified check runs.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@continuum/core": "*",
+    "@continuum/store": "*"
+  }
+}

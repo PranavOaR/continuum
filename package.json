@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @continuum/web",
+    "continuum": "tsx packages/cli/src/bin.ts",
     "build": "npm run build -w @continuum/web",
     "lint": "oxlint apps packages",
     "typecheck": "npm run typecheck --workspaces --if-present",
@@ -25,8 +26,12 @@
     "jsdom": "^30.1.3",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=22.5"
   }
 }
