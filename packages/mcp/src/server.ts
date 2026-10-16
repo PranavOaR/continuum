@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { hashFiles, isIgnored, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
+import { hashFiles, isIgnored, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
 import { DEFAULT_HANDOFF_CHARS, projectState, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
@@ -48,7 +48,7 @@ async function guarded(run: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
     return await run()
   } catch (error) {
-    if (error instanceof Error && ['ToolInputError', 'NotInitializedError', 'NotAGitRepositoryError'].includes(error.name)) return failure(error.message)
+    if (error instanceof ToolInputError || error instanceof NotInitializedError || error instanceof NotAGitRepositoryError) return failure(error.message)
     throw error
   }
 }
