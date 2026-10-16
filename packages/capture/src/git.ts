@@ -33,17 +33,22 @@ export interface WorkingTree {
 /** Runs git without a shell, so paths are never interpreted. */
 function git(cwd: string, args: readonly string[], input?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn('git', args, { cwd, stdio: ['pipe', 'pipe', 'pipe'] })
+    // Only open stdin when there is input: writing to a git that already exited raises EPIPE.
+    const child = spawn('git', args, { cwd, stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] })
     const stdout: Buffer[] = []
     const stderr: Buffer[] = []
-    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
-    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
+    child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk))
+    child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk))
     child.on('error', reject)
     child.on('close', (code) => {
       if (code === 0) resolve(Buffer.concat(stdout).toString('utf8'))
       else reject(new GitCommandError(args, code, Buffer.concat(stderr).toString('utf8')))
     })
-    child.stdin.end(input ?? '')
+    if (child.stdin) {
+      // git may exit early (e.g. a vanished path); its exit code is the real error, not the broken pipe.
+      child.stdin.on('error', () => {})
+      child.stdin.end(input)
+    }
   })
 }
 
