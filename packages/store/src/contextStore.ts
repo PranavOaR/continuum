@@ -1,0 +1,223 @@
+import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
+import {
+  anchorStatus,
+  checkStatus,
+  type AnchorStatus,
+  type CheckStatus,
+  type ContentHash,
+  type ContinuumEvent,
+  type IdentityKey,
+  type RecordedRun,
+} from '@continuum/core'
+import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
+import { canonicalJson, hashRecord } from './hash'
+import { keys, kindOf } from './keys'
+import { project, type Mutations } from './projector'
+import { SCHEMA } from './schema'
+
+export interface StoreSnapshot {
+  nodes: GraphNode[]
+  edges: string[]
+}
+
+interface NodeRow {
+  key: string
+  hash: string | null
+  props: string
+  updated_at: string
+}
+
+interface EventRow {
+  type: string
+  payload: string
+  evidence: string
+  source: string
+  occurred_at: string
+  revision: string | null
+}
+
+/**
+ * A workspace's local context store.
+ *
+ * Layer 1 — `objects`: content-addressed, immutable records keyed by hash.
+ * Layer 2 — the identity hash map (`GraphIndex`, persisted in `nodes`/`node_history`).
+ * Layer 3 — typed edges between identities (`edges`).
+ * Source of truth for all three is the append-only `events` log; the rest are projections.
+ */
+export class ContextStore implements Mutations {
+  private readonly db: DatabaseSync
+  private graphIndex = new GraphIndex()
+
+  private constructor(db: DatabaseSync) {
+    this.db = db
+    db.exec(SCHEMA)
+    this.loadGraph()
+  }
+
+  static open(path: string): ContextStore {
+    if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
+    return new ContextStore(new DatabaseSync(path))
+  }
+
+  /** Read-only view of the identity map and its graph. Mutate only through `record`. */
+  get graph(): GraphIndex {
+    return this.graphIndex
+  }
+
+  close(): void {
+    this.db.close()
+  }
+
+  /** Appends an event and projects it, atomically. On failure nothing is persisted and memory is restored. */
+  record(event: ContinuumEvent): void {
+    this.transaction(() => {
+      this.db
+        .prepare('INSERT INTO events (type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(event.type, canonicalJson(event.payload), event.evidence, event.source, event.occurredAt, event.revision ?? null)
+      project(this, event)
+    })
+  }
+
+  eventCount(): number {
+    const row = this.db.prepare('SELECT COUNT(*) AS count FROM events').get() as { count: number }
+    return row.count
+  }
+
+  *events(): Generator<ContinuumEvent> {
+    const rows = this.db.prepare('SELECT type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq').all() as unknown as EventRow[]
+    for (const row of rows) {
+      yield {
+        type: row.type,
+        payload: JSON.parse(row.payload),
+        evidence: row.evidence,
+        source: row.source,
+        occurredAt: row.occurred_at,
+        ...(row.revision ? { revision: row.revision } : {}),
+      } as ContinuumEvent
+    }
+  }
+
+  /** Discards all projections and replays the event log. */
+  rebuild(): void {
+    const events = [...this.events()]
+    this.transaction(() => {
+      this.db.exec('DELETE FROM edges; DELETE FROM node_history; DELETE FROM nodes;')
+      this.graphIndex = new GraphIndex()
+      for (const event of events) project(this, event)
+    })
+  }
+
+  // ── Layer 1: content-addressed objects ─────────────────────────
+
+  putObject(kind: string, value: unknown): ContentHash {
+    const hash = hashRecord(kind, value)
+    this.db.prepare('INSERT OR IGNORE INTO objects (hash, kind, body) VALUES (?, ?, ?)').run(hash, kind, canonicalJson(value))
+    return hash
+  }
+
+  getObject(hash: ContentHash): { kind: string; value: unknown } | undefined {
+    const row = this.db.prepare('SELECT kind, body FROM objects WHERE hash = ?').get(hash) as { kind: string; body: string } | undefined
+    return row ? { kind: row.kind, value: JSON.parse(row.body) } : undefined
+  }
+
+  // ── Layers 2 & 3: write-through mutations used by the projector ─
+
+  hasNode(key: IdentityKey): boolean {
+    return this.graphIndex.has(key)
+  }
+
+  upsertNode(key: IdentityKey, input: UpsertInput): void {
+    const before = this.graphIndex.get(key)?.history.length ?? 0
+    this.graphIndex.upsert(key, input)
+    const node = this.graphIndex.get(key) as GraphNode
+    this.db
+      // A true upsert: INSERT OR REPLACE would delete the row and cascade away its edges and history.
+      .prepare(
+        'INSERT INTO nodes (key, kind, hash, props, updated_at) VALUES (?, ?, ?, ?, ?) ' +
+          'ON CONFLICT (key) DO UPDATE SET hash = excluded.hash, props = excluded.props, updated_at = excluded.updated_at',
+      )
+      .run(key, node.kind, node.hash, canonicalJson(node.props), node.updatedAt)
+    node.history.slice(before).forEach((hash, offset) => {
+      this.db.prepare('INSERT INTO node_history (key, seq, hash) VALUES (?, ?, ?)').run(key, before + offset, hash)
+    })
+  }
+
+  link(from: IdentityKey, type: EdgeType, to: IdentityKey): void {
+    if (this.graphIndex.link(from, type, to)) {
+      this.db.prepare('INSERT OR IGNORE INTO edges (from_key, type, to_key) VALUES (?, ?, ?)').run(from, type, to)
+    }
+  }
+
+  // ── Evidence queries ───────────────────────────────────────────
+
+  checkRun(name: string): RecordedRun | undefined {
+    const runHash = this.graphIndex.get(keys.check(name))?.props.lastRunHash
+    if (typeof runHash !== 'string') return undefined
+    return this.getObject(runHash)?.value as RecordedRun | undefined
+  }
+
+  checkStatus(name: string): { status: CheckStatus; changed: IdentityKey[] } {
+    return checkStatus(this.checkRun(name), this.graphIndex.currentHashes())
+  }
+
+  memoryStatus(id: string): { status: AnchorStatus; changed: IdentityKey[] } {
+    const anchors = (this.graphIndex.get(keys.memory(id))?.props.anchors ?? {}) as Record<IdentityKey, ContentHash>
+    return anchorStatus(anchors, this.graphIndex.currentHashes())
+  }
+
+  /** Deterministic dump of the projected graph, for tests and debugging. */
+  snapshot(): StoreSnapshot {
+    const nodes = sortedNodes(this.graphIndex)
+    const edges = this.graphIndex
+      .allEdges()
+      .map((edge) => `${edge.from} -${edge.type}-> ${edge.to}`)
+      .sort()
+    return { nodes, edges }
+  }
+
+  // ── internals ──────────────────────────────────────────────────
+
+  private transaction(work: () => void): void {
+    this.db.exec('BEGIN')
+    try {
+      work()
+      this.db.exec('COMMIT')
+    } catch (error) {
+      this.db.exec('ROLLBACK')
+      this.loadGraph()
+      throw error
+    }
+  }
+
+  private loadGraph(): void {
+    const graph = new GraphIndex()
+    const history = new Map<string, string[]>()
+    for (const row of this.db.prepare('SELECT key, hash FROM node_history ORDER BY key, seq').all() as unknown as { key: string; hash: string }[]) {
+      history.set(row.key, [...(history.get(row.key) ?? []), row.hash])
+    }
+    for (const row of this.db.prepare('SELECT key, hash, props, updated_at FROM nodes').all() as unknown as NodeRow[]) {
+      graph.restore({
+        key: row.key,
+        kind: kindOf(row.key),
+        hash: row.hash,
+        history: history.get(row.key) ?? [],
+        props: JSON.parse(row.props),
+        updatedAt: row.updated_at,
+      })
+    }
+    for (const row of this.db.prepare('SELECT from_key, type, to_key FROM edges ORDER BY rowid').all() as unknown as { from_key: string; type: EdgeType; to_key: string }[]) {
+      graph.link(row.from_key, row.type, row.to_key)
+    }
+    this.graphIndex = graph
+  }
+}
+
+function sortedNodes(graph: GraphIndex): GraphNode[] {
+  const all: GraphNode[] = []
+  for (const kind of ['project', 'task', 'session', 'file', 'symbol', 'check', 'memory'] as const) {
+    for (const key of graph.keysOfKind(kind)) all.push(graph.get(key) as GraphNode)
+  }
+  return all.sort((a, b) => a.key.localeCompare(b.key)).map((node) => ({ ...node, props: JSON.parse(canonicalJson(node.props)) }))
+}
