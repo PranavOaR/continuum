@@ -76,6 +76,9 @@ export type TaskUpsertedEvent = EventBase<
  */
 export type CommitRecordedEvent = EventBase<'commit.recorded', { hash: string; message: string; files: string[]; baseline?: boolean }>
 
+/** Something was deliberately forgotten. Says how much, never what. */
+export type DataForgottenEvent = EventBase<'data.forgotten', { scope: 'path' | 'session' | 'before'; removedEvents: number; changedEvents: number }>
+
 export type ContinuumEvent =
   | SessionStartedEvent
   | SessionProgressEvent
@@ -87,5 +90,6 @@ export type ContinuumEvent =
   | MemoryRecordedEvent
   | TaskUpsertedEvent
   | CommitRecordedEvent
+  | DataForgottenEvent
 
 export type ContinuumEventType = ContinuumEvent['type']

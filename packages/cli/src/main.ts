@@ -5,6 +5,7 @@ import { PortInUseError } from '@continuum/daemon'
 import { compactCommand } from './commands/compact'
 import { configCommand } from './commands/config'
 import { doctorCommand } from './commands/doctor'
+import { forgetCommand } from './commands/forget'
 import { handoffCommand } from './commands/handoff'
 import { ingestCommand } from './commands/ingest'
 import { initCommand } from './commands/init'
@@ -39,6 +40,7 @@ Commands
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
   config [name on|off] Show or change settings: agent-checks, prompts
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
+  forget               Permanently remove recorded data: --path, --session or --before
   doctor               Check the install and this repository's setup, with fixes
   uninstall [--purge]  Disconnect Claude Code; --purge also deletes .continuum/
 
@@ -70,6 +72,7 @@ const COMMANDS: Record<string, Command> = {
   ingest: (io) => ingestCommand(io),
   compact: (io, args) => compactCommand(io, args),
   config: (io, args) => configCommand(io, args),
+  forget: (io, args) => forgetCommand(io, args),
   doctor: (io, args) => doctorCommand(io, args, selfInvocation()),
   uninstall: (io, args) => uninstallCommand(io, args),
 }

@@ -5,4 +5,5 @@ export { NODE_KINDS, keys, kindOf, normalizePath, REPOSITORY_NODE, type NodeKind
 export { project, type Mutations } from './projector'
 export { LATEST_SCHEMA_VERSION, migrate, MIGRATIONS, readSchemaVersion, StoreVersionError, type Migration } from './migrations'
 export { inspectStore, isCorruptStoreError, isStoreBusy, openChangeProbe, type ChangeProbe, type StoreInfo } from './inspect'
-export type { Checkpoint, CompactionResult, GraphState } from './checkpoint'
+export type { Checkpoint, CompactionResult, GraphState, HistoryRewrite, RewriteResult } from './checkpoint'
+export { FORGOTTEN, forgetPath, forgetSession, forgetTextBefore } from './forget'

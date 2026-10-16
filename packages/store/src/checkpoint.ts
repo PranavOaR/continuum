@@ -35,3 +35,20 @@ export function mergeFirstEvents(existing: readonly FirstEvent[], added: readonl
   }
   return [...firsts.values()]
 }
+
+/**
+ * A rewrite of recorded history (used by `forget`). Check coverage arrives
+ * inline: events carry `ranAgainst`, and check nodes in the checkpoint carry
+ * their last run as `props.lastRun` with `ranAgainst` inline.
+ */
+export interface HistoryRewrite {
+  /** The event to keep, possibly changed, or null to remove it. */
+  event(event: ContinuumEvent): ContinuumEvent | null
+  /** The compaction checkpoint's graph, rewritten the same way. */
+  state(state: GraphState): GraphState
+}
+
+export interface RewriteResult {
+  removedEvents: number
+  changedEvents: number
+}

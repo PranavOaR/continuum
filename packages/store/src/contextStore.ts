@@ -11,7 +11,7 @@ import {
   type IdentityKey,
   type RecordedRun,
 } from '@continuum/core'
-import { mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState } from './checkpoint'
+import { mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState, type HistoryRewrite, type RewriteResult } from './checkpoint'
 import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
@@ -194,6 +194,56 @@ export class ContextStore implements Mutations {
     }
   }
 
+  /**
+   * Rewrites recorded history in place, for `forget`. Events, the compaction
+   * checkpoint and every projection are rewritten in one transaction. Objects
+   * nothing refers to any more are then deleted, and SQLite overwrites freed
+   * pages (secure_delete), so removed text does not linger in the file.
+   * Call vacuum() afterwards to shrink the file.
+   */
+  rewriteHistory(rewrite: HistoryRewrite): RewriteResult {
+    const rows = this.db.prepare('SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq').all() as unknown as (EventRow & { seq: number })[]
+    const previous = this.checkpoint()
+    let removedEvents = 0
+    let changedEvents = 0
+    this.db.exec('PRAGMA secure_delete = ON')
+    this.transaction(() => {
+      const kept: { seq: number; event: ContinuumEvent }[] = []
+      for (const row of rows) {
+        const original = this.selfContained(toEvent(row))
+        const next = rewrite.event(original)
+        if (!next) removedEvents += 1
+        else {
+          if (canonicalJson(next) !== canonicalJson(original)) changedEvents += 1
+          kept.push({ seq: row.seq, event: next })
+        }
+      }
+      const checkpoint = previous && {
+        ...previous,
+        state: this.externalizeRuns(rewrite.state(this.inlineRuns(previous.state))),
+        firstEvents: previous.firstEvents.flatMap((entry) => {
+          const event = rewrite.event(this.selfContained(entry.event))
+          return event ? [{ seq: entry.seq, event: this.withStoredCoverage(event) }] : []
+        }),
+      }
+      this.db.exec('DELETE FROM events')
+      const insert = this.db.prepare('INSERT INTO events (seq, type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      for (const { seq, event } of kept) {
+        const stored = this.withStoredCoverage(event)
+        insert.run(seq, stored.type, canonicalJson(stored.payload), stored.evidence, stored.source, stored.occurredAt, stored.revision ?? null)
+      }
+      if (checkpoint) {
+        this.db
+          .prepare('UPDATE checkpoints SET state = ?, first_events = ? WHERE id = 1')
+          .run(gzipSync(JSON.stringify(checkpoint.state)), JSON.stringify(checkpoint.firstEvents))
+      }
+      this.writeState(checkpoint?.state ?? { nodes: [], edges: [] })
+      for (const { event } of kept) project(this, this.withStoredCoverage(event))
+      this.deleteUnreferencedObjects()
+    })
+    return { removedEvents, changedEvents }
+  }
+
   /** The latest compaction checkpoint, if the log was ever compacted. */
   /** Just the first events kept by compaction, without unpacking the graph state. */
   private compactedFirstEvents(): FirstEvent[] {
@@ -365,6 +415,71 @@ export class ContextStore implements Mutations {
       this.loadGraph()
       throw error
     }
+  }
+
+  /** A check.recorded event with inline coverage, as stored: the manifest becomes an object named by hash. */
+  private withStoredCoverage(event: ContinuumEvent): ContinuumEvent {
+    if (event.type !== 'check.recorded' || !event.payload.ranAgainst) return event
+    const { ranAgainst, ...payload } = event.payload
+    return { ...event, payload: { ...payload, coverage: this.putCoverage(ranAgainst) } }
+  }
+
+  /** Check nodes carry their last run inline (`props.lastRun`), so a rewrite can see and change its coverage. */
+  private inlineRuns(state: GraphState): GraphState {
+    return {
+      ...state,
+      nodes: state.nodes.map((node) => {
+        if (node.kind !== 'check' || typeof node.props.lastRunHash !== 'string') return node
+        const run = this.getObject(node.props.lastRunHash)?.value as (Record<string, unknown> & { coverage?: ContentHash; ranAgainst?: unknown }) | undefined
+        if (!run) return node
+        const { coverage, ...rest } = run
+        const ranAgainst = rest.ranAgainst ?? (coverage ? this.getObject(coverage)?.value : undefined) ?? {}
+        const { lastRunHash: _hash, ...props } = node.props
+        return { ...node, props: { ...props, lastRun: { ...rest, ranAgainst } } }
+      }),
+    }
+  }
+
+  /** Stores inline runs and memory records again under their new hashes, the reverse of inlineRuns. */
+  private externalizeRuns(state: GraphState): GraphState {
+    const informs = new Map(state.edges.filter((edge) => edge.type === 'informs').map((edge) => [edge.from, edge.to.slice('task:'.length)]))
+    return {
+      ...state,
+      nodes: state.nodes.map((node) => {
+        if (node.kind === 'check' && node.props.lastRun) {
+          const { lastRun, ...props } = node.props
+          const { ranAgainst, ...run } = lastRun as { ranAgainst: Record<IdentityKey, ContentHash> }
+          const runHash = this.putObject('check-run', { ...run, coverage: this.putCoverage(ranAgainst) })
+          return { ...node, hash: runHash, history: node.history.includes(runHash) ? node.history : [...node.history, runHash], props: { ...props, lastRunHash: runHash } }
+        }
+        if (node.kind === 'memory') {
+          const { anchors, kind, title, body } = node.props
+          const id = node.key.slice('memory:'.length)
+          const recordHash = this.putObject('memory', { id, kind, title, body, taskId: informs.get(node.key), anchors })
+          return { ...node, hash: recordHash, props: { ...node.props, recordHash } }
+        }
+        return node
+      }),
+    }
+  }
+
+  /** Objects reachable from the log and the graph; everything else is removed (forgotten data must not linger). */
+  private deleteUnreferencedObjects(): void {
+    const referenced = new Set<string>()
+    const events = [...this.events(), ...this.compactedFirstEvents().map((entry) => entry.event)]
+    for (const event of events) if (event.type === 'check.recorded' && event.payload.coverage) referenced.add(event.payload.coverage)
+    for (const kind of ['check', 'memory'] as const) {
+      for (const key of this.graphIndex.keysOfKind(kind)) {
+        const node = this.graphIndex.get(key) as GraphNode
+        for (const hash of [node.props.lastRunHash, node.props.recordHash]) if (typeof hash === 'string') referenced.add(hash)
+      }
+    }
+    for (const hash of [...referenced]) {
+      const coverage = (this.getObject(hash)?.value as { coverage?: unknown } | undefined)?.coverage
+      if (typeof coverage === 'string') referenced.add(coverage)
+    }
+    const remove = this.db.prepare('DELETE FROM objects WHERE hash = ?')
+    for (const { hash } of this.db.prepare('SELECT hash FROM objects').all() as { hash: string }[]) if (!referenced.has(hash)) remove.run(hash)
   }
 
   private captureState(): GraphState {
