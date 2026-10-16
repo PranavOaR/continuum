@@ -52,3 +52,30 @@ describe('uncommittedChanges', () => {
     expect(diff?.truncated).toBe(true)
   })
 })
+
+describe('uncommittedChanges safety', () => {
+  it('keeps excerpts for paths with spaces', async () => {
+    const created = repo({ 'my file.ts': 'one\n' })
+    created.commit('initial')
+    created.write('my file.ts', 'two\n')
+    expect((await uncommittedChanges(created.root)).get('my file.ts')?.excerpt).toEqual([
+      { kind: 'remove', text: 'one' },
+      { kind: 'add', text: 'two' },
+    ])
+  })
+
+  it('never reads through an untracked symlink, and redacts secrets in excerpts', async () => {
+    const created = repo({ 'a.ts': 'a\n' })
+    created.commit('initial')
+    const { symlinkSync, writeFileSync, mkdtempSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const outside = join(mkdtempSync(join(tmpdir(), 'continuum-outside-')), 'id_rsa')
+    writeFileSync(outside, 'PRIVATE KEY MATERIAL\n')
+    symlinkSync(outside, join(created.root, 'linked-key'))
+    created.write('config.ts', `export const token = "ghp_${'a'.repeat(36)}"\n`)
+    const diffs = await uncommittedChanges(created.root)
+    expect(JSON.stringify(diffs.get('linked-key') ?? null)).not.toContain('PRIVATE KEY')
+    expect(JSON.stringify(diffs.get('config.ts')?.excerpt)).not.toContain('a'.repeat(36))
+  })
+})

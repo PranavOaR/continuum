@@ -21,6 +21,8 @@ const CHECK_COMMANDS: readonly RegExp[] = [
  * pipes, `;`, `||` and backgrounding hide or replace the check's exit code.
  */
 export function recognizeCheck(command: string): string | null {
+  // Several lines run as a script: the exit code is the last line's, not the check's.
+  if (/[\r\n]/.test(command.trim())) return null
   const withoutRedirects = command.replace(/\s\d?>&\d/g, ' ').replace(/\s\d?>>?\s*\S+/g, ' ')
   if (/[|;&]/.test(withoutRedirects.replace(/&&/g, ''))) return null
   const last = withoutRedirects.split('&&').at(-1)?.trim().replace(/\s+/g, ' ') ?? ''
@@ -38,7 +40,8 @@ export function exitCodeFromError(error: string | undefined): number | null {
 /** The last part of the command's output, redacted, for the record. */
 export function outputTail(...parts: unknown[]): string | undefined {
   const text = parts.filter((part): part is string => typeof part === 'string' && part !== '').join('\n')
-  return text === '' ? undefined : redactSecrets(text.slice(-MAX_AGENT_OUTPUT_CHARS))
+  // Redact before cutting, so a secret split by the cut cannot slip through as a fragment.
+  return text === '' ? undefined : redactSecrets(text).slice(-MAX_AGENT_OUTPUT_CHARS)
 }
 
 /** A check an agent ran, as observed from its Bash tool call. */

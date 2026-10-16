@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { DiffLine } from '@continuum/core'
-import { gitOutput } from './git'
+import { gitOutput, isRegularFileInRepo } from './git'
+import { redactSecrets } from './redact'
 
 /** Lines of patch kept per file: enough to recognize the change, bounded for the dashboard. */
 export const MAX_EXCERPT_LINES = 80
@@ -51,16 +52,17 @@ function parsePatch(patch: string): Map<string, { excerpt: DiffLine[]; truncated
       current = null
       inHunk = false
     } else if (!inHunk && line.startsWith('--- ')) {
-      oldPath = line === '--- /dev/null' ? null : line.slice('--- a/'.length)
+      // Git appends a tab to header paths that contain whitespace.
+      oldPath = line === '--- /dev/null' ? null : line.slice('--- a/'.length).replace(/\t$/, '')
     } else if (!inHunk && line.startsWith('+++ ')) {
-      const path = line === '+++ /dev/null' ? oldPath : line.slice('+++ b/'.length)
+      const path = line === '+++ /dev/null' ? oldPath : line.slice('+++ b/'.length).replace(/\t$/, '')
       current = path ? { excerpt: [], truncated: false } : null
       if (path && current) files.set(path, current)
     } else if (line.startsWith('@@')) {
       inHunk = true
     } else if (current && inHunk && /^[ +-]/.test(line)) {
       if (current.excerpt.length >= MAX_EXCERPT_LINES) current.truncated = true
-      else current.excerpt.push({ kind: line[0] === '+' ? 'add' : line[0] === '-' ? 'remove' : 'context', text: line.slice(1) })
+      else current.excerpt.push({ kind: line[0] === '+' ? 'add' : line[0] === '-' ? 'remove' : 'context', text: redactSecrets(line.slice(1)) })
     }
   }
   return files
@@ -71,11 +73,13 @@ async function untrackedDiffs(root: string): Promise<Map<string, UncommittedDiff
   const entries = await Promise.all(
     paths.map(async (path): Promise<[string, UncommittedDiff] | null> => {
       try {
+        // Never follow a symlink out of the repository (e.g. to ~/.ssh) or into a FIFO.
+        if (!(await isRegularFileInRepo(root, path))) return null
         const content = await readFile(join(root, path))
         if (content.length > MAX_UNTRACKED_BYTES || content.includes(0)) return [path, { additions: null, deletions: null, excerpt: [], truncated: false }]
         const lines = content.toString('utf8').split('\n')
         if (lines.at(-1) === '') lines.pop()
-        return [path, { additions: lines.length, deletions: 0, excerpt: lines.slice(0, MAX_EXCERPT_LINES).map((text) => ({ kind: 'add', text })), truncated: lines.length > MAX_EXCERPT_LINES }]
+        return [path, { additions: lines.length, deletions: 0, excerpt: lines.slice(0, MAX_EXCERPT_LINES).map((text) => ({ kind: 'add', text: redactSecrets(text) })), truncated: lines.length > MAX_EXCERPT_LINES }]
       } catch {
         return null // removed since it was listed
       }

@@ -38,7 +38,8 @@ function parseLog(output: string): CommitInfo[] {
 export async function commitsSince(root: string, head: string, since: string | null): Promise<CommitInfo[]> {
   const range = since ? [head, `^${since}`] : [head, '--max-count=1']
   try {
-    const output = await gitOutput(root, ['-c', 'core.quotePath=false', 'log', `--max-count=${MAX_COMMITS_PER_SCAN}`, '--no-renames', `--format=${RECORD}%H${FIELD}%s`, '--name-only', ...range, '--'])
+    // -m --first-parent: a merge lists the files it brought into this branch instead of none.
+    const output = await gitOutput(root, ['-c', 'core.quotePath=false', 'log', `--max-count=${MAX_COMMITS_PER_SCAN}`, '--no-renames', '-m', '--first-parent', `--format=${RECORD}%H${FIELD}%s`, '--name-only', ...range, '--'])
     return parseLog(output)
   } catch {
     // `since` no longer exists (garbage-collected after a rebase): record just HEAD.

@@ -77,13 +77,16 @@ export async function scanRepository(store: ContextStore, root: string, options:
   const previousHead = recordedHead(store)
   // tree.revision is abbreviated; the recorded head is the full hash.
   const headMoved = tree.revision !== null && !previousHead?.startsWith(tree.revision)
-  const commits = headMoved && tree.revision ? await commitsSince(root, tree.revision, previousHead) : []
+  const found = headMoved && tree.revision ? await commitsSince(root, tree.revision, previousHead) : []
+  // HEAD moved back (reset, checkout of an older commit): no new commits, but record where HEAD is now,
+  // or every later scan would look for new commits again.
+  const commits = headMoved && found.length === 0 && tree.revision ? await commitsSince(root, tree.revision, null) : found
   let changes: FileChange[] = []
   // Diff inside the transaction: another process may have recorded some of these changes already.
   store.transact(() => {
     changes = diffSnapshots(recordedFiles(store), tree.files)
     // Only the process that still sees the old HEAD records the new commits.
-    const commitEvents = recordedHead(store) === previousHead ? [...commits].reverse().map((commit) => commitEvent(commit, occurredAt, previousHead === null)) : []
+    const commitEvents = recordedHead(store) === previousHead ? [...commits].reverse().map((commit) => commitEvent(commit, occurredAt, previousHead === null || found.length === 0)) : []
     return [...commitEvents, ...changes.map((change) => toEvent(change, occurredAt, tree.revision))]
   })
   return { changes, tree }

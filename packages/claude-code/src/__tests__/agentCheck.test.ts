@@ -17,7 +17,7 @@ describe('recognizeCheck', () => {
     expect(recognizeCheck(command)).toBe(name)
   })
 
-  it.each(['ls -la', 'git status', 'cat package.json', 'npm install', 'npm test | tail -20', 'npm test; echo done', 'npm test || true', 'npm test &', 'echo npm test', 'npm run dev'])(
+  it.each(['ls -la', 'git status', 'cat package.json', 'npm install', 'npm test | tail -20', 'npm test; echo done', 'npm test || true', 'npm test &', 'echo npm test', 'npm run dev', 'npm test\necho done'])(
     'ignores %s',
     (command) => {
       expect(recognizeCheck(command)).toBeNull()
