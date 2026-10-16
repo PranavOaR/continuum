@@ -18,7 +18,14 @@ function isBaseline(snapshot: RepoSnapshot, event: ContinuumEvent): boolean {
   return event.type === 'file.changed' && event.source === 'watcher:git' && event.occurredAt === snapshot.baselineAt
 }
 
-type Described = Pick<ActivityEvent, 'type' | 'title' | 'description'> & Partial<Pick<ActivityEvent, 'agent' | 'fileId'>>
+type Described = Pick<ActivityEvent, 'type' | 'title' | 'description'> & Partial<Pick<ActivityEvent, 'agent' | 'fileId' | 'taskId'>>
+
+function sessionTask(snapshot: RepoSnapshot, sessionId: string): string | undefined {
+  const taskId = snapshot.nodeByKey.get(`session:${sessionId}`)?.props.taskId
+  return typeof taskId === 'string' ? taskId : undefined
+}
+
+const withTask = (taskId: string | undefined) => (taskId ? { taskId } : {})
 
 function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
   switch (event.type) {
@@ -30,6 +37,7 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
         description: agent ? `Edited by ${getAgent(agent).name}.` : 'Captured from the working tree.',
         fileId: ids.file(snapshot.projectId, event.payload.path),
         ...(agent ? { agent } : {}),
+        ...withTask(event.payload.taskId),
       }
     }
     case 'check.recorded': {
@@ -41,21 +49,32 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
       }
     }
     case 'memory.recorded':
-      return { type: 'decision', title: event.payload.title, description: clip(event.payload.body) || 'Recorded by an agent.' }
+      return { type: 'decision', title: event.payload.title, description: clip(event.payload.body) || 'Recorded by an agent.', ...withTask(event.payload.taskId) }
     case 'session.started': {
       const agent = asAgent(event.payload.agent)
-      return { type: 'session', title: `${getAgent(agent).name} session started`, description: 'A new agent session began.', agent }
+      return { type: 'session', title: `${getAgent(agent).name} session started`, description: 'A new agent session began.', agent, ...withTask(event.payload.taskId) }
     }
     case 'session.progress': {
       const agent = sessionAgent(snapshot, event.payload.sessionId)
-      return { type: 'session', title: 'Progress note', description: clip(event.payload.note), ...(agent ? { agent } : {}) }
+      return { type: 'session', title: 'Progress note', description: clip(event.payload.note), ...(agent ? { agent } : {}), ...withTask(sessionTask(snapshot, event.payload.sessionId)) }
     }
     case 'session.ended': {
       const agent = sessionAgent(snapshot, event.payload.sessionId)
-      return { type: 'session', title: 'Session ended', description: clip(event.payload.summary ?? '') || 'The agent session ended.', ...(agent ? { agent } : {}) }
+      return {
+        type: 'session',
+        title: 'Session ended',
+        description: clip(event.payload.summary ?? '') || 'The agent session ended.',
+        ...(agent ? { agent } : {}),
+        ...withTask(sessionTask(snapshot, event.payload.sessionId)),
+      }
     }
     case 'task.upserted':
-      return { type: 'task-update', title: event.payload.title, description: `Task is ${event.payload.status.replace('-', ' ')}.` }
+      return {
+        type: 'task-update',
+        title: event.payload.title,
+        description: event.payload.nextAction ? `Task is ${event.payload.status.replace('-', ' ')}. Next: ${clip(event.payload.nextAction)}` : `Task is ${event.payload.status.replace('-', ' ')}.`,
+        taskId: event.payload.id,
+      }
   }
 }
 

@@ -203,3 +203,57 @@ describe('LocalContinuumService resilience', () => {
     expect((await local.getWorkspace('acme')).files.map((file) => file.path)).toEqual(['src/auth.ts'])
   })
 })
+
+describe('LocalContinuumService tasks', () => {
+  it('maps recorded tasks, makes the current one drive status, and links its files and checks', async () => {
+    const { repo, storePath } = await seededRepo()
+    sandboxes.push(repo)
+    const store = openStore(storePath)
+    store.recordAll([
+      {
+        type: 'task.upserted',
+        payload: {
+          id: 'oauth',
+          title: 'Add Google sign-in',
+          status: 'blocked',
+          objective: 'Users sign in with Google',
+          nextAction: 'Ask for the client secret',
+          acceptanceCriteria: [{ text: 'Callback creates a session', met: true }, { text: 'State validated', met: false }],
+          completedSteps: ['Callback route'],
+          remainingSteps: ['State validation'],
+        },
+        evidence: 'agent-reported',
+        source: 'mcp',
+        occurredAt: '2026-10-16T11:40:00.000Z',
+      },
+      { type: 'file.changed', payload: { path: 'src/auth.ts', contentHash: repo.git('hash-object', 'src/auth.ts'), changeType: 'modified', taskId: 'oauth' }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: '2026-10-16T11:41:00.000Z' },
+    ])
+    store.close()
+    const local = new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 0 })
+
+    const workspace = await local.getWorkspace('acme')
+    expect(workspace.project.currentTaskId).toBe('oauth')
+    expect(workspace.tasks).toEqual([
+      expect.objectContaining({
+        id: 'oauth',
+        status: 'blocked',
+        nextAction: 'Ask for the client secret',
+        relatedFileIds: ['acme~file~src/auth.ts'],
+        verificationIds: expect.arrayContaining(['acme~check~unit', 'acme~check~lint']),
+        acceptanceCriteria: [
+          expect.objectContaining({ status: 'complete', evidence: expect.stringContaining('not verified') }),
+          expect.objectContaining({ status: 'incomplete' }),
+        ],
+      }),
+    ])
+    expect(workspace.events.find((event) => event.type === 'task-update')).toMatchObject({ taskId: 'oauth', description: 'Task is blocked. Next: Ask for the client secret' })
+
+    const [summary] = await local.listProjects()
+    expect(summary).toMatchObject({ status: 'blocked', progress: { done: 1, total: 2 }, currentTask: { id: 'oauth' } })
+    const overview = await local.getOverview()
+    expect(overview.activeTaskCount).toBe(1)
+    expect(overview.attention[0]).toMatchObject({ kind: 'incomplete-task', title: 'Blocked: Add Google sign-in' })
+    expect((await local.search('google')).map((result) => result.kind)).toEqual(['task', 'activity'])
+    expect(await local.listTasks()).toHaveLength(1)
+  })
+})

@@ -32,6 +32,7 @@ export function toProject(snapshot: RepoSnapshot): Project {
     branch: snapshot.branch ?? 'detached HEAD',
     stack: detectStack(snapshot.tree.files.keys()),
     lastActiveAgent: asAgent(snapshot.state.sessions[0]?.agent),
+    ...(snapshot.state.currentTaskId ? { currentTaskId: snapshot.state.currentTaskId } : {}),
     updatedAt: latestEvent ?? snapshot.state.generatedAt,
   }
 }
