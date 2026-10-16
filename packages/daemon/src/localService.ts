@@ -13,7 +13,7 @@ import {
 import { renderHandoff } from '@continuum/context'
 import { toActivity } from './mapActivity'
 import { toGraph } from './mapGraph'
-import { toFiles, toProject } from './mapProject'
+import { allChangedFileNodes, toFiles, toProject } from './mapProject'
 import { toMemory, toSessions, toVerification } from './mapRecords'
 import { loadSnapshot, type RepoSnapshot } from './snapshot'
 
@@ -31,7 +31,19 @@ export interface Repository {
 export interface LocalServiceOptions {
   now?: () => Date
   ttlMs?: number
+  /** Told when a repository cannot be read; the others keep working. */
+  onError?: (projectId: string, error: unknown) => void
 }
+
+/** One served repository could not be read (moved, deleted, or Continuum removed); the others still work. */
+export class ProjectUnavailableError extends Error {
+  constructor(projectId: string) {
+    super(`Continuum could not read project "${projectId}". Check that the repository still exists and has been set up with continuum init.`)
+    this.name = 'ProjectUnavailableError'
+  }
+}
+
+type Loaded = { projectId: string; snapshot: RepoSnapshot } | { projectId: string; error: unknown }
 
 function attentionFor(snapshot: RepoSnapshot): AttentionItem[] {
   const to = `/app/projects/${snapshot.projectId}`
@@ -59,7 +71,7 @@ function attentionFor(snapshot: RepoSnapshot): AttentionItem[] {
 }
 
 function summarize(snapshot: RepoSnapshot): ProjectSummary {
-  return { project: toProject(snapshot), status: 'idle', progress: { done: 0, total: 0 }, changedFileCount: toFiles(snapshot).length }
+  return { project: toProject(snapshot), status: 'idle', progress: { done: 0, total: 0 }, changedFileCount: allChangedFileNodes(snapshot).length }
 }
 
 const newestFirst = (a: ActivityEvent, b: ActivityEvent) => b.timestamp.localeCompare(a.timestamp)
@@ -72,30 +84,48 @@ export class LocalContinuumService implements ContinuumService {
   private readonly repositories: readonly Repository[]
   private readonly now: () => Date
   private readonly ttlMs: number
-  private cache: { at: number; snapshots: Promise<RepoSnapshot[]> } | null = null
+  private readonly onError: (projectId: string, error: unknown) => void
+  /** One load at a time: concurrent requests share it, and freshness counts from when it finished. */
+  private cache: { loaded: Promise<Loaded[]>; finishedAt: number | null } | null = null
 
   constructor(repositories: readonly Repository[], options: LocalServiceOptions = {}) {
     this.repositories = repositories
     this.now = options.now ?? (() => new Date())
     this.ttlMs = options.ttlMs ?? SNAPSHOT_TTL_MS
+    this.onError = options.onError ?? (() => {})
   }
 
-  private snapshots(): Promise<RepoSnapshot[]> {
-    const at = Date.now()
-    if (this.cache && at - this.cache.at < this.ttlMs) return this.cache.snapshots
-    const snapshots = Promise.all(this.repositories.map((repo) => loadSnapshot(repo.projectId, repo.cwd, this.now())))
-    // Never cache a failure: the next request retries.
-    snapshots.catch(() => {
-      if (this.cache?.snapshots === snapshots) this.cache = null
+  private load(): Promise<Loaded[]> {
+    const { cache } = this
+    if (cache && (cache.finishedAt === null || Date.now() - cache.finishedAt < this.ttlMs)) return cache.loaded
+    const loaded = Promise.all(
+      this.repositories.map(async ({ projectId, cwd }): Promise<Loaded> => {
+        try {
+          return { projectId, snapshot: await loadSnapshot(projectId, cwd, this.now()) }
+        } catch (error) {
+          this.onError(projectId, error)
+          return { projectId, error }
+        }
+      }),
+    )
+    const entry: { loaded: Promise<Loaded[]>; finishedAt: number | null } = { loaded, finishedAt: null }
+    this.cache = entry
+    void loaded.then(() => {
+      entry.finishedAt = Date.now()
     })
-    this.cache = { at, snapshots }
-    return snapshots
+    return loaded
+  }
+
+  /** Readable repositories; unreadable ones are left out of lists (and reported through onError). */
+  private async snapshots(): Promise<RepoSnapshot[]> {
+    return (await this.load()).flatMap((result) => ('snapshot' in result ? [result.snapshot] : []))
   }
 
   private async snapshot(projectId: string): Promise<RepoSnapshot> {
-    const found = (await this.snapshots()).find((snapshot) => snapshot.projectId === projectId)
+    const found = (await this.load()).find((result) => result.projectId === projectId)
     if (!found) throw new NotFoundError('Project', projectId)
-    return found
+    if (!('snapshot' in found)) throw new ProjectUnavailableError(projectId)
+    return found.snapshot
   }
 
   async getOverview(): Promise<OverviewData> {

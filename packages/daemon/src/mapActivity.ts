@@ -11,7 +11,7 @@ function clip(value: string): string {
 
 function sessionAgent(snapshot: RepoSnapshot, sessionId: string | undefined) {
   if (!sessionId) return undefined
-  return asAgent(snapshot.nodes.find((node) => node.key === `session:${sessionId}`)?.props.agent)
+  return asAgent(snapshot.nodeByKey.get(`session:${sessionId}`)?.props.agent)
 }
 
 function isBaseline(snapshot: RepoSnapshot, event: ContinuumEvent): boolean {
@@ -59,9 +59,13 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
   }
 }
 
+const activityCache = new WeakMap<RepoSnapshot, ActivityEvent[]>()
+
 /** Recorded work, newest first. The first scan's import of existing files is left out. */
 export function toActivity(snapshot: RepoSnapshot): ActivityEvent[] {
-  return snapshot.events
+  const cached = activityCache.get(snapshot)
+  if (cached) return cached
+  const activity = snapshot.events
     .filter(({ event }) => !isBaseline(snapshot, event))
     .map(({ seq, event }) => ({
       id: ids.event(snapshot.projectId, seq),
@@ -70,4 +74,6 @@ export function toActivity(snapshot: RepoSnapshot): ActivityEvent[] {
       timestamp: event.occurredAt,
       ...describe(snapshot, event),
     }))
+  activityCache.set(snapshot, activity)
+  return activity
 }

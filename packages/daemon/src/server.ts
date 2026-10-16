@@ -1,13 +1,23 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, realpath, stat } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
+import { pipeline } from 'node:stream'
 import { NotFoundError, type ContinuumService } from '@continuum/core'
+import { ProjectUnavailableError } from './localService'
 
 export const LOOPBACK = '127.0.0.1'
 export const DEFAULT_PORT = 4747
 const MAX_QUERY_CHARS = 200
+const TOKEN_BYTES = 24
+const TOKEN_PARAM = 'token'
+
+/** A fresh secret per `continuum serve`: other users and processes on this machine cannot read the dashboard without it. */
+export function createAccessToken(): string {
+  return randomBytes(TOKEN_BYTES).toString('base64url')
+}
 
 const CONTENT_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -32,6 +42,8 @@ const SECURITY_HEADERS = {
 export interface DaemonOptions {
   service: ContinuumService
   version: string
+  /** Required on every request: as a cookie set from the launch link, or as a bearer token. */
+  token: string
   /** Built web app to serve; without it only the API is available. */
   staticDir?: string
   port?: number
@@ -40,6 +52,8 @@ export interface DaemonOptions {
 
 export interface RunningDaemon {
   url: string
+  /** The link to open: it carries the access token once, then a cookie takes over. */
+  launchUrl: string
   port: number
   close(): Promise<void>
 }
@@ -67,9 +81,53 @@ const fail = (response: ServerResponse, status: number, code: string, message: s
 /** Only the daemon's own origin may talk to it: blocks DNS rebinding and cross-site reads. */
 function isTrustedRequest(request: IncomingMessage, port: number): boolean {
   const allowed = new Set([`${LOOPBACK}:${port}`, `localhost:${port}`])
-  if (!allowed.has(request.headers.host ?? '')) return false
+  if (!allowed.has((request.headers.host ?? '').toLowerCase())) return false
   const origin = request.headers.origin
-  return origin === undefined || allowed.has(origin.replace(/^http:\/\//, ''))
+  return origin === undefined || allowed.has(origin.toLowerCase().replace(/^http:\/\//, ''))
+}
+
+const cookieName = (port: number) => `continuum_${port}`
+
+function sameSecret(candidate: string | undefined, token: string): boolean {
+  if (!candidate) return false
+  const a = Buffer.from(candidate)
+  const b = Buffer.from(token)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+function cookie(request: IncomingMessage, name: string): string | undefined {
+  for (const part of (request.headers.cookie ?? '').split(';')) {
+    const [key, ...value] = part.trim().split('=')
+    if (key === name) return value.join('=')
+  }
+  return undefined
+}
+
+type Access = 'granted' | 'denied' | 'redirected'
+
+/**
+ * Checks the access token. The launch link's ?token= is exchanged for an
+ * HttpOnly, SameSite=Strict cookie and stripped from the address bar.
+ */
+function authorize(request: IncomingMessage, response: ServerResponse, url: URL, token: string, port: number): Access {
+  const bearer = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1]
+  if (sameSecret(bearer, token) || sameSecret(cookie(request, cookieName(port)), token)) return 'granted'
+  if (!sameSecret(url.searchParams.get(TOKEN_PARAM) ?? undefined, token)) return 'denied'
+  url.searchParams.delete(TOKEN_PARAM)
+  response.writeHead(302, {
+    Location: `${url.pathname}${url.search}`,
+    'Set-Cookie': `${cookieName(port)}=${token}; HttpOnly; SameSite=Strict; Path=/`,
+    'Cache-Control': 'no-store',
+    ...SECURITY_HEADERS,
+  })
+  response.end()
+  return 'redirected'
+}
+
+function deny(response: ServerResponse, isApi: boolean): void {
+  if (isApi) return fail(response, 401, 'unauthorized', 'Open the dashboard through the link printed by `continuum serve`.')
+  response.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...SECURITY_HEADERS })
+  response.end('Open the dashboard through the link printed by `continuum serve`; it carries the access token.')
 }
 
 function safeDecode(value: string): string | null {
@@ -95,6 +153,7 @@ async function handleApi(service: ContinuumService, url: URL, response: ServerRe
       return send(response, 200, { data: await handler(service, params, url.searchParams) })
     } catch (error) {
       if (error instanceof NotFoundError) return fail(response, 404, 'not-found', error.message)
+      if (error instanceof ProjectUnavailableError) return fail(response, 503, 'unavailable', error.message)
       onError?.(error)
       return fail(response, 500, 'internal', 'Continuum could not read this repository. See the terminal running `continuum serve` for details.')
     }
@@ -102,12 +161,13 @@ async function handleApi(service: ContinuumService, url: URL, response: ServerRe
   return fail(response, 404, 'not-found', `No API route ${url.pathname}`)
 }
 
+/** A regular file physically inside the build directory: symlinks pointing outside it are refused. */
 async function fileAt(root: string, pathname: string): Promise<string | null> {
   const decoded = safeDecode(pathname)
   if (decoded === null || decoded.includes('\0')) return null
-  const target = resolve(root, `.${decoded}`)
-  if (target !== root && !target.startsWith(root + sep)) return null
   try {
+    const [target, realRoot] = await Promise.all([realpath(resolve(root, `.${decoded}`)), realpath(root)])
+    if (!target.startsWith(realRoot + sep)) return null
     return (await stat(target)).isFile() ? target : null
   } catch {
     return null
@@ -140,7 +200,10 @@ async function handleStatic(root: string, url: URL, response: ServerResponse): P
     'Cache-Control': isHashedAsset ? 'public, max-age=31536000, immutable' : 'no-cache',
     ...SECURITY_HEADERS,
   })
-  createReadStream(file).pipe(response)
+  // pipeline closes the file if the client goes away, and reports a file removed by a rebuild instead of crashing.
+  pipeline(createReadStream(file), response, (error) => {
+    if (error && !response.headersSent) response.destroy()
+  })
 }
 
 export function createDaemonServer(options: DaemonOptions, port: () => number): Server {
@@ -150,7 +213,11 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
       if (!isTrustedRequest(request, port())) return fail(response, 403, 'forbidden', 'Requests must come from the Continuum dashboard on this machine.')
       if (request.method !== 'GET' && request.method !== 'HEAD') return fail(response, 405, 'method-not-allowed', 'The local API is read-only.')
       const url = new URL(request.url ?? '/', `http://${LOOPBACK}`)
-      if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return handleApi(options.service, url, response, options.onError)
+      const isApi = url.pathname === '/api' || url.pathname.startsWith('/api/')
+      const access = authorize(request, response, url, options.token, port())
+      if (access === 'redirected') return
+      if (access === 'denied') return deny(response, isApi)
+      if (isApi) return handleApi(options.service, url, response, options.onError)
       if (!staticRoot) return fail(response, 404, 'not-found', 'The dashboard is not built. Run `npm run build` in the Continuum checkout.')
       return handleStatic(staticRoot, url, response)
     })().catch((error: unknown) => {
@@ -178,6 +245,7 @@ export function startDaemon(options: DaemonOptions): Promise<RunningDaemon> {
       boundPort = (server.address() as AddressInfo).port
       resolvePromise({
         url: `http://${LOOPBACK}:${boundPort}`,
+        launchUrl: `http://${LOOPBACK}:${boundPort}/?${TOKEN_PARAM}=${options.token}`,
         port: boundPort,
         close: () => new Promise((done) => server.close(() => done())),
       })

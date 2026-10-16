@@ -23,14 +23,29 @@ export interface RepoSnapshot {
   edges: Edge[]
   /** Hash each check recorded per file, keyed by check name. */
   checkCoverage: Map<string, Readonly<Record<string, string>>>
+  /** Indexes so mapping stays linear in the size of the graph. */
+  nodeByKey: ReadonlyMap<string, GraphNode>
+  /** File key → keys of sessions that modified it. */
+  modifiedBy: ReadonlyMap<string, readonly string[]>
+  /** File key → ids of memories anchored to it. */
+  anchoredBy: ReadonlyMap<string, readonly string[]>
 }
 
+function groupEdges(edges: readonly Edge[], type: Edge['type'], valueOf: (edge: Edge) => string): Map<string, string[]> {
+  const grouped = new Map<string, string[]>()
+  for (const edge of edges) {
+    if (edge.type !== type) continue
+    grouped.set(edge.to, [...(grouped.get(edge.to) ?? []), valueOf(edge)])
+  }
+  return grouped
+}
+
+/** When the first scan imported the existing files, even if other events were recorded before it. */
 function firstScanTime(store: ContextStore): string | null {
-  const first = store.firstEvent()
-  return first?.source === 'watcher:git' ? first.occurredAt : null
+  return store.firstEvent({ source: 'watcher:git', type: 'file.changed' })?.occurredAt ?? null
 }
 
-function snapshotGraph(store: ContextStore): Pick<RepoSnapshot, 'nodes' | 'edges' | 'checkCoverage'> {
+function snapshotGraph(store: ContextStore): Pick<RepoSnapshot, 'nodes' | 'edges' | 'checkCoverage' | 'nodeByKey' | 'modifiedBy' | 'anchoredBy'> {
   const nodes = (['session', 'file', 'check', 'memory', 'task'] as const).flatMap((kind) =>
     store.graph.keysOfKind(kind).map((key) => store.graph.get(key) as GraphNode),
   )
@@ -40,7 +55,15 @@ function snapshotGraph(store: ContextStore): Pick<RepoSnapshot, 'nodes' | 'edges
       .map((key) => key.slice('check:'.length))
       .map((name) => [name, store.checkRun(name)?.ranAgainst ?? {}] as const),
   )
-  return { nodes, edges: store.graph.allEdges(), checkCoverage }
+  const edges = store.graph.allEdges()
+  return {
+    nodes,
+    edges,
+    checkCoverage,
+    nodeByKey: new Map(nodes.map((node) => [node.key, node])),
+    modifiedBy: groupEdges(edges, 'modified', (edge) => edge.from),
+    anchoredBy: groupEdges(edges, 'anchored_to', (edge) => edge.from.slice('memory:'.length)),
+  }
 }
 
 export async function loadSnapshot(projectId: string, cwd: string, now: Date): Promise<RepoSnapshot> {

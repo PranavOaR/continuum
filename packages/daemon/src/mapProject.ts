@@ -36,17 +36,29 @@ export function toProject(snapshot: RepoSnapshot): Project {
   }
 }
 
+/** Most changed files a response lists; counts still include every one. */
+export const MAX_LISTED_FILES = 500
+
 function sessionsThatModified(snapshot: RepoSnapshot, key: string): GraphNode[] {
-  const sessionKeys = new Set(snapshot.edges.filter((edge) => edge.type === 'modified' && edge.to === key).map((edge) => edge.from))
-  return snapshot.nodes.filter((node) => sessionKeys.has(node.key))
+  return (snapshot.modifiedBy.get(key) ?? []).map((sessionKey) => snapshot.nodeByKey.get(sessionKey)).filter((node): node is GraphNode => node !== undefined)
 }
 
-/** Files changed after the first scan: the baseline import of existing files is not "work". */
-export function changedFileNodes(snapshot: RepoSnapshot): GraphNode[] {
-  const modified = new Set(snapshot.edges.filter((edge) => edge.type === 'modified').map((edge) => edge.to))
-  return snapshot.nodes
-    .filter((node) => node.kind === 'file' && (node.updatedAt !== snapshot.baselineAt || modified.has(node.key)))
+const changedCache = new WeakMap<RepoSnapshot, GraphNode[]>()
+
+/** Every file changed after the first scan, newest first: the baseline import of existing files is not "work". */
+export function allChangedFileNodes(snapshot: RepoSnapshot): GraphNode[] {
+  const cached = changedCache.get(snapshot)
+  if (cached) return cached
+  const changed = snapshot.nodes
+    .filter((node) => node.kind === 'file' && (node.updatedAt !== snapshot.baselineAt || snapshot.modifiedBy.has(node.key)))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  changedCache.set(snapshot, changed)
+  return changed
+}
+
+/** The newest changed files, bounded so very busy repositories still respond quickly. */
+export function changedFileNodes(snapshot: RepoSnapshot): GraphNode[] {
+  return allChangedFileNodes(snapshot).slice(0, MAX_LISTED_FILES)
 }
 
 function passingChecksCovering(snapshot: RepoSnapshot, key: string, hash: string | undefined): string[] {
@@ -65,7 +77,7 @@ export function toFile(snapshot: RepoSnapshot, node: GraphNode): ProjectFile {
   const path = node.key.slice(FILE_PREFIX.length)
   const sessions = sessionsThatModified(snapshot, node.key)
   const verifiedBy = passingChecksCovering(snapshot, node.key, snapshot.current.get(node.key))
-  const decisions = snapshot.edges.filter((edge) => edge.type === 'anchored_to' && edge.to === node.key).map((edge) => edge.from.slice('memory:'.length))
+  const decisions = snapshot.anchoredBy.get(node.key) ?? []
   const changeType = (text(node.props.changeType) ?? 'modified') as ProjectFile['changeType']
   const agents = [...new Set(sessions.map((session) => getAgent(asAgent(session.props.agent)).name))]
   const relevance = [
@@ -94,6 +106,12 @@ export function toFile(snapshot: RepoSnapshot, node: GraphNode): ProjectFile {
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 
+const filesCache = new WeakMap<RepoSnapshot, ProjectFile[]>()
+
 export function toFiles(snapshot: RepoSnapshot): ProjectFile[] {
-  return changedFileNodes(snapshot).map((node) => toFile(snapshot, node))
+  const cached = filesCache.get(snapshot)
+  if (cached) return cached
+  const files = changedFileNodes(snapshot).map((node) => toFile(snapshot, node))
+  filesCache.set(snapshot, files)
+  return files
 }

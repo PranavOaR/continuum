@@ -2,9 +2,9 @@ import type { Sandbox } from '@continuum/capture/testing'
 import { NotFoundError } from '@continuum/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { projectIds } from '../ids'
-import { LocalContinuumService } from '../localService'
+import { LocalContinuumService, ProjectUnavailableError } from '../localService'
 import { detectStack } from '../mapProject'
-import { NOW, seededRepo } from './fixtures'
+import { NOW, openStore, seededRepo } from './fixtures'
 
 const sandboxes: Sandbox[] = []
 afterEach(() => {
@@ -152,5 +152,54 @@ describe('helpers', () => {
 
   it('detects the stack only from root marker files', () => {
     expect(detectStack(['package.json', 'go.mod', 'web/Cargo.toml', 'vite.config.ts'])).toEqual(['Node.js', 'Go', 'Vite'])
+  })
+})
+
+describe('LocalContinuumService resilience', () => {
+  it('keeps serving the other repositories when one cannot be read', async () => {
+    const { repo } = await seededRepo()
+    const { repo: doomed } = await seededRepo()
+    sandboxes.push(repo, doomed)
+    const failures: string[] = []
+    const local = new LocalContinuumService(
+      [
+        { projectId: 'ok', cwd: repo.root },
+        { projectId: 'gone', cwd: doomed.root },
+      ],
+      { now: () => NOW, ttlMs: 0, onError: (projectId) => failures.push(projectId) },
+    )
+    doomed.cleanup()
+    expect((await local.listProjects()).map((summary) => summary.project.id)).toEqual(['ok'])
+    await expect(local.getWorkspace('gone')).rejects.toBeInstanceOf(ProjectUnavailableError)
+    expect((await local.getWorkspace('ok')).files).toHaveLength(1)
+    expect(failures).toContain('gone')
+  })
+
+  it('shares one load between concurrent requests', async () => {
+    const { repo } = await seededRepo()
+    sandboxes.push(repo)
+    const local = new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 0 })
+    const [first, second] = await Promise.all([local.getWorkspace('acme'), local.getWorkspace('acme')])
+    expect(first.files).toBe(second.files)
+  })
+
+  it('treats files as baseline imports even when a session was recorded before the first scan', async () => {
+    const { repo, storePath } = await seededRepo()
+    sandboxes.push(repo)
+    const store = openStore(storePath)
+    const events = [...store.events()]
+    store.close()
+    // Rebuild the log with a session event first, then the original history.
+    const { ContextStore } = await import('@continuum/store')
+    const rebuilt = ContextStore.open(storePath + '.rebuilt')
+    rebuilt.recordAll([
+      { type: 'session.started', payload: { sessionId: 'early', agent: 'claude-code' }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: '2026-10-16T10:00:00.000Z' },
+      ...events,
+    ])
+    rebuilt.close()
+    const { renameSync } = await import('node:fs')
+    renameSync(storePath + '.rebuilt', storePath)
+    const local = new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 0 })
+    expect((await local.getWorkspace('acme')).files.map((file) => file.path)).toEqual(['src/auth.ts'])
   })
 })

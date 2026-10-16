@@ -38,7 +38,7 @@ export function toVerification(snapshot: RepoSnapshot): VerificationRecord[] {
 
 export function toMemory(snapshot: RepoSnapshot): MemoryRecord[] {
   return snapshot.state.decisions.map((decision) => {
-    const node = snapshot.nodes.find((candidate) => candidate.key === `memory:${decision.id}`)
+    const node = snapshot.nodeByKey.get(`memory:${decision.id}`)
     const anchors = Object.keys((node?.props.anchors ?? {}) as Record<string, string>).map((key) => key.slice('file:'.length))
     const stale = decision.status === 'anchor-changed' ? ` Anchored code changed since: ${list(decision.changed)}.` : ''
     return {

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,6 +6,7 @@ import { NotFoundError, type ContinuumService } from '@continuum/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PortInUseError, startDaemon, type RunningDaemon } from '../server'
 
+const TOKEN = 'test-token-0123456789abcdef'
 const running: RunningDaemon[] = []
 const dirs: string[] = []
 afterEach(async () => {
@@ -39,13 +40,14 @@ function webBuild() {
 }
 
 async function start(staticDir?: string) {
-  const daemon = await startDaemon({ service: fakeService, version: 'test', port: 0, staticDir, onError: (error) => errors.push(error) })
+  const daemon = await startDaemon({ service: fakeService, version: 'test', token: TOKEN, port: 0, staticDir, onError: (error) => errors.push(error) })
   running.push(daemon)
   return daemon
 }
 
-/** Raw request, so tests control Host and Origin exactly. */
-function raw(daemon: RunningDaemon, path: string, headers: Record<string, string> = {}, method = 'GET') {
+/** Raw request, so tests control Host, Origin and credentials exactly. Authenticated unless overridden. */
+function raw(daemon: RunningDaemon, path: string, extra: Record<string, string> = {}, method = 'GET') {
+  const headers = { authorization: `Bearer ${TOKEN}`, ...extra }
   return new Promise<{ status: number; body: string; headers: Record<string, unknown> }>((resolve, reject) => {
     const req = request({ host: '127.0.0.1', port: daemon.port, path, method, headers: { host: `127.0.0.1:${daemon.port}`, ...headers } }, (res) => {
       let body = ''
@@ -95,7 +97,33 @@ describe('daemon API', () => {
 
   it('reports a port that is already taken', async () => {
     const daemon = await start()
-    await expect(startDaemon({ service: fakeService, version: 'test', port: daemon.port })).rejects.toBeInstanceOf(PortInUseError)
+    await expect(startDaemon({ service: fakeService, version: 'test', token: TOKEN, port: daemon.port })).rejects.toBeInstanceOf(PortInUseError)
+  })
+})
+
+describe('daemon access token', () => {
+  it('refuses requests without the token, for the API and the app', async () => {
+    const daemon = await start(webBuild())
+    const api = await raw(daemon, '/api/overview', { authorization: '' })
+    expect(api.status).toBe(401)
+    expect(JSON.parse(api.body).error.code).toBe('unauthorized')
+    expect((await raw(daemon, '/app', { authorization: '' })).status).toBe(401)
+    expect((await raw(daemon, '/api/overview', { authorization: 'Bearer wrong' })).status).toBe(401)
+    expect((await raw(daemon, '/app?token=wrong', { authorization: '' })).status).toBe(401)
+  })
+
+  it('exchanges the launch link for an HttpOnly, SameSite=Strict cookie', async () => {
+    const daemon = await start(webBuild())
+    expect(daemon.launchUrl).toBe(`${daemon.url}/?token=${TOKEN}`)
+    const launch = await raw(daemon, `/app/projects?view=all&token=${TOKEN}`, { authorization: '' })
+    expect(launch.status).toBe(302)
+    expect(launch.headers.location).toBe('/app/projects?view=all')
+    const setCookie = String(launch.headers['set-cookie'])
+    expect(setCookie).toContain(`continuum_${daemon.port}=${TOKEN}`)
+    expect(setCookie).toContain('HttpOnly')
+    expect(setCookie).toContain('SameSite=Strict')
+    const withCookie = await raw(daemon, '/api/overview', { authorization: '', cookie: `other=1; continuum_${daemon.port}=${TOKEN}` })
+    expect(withCookie.status).toBe(200)
   })
 })
 
@@ -119,6 +147,20 @@ describe('daemon static files', () => {
       const response = await raw(daemon, path)
       expect(response.body).not.toContain('secret')
     }
+  })
+
+  it('refuses symlinks that point outside the build directory', async () => {
+    const dir = webBuild()
+    symlinkSync(join(dir, '..', 'outside-secret.txt'), join(dir, 'assets', 'link.txt'))
+    const daemon = await start(dir)
+    const response = await raw(daemon, '/assets/link.txt')
+    expect(response.status).toBe(404)
+    expect(response.body).not.toContain('secret')
+  })
+
+  it('treats the host name case-insensitively', async () => {
+    const daemon = await start()
+    expect((await raw(daemon, '/api/health', { host: `LOCALHOST:${daemon.port}` })).status).toBe(200)
   })
 
   it('explains how to build the dashboard when it is missing', async () => {
