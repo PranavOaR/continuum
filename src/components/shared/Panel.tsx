@@ -15,7 +15,7 @@ interface PanelProps {
 export function Panel({ title, description, actions, id, className, bodyClassName, children }: PanelProps) {
   const headingId = id ? `${id}-heading` : undefined
   return (
-    <section id={id} aria-labelledby={headingId} className={cn('scroll-mt-20 border border-line bg-surface', className)}>
+    <section id={id} aria-labelledby={headingId} className={cn('scroll-mt-20 rounded-lg border border-line bg-surface', className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-line px-5 py-4">
           <div className="min-w-0">

@@ -26,7 +26,7 @@ export function Badge({ tone = 'neutral', icon, dashed, title, className, childr
     <span
       title={title}
       className={cn(
-        'inline-flex h-5 shrink-0 items-center gap-1 border px-1.5 font-mono text-[10px] font-medium leading-none tracking-[0.04em] whitespace-nowrap uppercase [&_svg]:size-3 [&_svg]:shrink-0',
+        'inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border px-1.5 font-mono text-[10px] font-medium leading-none tracking-[0.04em] whitespace-nowrap uppercase [&_svg]:size-3 [&_svg]:shrink-0',
         dashed && 'border-dashed',
         TONES[tone],
         className,

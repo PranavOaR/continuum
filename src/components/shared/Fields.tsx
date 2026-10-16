@@ -17,7 +17,7 @@ export function SearchInput({ value, onChange, label, className, ...rest }: Sear
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-9 w-full border border-line bg-surface pr-8 pl-8 text-[13px] text-fg placeholder:text-subtle focus:border-accent focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        className="h-9 w-full rounded-md border border-line bg-surface pr-8 pl-8 text-[13px] text-fg placeholder:text-subtle focus:border-accent focus:outline-none [&::-webkit-search-cancel-button]:hidden"
         {...rest}
       />
       {value && (
@@ -51,7 +51,7 @@ export function SelectField({ label, hideLabel, className, children, id, ...rest
       <div className="relative">
         <select
           id={selectId}
-          className="h-9 w-full appearance-none border border-line bg-surface pr-8 pl-3 text-[13px] text-fg focus:border-accent focus:outline-none"
+          className="h-9 w-full appearance-none rounded-md border border-line bg-surface pr-8 pl-3 text-[13px] text-fg focus:border-accent focus:outline-none"
           {...rest}
         >
           {children}
@@ -119,13 +119,13 @@ export function Toggle({ checked, onChange, label, description }: ToggleProps) {
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={cn(
-          'relative inline-flex h-5 w-9 shrink-0 items-center border transition-colors',
+          'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors',
           checked ? 'border-accent-strong bg-accent-strong' : 'border-line-strong bg-surface-3 [&>span]:bg-subtle',
         )}
       >
         <span
           aria-hidden
-          className={cn('inline-block size-3.5 bg-white transition-transform', checked ? 'translate-x-[18px]' : 'translate-x-0.5')}
+          className={cn('inline-block size-3.5 rounded-full bg-white transition-transform', checked ? 'translate-x-[18px]' : 'translate-x-0.5')}
         />
       </button>
     </div>

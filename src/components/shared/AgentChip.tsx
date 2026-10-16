@@ -8,7 +8,7 @@ export function AgentMonogram({ agent, className }: { agent: AgentType; classNam
     <span
       aria-hidden
       className={cn(
-        'inline-flex size-5 shrink-0 items-center justify-center border border-line bg-surface-2 font-mono text-[9px] font-medium text-muted',
+        'inline-flex size-5 shrink-0 items-center justify-center rounded-sm border border-line bg-surface-2 font-mono text-[9px] font-medium text-muted',
         className,
       )}
     >

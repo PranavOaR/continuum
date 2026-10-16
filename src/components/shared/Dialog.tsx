@@ -66,7 +66,7 @@ export function Dialog({ open, onClose, title, description, variant = 'modal', s
       {open && (
         <div
           className={cn(
-            'cn-dialog-panel flex flex-col border-line bg-surface text-fg',
+            'cn-dialog-panel flex flex-col border-line bg-surface text-fg sm:shadow-[0_24px_64px_-24px_rgb(20_19_24/0.35)]',
             isDrawer
               ? 'h-dvh w-full border-l sm:w-[480px]'
               : cn('h-dvh w-full sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-xl sm:border', MODAL_WIDTH[size]),

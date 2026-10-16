@@ -39,7 +39,7 @@ export function Popover({ trigger, align = 'right', className, children }: Popov
         <div
           id={panelId}
           className={cn(
-            'cn-toast absolute top-full z-40 mt-2 border border-line bg-surface p-1',
+            'cn-toast absolute top-full z-40 mt-2 rounded-lg border border-line bg-surface p-1 shadow-[0_12px_32px_-12px_rgb(20_19_24/0.25)]',
             align === 'right' ? 'right-0' : 'left-0',
             className,
           )}
