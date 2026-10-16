@@ -1,7 +1,8 @@
-import { ArrowRight, ArrowRightLeft, Brain, Check, Code2, Copy, GitCompareArrows, HardDrive, ShieldCheck, type LucideIcon } from 'lucide-react'
+import { ArrowRight, Check, Copy } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ActivityFlow } from '../components/landing/ActivityFlow'
+import { FeatureList } from '../components/landing/FeatureList'
 import { HeroPreview } from '../components/landing/HeroPreview'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
 import { ButtonLink, buttonClass } from '../components/shared/Button'
@@ -33,15 +34,6 @@ const PROBLEMS = [
   { title: 'Every new session starts blank', body: 'You re-explain the architecture, the task, and what was already tried — again.' },
   { title: 'Handoffs are written by hand', body: 'Summaries come from memory, and quietly drift from what actually changed.' },
   { title: 'Unfinished work hides', body: 'Which files changed? Which tests ran? What was abandoned? It all takes digging.' },
-]
-
-const FEATURES: { icon: LucideIcon; title: string; caption: string; body: string }[] = [
-  { icon: Brain, title: 'Project-aware memory', caption: 'Decisions · issues · attempts', body: 'Typed records tied to the tasks and files they affect.' },
-  { icon: GitCompareArrows, title: 'Change tracking', caption: 'Per session, per file', body: 'See which files each session touched and why they matter.' },
-  { icon: ShieldCheck, title: 'Evidence-backed state', caption: 'Observed · verified · inferred', body: 'Every claim is labelled with how Continuum knows it.' },
-  { icon: ArrowRightLeft, title: 'Cross-agent handoffs', caption: 'Choose what to include', body: 'A focused context package for whichever agent comes next.' },
-  { icon: Code2, title: 'Code-aware retrieval', caption: 'Files · symbols · tests', body: 'Context assembled around what the task actually touches.' },
-  { icon: HardDrive, title: 'Local-first', caption: 'No mandatory AI APIs', body: 'Designed to index and retrieve on your own machine.' },
 ]
 
 function Eyebrow({ index, children }: { index: string; children: ReactNode }) {
@@ -246,18 +238,7 @@ export function LandingPage() {
           <div className="mx-auto max-w-[1160px] px-4 sm:px-8">
             <Eyebrow index="03">Features</Eyebrow>
             <SectionTitle lead="An evolving, evidence-backed picture of the actual software project.">More than a conversation summary.</SectionTitle>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map(({ icon: Icon, title, caption, body }) => (
-                <div key={title} className="cn-thread group rounded-lg border border-line bg-surface p-6 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-line-strong">
-                  <span className="flex size-9 items-center justify-center rounded-md bg-accent/10 text-accent transition-colors group-hover:bg-accent group-hover:text-accent-fg">
-                    <Icon className="size-4" aria-hidden />
-                  </span>
-                  <h3 className="mt-5 text-[16px] font-medium tracking-[-0.01em] text-fg">{title}</h3>
-                  <p className="mt-1 label-mono text-subtle">{caption}</p>
-                  <p className="mt-3 text-[14px] leading-[1.55] text-muted">{body}</p>
-                </div>
-              ))}
-            </div>
+            <FeatureList />
           </div>
         </section>
 
