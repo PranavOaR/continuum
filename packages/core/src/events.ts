@@ -20,6 +20,10 @@ export type SessionStartedEvent = EventBase<'session.started', { sessionId: stri
 /** The agent's latest account of where it is (e.g. its last message in a turn). Agent-reported, never verified. */
 export type SessionProgressEvent = EventBase<'session.progress', { sessionId: string; note: string }>
 export type SessionEndedEvent = EventBase<'session.ended', { sessionId: string; summary?: string }>
+/** The session took up a task (started or updated it through the MCP tools): its edits belong to that task. */
+export type SessionTaskEvent = EventBase<'session.task', { sessionId: string; taskId: string }>
+/** What the person typed to the agent. Recorded only when prompt capture is turned on; redacted. */
+export type SessionPromptedEvent = EventBase<'session.prompted', { sessionId: string; prompt: string }>
 
 export type FileChangedEvent = EventBase<
   'file.changed',
@@ -70,6 +74,8 @@ export type ContinuumEvent =
   | SessionStartedEvent
   | SessionProgressEvent
   | SessionEndedEvent
+  | SessionTaskEvent
+  | SessionPromptedEvent
   | FileChangedEvent
   | CheckRecordedEvent
   | MemoryRecordedEvent

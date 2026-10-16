@@ -23,6 +23,8 @@ export interface SessionSummary {
   ended: boolean
   /** Latest progress note, or the end-of-session summary. Agent-reported. */
   note: string | null
+  /** The person's last prompt in this session, when prompt capture is on. */
+  prompt: string | null
   filesChanged: { path: string; exists: boolean }[]
 }
 
@@ -95,6 +97,7 @@ function summarizeSession(store: ContextStore, node: GraphNode, tree: WorkingTre
     lastActivityAt: text(node.props.lastActivityAt) ?? text(node.props.endedAt) ?? startedAt ?? node.updatedAt,
     ended: text(node.props.endedAt) !== null,
     note: text(node.props.lastNote) ?? text(node.props.summary),
+    prompt: text(node.props.lastPrompt),
     filesChanged,
   }
 }

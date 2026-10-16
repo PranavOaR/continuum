@@ -89,6 +89,7 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
   const [latest] = state.sessions
   if (!latest) return ['## Where we left off', 'No agent sessions recorded yet.']
   const lines = ['## Where we left off', `Latest: ${describeSession(latest, now)}.`]
+  if (latest.prompt) lines.push(`Last request [said by you]: ${quote(latest.prompt)}`)
   if (latest.note) lines.push(`Last note [agent-reported]: ${quote(latest.note)}`)
   if (latest.filesChanged.length > 0) {
     const files = latest.filesChanged.map((file) => (file.exists ? code(file.path) : `${code(file.path)} (since deleted)`))

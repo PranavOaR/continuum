@@ -6,6 +6,8 @@ import type { HookPayload } from './hookPayload'
 export const ADAPTER_SOURCE = 'adapter:claude-code'
 /** Longest agent note kept per turn; the handoff quotes far less. */
 export const MAX_NOTE_CHARS = 2_000
+/** Longest prompt kept; the handoff quotes far less. */
+export const MAX_PROMPT_CHARS = 2_000
 const FRESH_SESSION_SOURCES = new Set(['startup', 'clear', 'fork'])
 
 export interface FileEdit {
@@ -24,6 +26,10 @@ export interface TranslateContext {
   edit?: FileEdit
   /** The task currently being worked on, if one is recorded. */
   taskId?: string
+  /** Set when a task tool call linked this session to a task. */
+  sessionTaskId?: string
+  /** Set when prompt capture is on: the prompt, redacted and bounded. */
+  prompt?: string
   /** Set when the payload is a check the agent ran, with the stored coverage manifest of the tree it ran against. */
   check?: AgentCheck & { coverage: ContentHash }
 }
@@ -62,10 +68,13 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
       if (note === '') return []
       return [{ ...base, type: 'session.progress', evidence: 'agent-reported', payload: { sessionId, note: note.slice(0, MAX_NOTE_CHARS) } }]
     }
+    case 'UserPromptSubmit':
+      return context.prompt ? [{ ...base, type: 'session.prompted', evidence: 'observed', payload: { sessionId, prompt: context.prompt } }] : []
     case 'PostToolUseFailure':
       return context.check ? [checkEvent(base, context.check)] : []
     case 'PostToolUse': {
       if (context.check) return [checkEvent(base, context.check)]
+      if (context.sessionTaskId) return [{ ...base, type: 'session.task', evidence: 'observed', payload: { sessionId, taskId: context.sessionTaskId } }]
       const { edit } = context
       if (!edit) return []
       return [
@@ -78,4 +87,13 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
       ]
     }
   }
+}
+
+/**
+ * A prompt as Continuum keeps it: redacted, with pasted blocks (logs, files,
+ * credentials) replaced by a marker, and bounded.
+ */
+export function cleanPrompt(prompt: string): string {
+  const withoutPastes = prompt.replace(/<pasted_content id="[^"]*">[\s\S]*?<\/pasted_content id="[^"]*">/g, '[pasted content]')
+  return redactSecrets(withoutPastes).trim().slice(0, MAX_PROMPT_CHARS)
 }

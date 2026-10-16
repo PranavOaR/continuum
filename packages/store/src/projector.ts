@@ -69,6 +69,21 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       store.upsertNode(session, { hash: hashRecord('session-progress', event.payload), props: { lastNote: event.payload.note, lastActivityAt: at }, at })
       return
     }
+    case 'session.task': {
+      const { sessionId, taskId } = event.payload
+      const session = keys.session(sessionId)
+      ensure(store, session, at)
+      ensure(store, keys.task(taskId), at)
+      store.upsertNode(session, { hash: hashRecord('session-task', event.payload), props: { taskId, lastActivityAt: at }, at })
+      store.link(session, 'worked_on', keys.task(taskId))
+      return
+    }
+    case 'session.prompted': {
+      const session = keys.session(event.payload.sessionId)
+      ensure(store, session, at)
+      store.upsertNode(session, { hash: hashRecord('session-prompt', event.payload), props: { lastPrompt: event.payload.prompt, lastActivityAt: at }, at })
+      return
+    }
     case 'session.ended': {
       const session = keys.session(event.payload.sessionId)
       ensure(store, session, at)

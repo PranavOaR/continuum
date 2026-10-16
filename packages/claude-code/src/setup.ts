@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { addGitExclude, isTracked, removeGitExclude } from '@continuum/capture'
-import { FILE_EDIT_TOOLS, SHELL_TOOL } from './hookPayload'
+import { FILE_EDIT_TOOLS, SHELL_TOOL, TASK_TOOLS } from './hookPayload'
 
 /** Hooks hold machine-specific paths, so they go in the gitignored local settings, never in ~/.claude. */
 export const HOOKS_FILE = '.claude/settings.local.json'
@@ -100,7 +100,7 @@ function withoutOurs(groups: unknown): unknown {
 }
 
 /** The Claude Code events setup registers. */
-export const HOOK_EVENTS = ['SessionStart', 'SessionEnd', 'Stop', 'PostToolUse', 'PostToolUseFailure'] as const
+export const HOOK_EVENTS = ['SessionStart', 'SessionEnd', 'Stop', 'PostToolUse', 'PostToolUseFailure', 'UserPromptSubmit'] as const
 
 function ourHooks(invocation: Invocation): Record<(typeof HOOK_EVENTS)[number], Json[]> {
   const handler = (extra: Json): Json => ({ type: 'command', command: invocation.command, args: [...invocation.args, INGEST], ...extra })
@@ -112,10 +112,12 @@ function ourHooks(invocation: Invocation): Record<(typeof HOOK_EVENTS)[number], 
     // which kills background hooks before the final message is recorded.
     Stop: [{ hooks: [handler({ timeout: SESSION_END_TIMEOUT_S })] }],
     // In the background, so capture never slows editing down; the session keeps running meanwhile.
-    // File edits, and Bash so test, lint and build runs are recorded (successful ones arrive here).
-    PostToolUse: [{ matcher: [...Object.keys(FILE_EDIT_TOOLS), SHELL_TOOL].join('|'), hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
+    // File edits; Bash, so successful test, lint and build runs are recorded; and the task tools, to link the session to its task.
+    PostToolUse: [{ matcher: [...Object.keys(FILE_EDIT_TOOLS), SHELL_TOOL, ...TASK_TOOLS].join('|'), hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
     // A Bash command that exits non-zero arrives here instead, with "Exit code N".
     PostToolUseFailure: [{ matcher: SHELL_TOOL, hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
+    // Recorded only after `continuum config prompts on`; in the background so typing is never slowed.
+    UserPromptSubmit: [{ hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
   }
 }
 

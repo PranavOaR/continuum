@@ -45,7 +45,7 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
       return {
         type: 'test-result',
         title: `${name} ${exitCode === 0 ? 'passed' : 'failed'}`,
-        description: `\`${command}\` exited ${exitCode} after ${(durationMs / 1000).toFixed(1)}s.`,
+        description: `${event.evidence === 'verified' ? '' : 'Run by an agent: '}\`${command}\` exited ${exitCode}${durationMs > 0 ? ` after ${(durationMs / 1000).toFixed(1)}s` : ''}.`,
       }
     }
     case 'memory.recorded':
@@ -67,6 +67,14 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
         ...(agent ? { agent } : {}),
         ...withTask(sessionTask(snapshot, event.payload.sessionId)),
       }
+    }
+    case 'session.task': {
+      const agent = sessionAgent(snapshot, event.payload.sessionId)
+      return { type: 'session', title: 'Session took up a task', description: 'Edits in this session are attributed to this task.', ...(agent ? { agent } : {}), taskId: event.payload.taskId }
+    }
+    case 'session.prompted': {
+      const agent = sessionAgent(snapshot, event.payload.sessionId)
+      return { type: 'session', title: 'You asked', description: clip(event.payload.prompt), ...(agent ? { agent } : {}), ...withTask(sessionTask(snapshot, event.payload.sessionId)) }
     }
     case 'task.upserted':
       return {

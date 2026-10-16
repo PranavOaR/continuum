@@ -187,3 +187,55 @@ describe('ingestHook for checks the agent runs', () => {
     expect(next.status === 'recorded' && next.additionalContext).toContain('[observed: run by an agent] passed: `npm test`')
   })
 })
+
+describe('ingestHook per-session tasks', () => {
+  const startTask = (title: string, id: string) => ({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'mcp__continuum__start_task',
+    tool_input: { title },
+    tool_response: [{ type: 'text', text: `Task ${id}: "${title}" is in-progress.\nNext: write it` }],
+  })
+
+  it("attributes each session's edits to the task it took up, not the latest one", async () => {
+    const { repo, storePath } = await initialized()
+    withStore(storePath, (store) => {
+      store.record({ type: 'task.upserted', payload: { id: 'auth-1', title: 'Auth', status: 'in-progress' }, evidence: 'agent-reported', source: 'mcp', occurredAt: NOW.toISOString() })
+      store.record({ type: 'task.upserted', payload: { id: 'docs-2', title: 'Docs', status: 'in-progress' }, evidence: 'agent-reported', source: 'mcp', occurredAt: new Date(NOW.getTime() + 1000).toISOString() })
+    })
+    const later = () => new Date(NOW.getTime() + 2000)
+    await ingestHook(hook(repo, startTask('Auth', 'auth-1'), 'agent-a'), { now: later })
+    await ingestHook(hook(repo, startTask('Docs', 'docs-2'), 'agent-b'), { now: later })
+
+    repo.write('src/a.ts', 'by agent a')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/a.ts') } }, 'agent-a'), { now: later })
+    withStore(storePath, (store) => {
+      expect(store.graph.neighbors('task:auth-1', { direction: 'out', types: ['touches'] })).toContain('file:src/a.ts')
+      expect(store.graph.neighbors('task:docs-2', { direction: 'out', types: ['touches'] })).not.toContain('file:src/a.ts')
+      expect(store.graph.get('session:agent-a')?.props.taskId).toBe('auth-1')
+    })
+  })
+})
+
+describe('ingestHook prompts', () => {
+  const prompt = (text: string) => ({ hook_event_name: 'UserPromptSubmit', prompt: text })
+
+  it('records nothing unless prompt capture is turned on', async () => {
+    const { repo } = await initialized()
+    expect((await ingestHook(hook(repo, prompt('fix the login bug')), { now: () => NOW })).status).toBe('ignored')
+  })
+
+  it('keeps prompts redacted, without pasted content, once turned on', async () => {
+    const { repo, storePath } = await initialized()
+    const { updateConfig } = await import('@continuum/capture')
+    await updateConfig(repo.root, { capturePrompts: true })
+    const pasted = '<pasted_content id="p1">\nAPI_KEY=abc123secretvalue\n</pasted_content id="p1">'
+    await ingestHook(hook(repo, prompt(`Fix login, here is the log:\n${pasted}\nToken: Bearer ${'x'.repeat(30)}`)), { now: () => NOW })
+    const kept = withStore(storePath, (store) => store.graph.get('session:sess-1')?.props.lastPrompt) as string
+    expect(kept).toContain('Fix login')
+    expect(kept).toContain('[pasted content]')
+    expect(kept).not.toContain('abc123secretvalue')
+    expect(kept).not.toContain('x'.repeat(30))
+    const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: () => NOW })
+    expect(next.status === 'recorded' && next.additionalContext).toContain('Last request [said by you]: "Fix login')
+  })
+})
