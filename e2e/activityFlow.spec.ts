@@ -23,3 +23,17 @@ test('activity flow shows a static final frame when motion is reduced', async ({
   expect(await page.locator('figure svg[role=img] animate, figure svg[role=img] animateMotion').count()).toBe(0)
   await context.close()
 })
+
+test('feature tiles animate, and render statically when motion is reduced', async ({ browser, page }) => {
+  await page.goto('/#features')
+  const tiles = page.locator('#features ul li svg')
+  await expect(tiles).toHaveCount(6)
+  expect(await page.locator('#features ul li svg :is(animate, animateMotion, animateTransform)').count()).toBeGreaterThan(50)
+
+  const context = await browser.newContext({ reducedMotion: 'reduce' })
+  const reduced = await context.newPage()
+  await reduced.goto('/#features')
+  await expect(reduced.locator('#features ul li svg')).toHaveCount(6)
+  expect(await reduced.locator('#features ul li svg :is(animate, animateMotion, animateTransform)').count()).toBe(0)
+  await context.close()
+})
