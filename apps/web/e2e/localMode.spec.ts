@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { expect, test } from './fixtures'
 
 /**
@@ -43,6 +45,16 @@ test.beforeAll(async () => {
   execFileSync('git', [...GIT_IDENTITY, 'commit', '--quiet', '-m', 'initial'], { cwd: repo })
 
   continuum(['init'])
+
+  // Record a task through the real MCP server, exactly as Claude Code would.
+  const mcp = new Client({ name: 'e2e', version: '0' })
+  await mcp.connect(new StdioClientTransport({ command: process.execPath, args: [...CLI, '-C', repo, 'mcp'], cwd: ROOT, stderr: 'pipe' }))
+  await mcp.callTool({
+    name: 'start_task',
+    arguments: { title: 'Load config from env', objective: 'The app reads its config from the environment', acceptance_criteria: ['Reads APP_PORT'], steps: ['Parse env', 'Validate'] },
+  })
+  await mcp.callTool({ name: 'update_task', arguments: { completed_steps: ['Parse env'], next_action: 'Validate the parsed values' } })
+  await mcp.close()
   hook({ hook_event_name: 'SessionStart', source: 'startup' })
   write('src/app.ts', 'export const app = 2\n')
   hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo, 'src/app.ts') } })
@@ -95,9 +107,10 @@ test('shows the repository, its session, changed file and verified check', async
   const name = repo.split('/').at(-1) as string
   await page.goto(`${url}/app/projects`)
   await page.getByRole('link', { name: new RegExp(name) }).first().click()
-  await expect(page.getByRole('heading', { name: 'Where we left off' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Load config from env' })).toBeVisible()
+  await expect(page.getByText('Validate the parsed values').first()).toBeVisible()
+  await expect(page.getByText('Reads APP_PORT')).toBeVisible()
   await expect(page.getByText('src/app.ts').first()).toBeVisible()
-  await expect(page.getByText('Bumped app to 2. Next: wire the config loader.').first()).toBeVisible()
   await expect(page.locator('#verification').getByText('unit')).toBeVisible()
 
   await page.getByText('src/app.ts').first().click()
@@ -107,14 +120,13 @@ test('shows the repository, its session, changed file and verified check', async
   await expect(drawer.getByText('Mock excerpt')).toHaveCount(0)
 })
 
-test('prepare handoff shows the briefing a new agent session receives', async ({ page }) => {
+test('prepare handoff builds from the recorded task', async ({ page }) => {
   const name = repo.split('/').at(-1) as string
   await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
-  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).click()
+  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).first().click()
   const dialog = page.getByRole('dialog')
-  await expect(dialog.getByText('# Continuum handoff:', { exact: false })).toBeVisible()
-  await expect(dialog.getByText('Bumped app to 2. Next: wire the config loader.', { exact: false })).toBeVisible()
-  await expect(dialog.getByRole('button', { name: 'Copy briefing' })).toBeVisible()
+  await expect(dialog.getByRole('combobox', { name: 'Task' })).toHaveValue(/^load-config-from-env-/)
+  await expect(dialog.getByText('The app reads its config from the environment', { exact: false }).first()).toBeVisible()
 })
 
 test('handoff history starts empty instead of showing demo samples', async ({ page }) => {

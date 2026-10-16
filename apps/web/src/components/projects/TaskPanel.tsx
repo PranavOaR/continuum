@@ -104,27 +104,29 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
           </p>
         </div>
 
-        <div>
-          <div className="mb-2 flex items-end justify-between gap-4">
-            <h3 className="label-mono text-muted">Acceptance criteria</h3>
-            <div className="w-40">
-              <ProgressBar done={criteriaDone} total={task.acceptanceCriteria.length} label="Complete" />
+        {task.acceptanceCriteria.length > 0 && (
+          <div>
+            <div className="mb-2 flex items-end justify-between gap-4">
+              <h3 className="label-mono text-muted">Acceptance criteria</h3>
+              <div className="w-40">
+                <ProgressBar done={criteriaDone} total={task.acceptanceCriteria.length} label="Complete" />
+              </div>
             </div>
+            <ul className="divide-y divide-line rounded-md border border-line">
+              {task.acceptanceCriteria.map((criterion) => (
+                <li key={criterion.id} className="flex flex-col gap-1 px-3 py-2.5 sm:flex-row sm:items-start sm:gap-3">
+                  <div className="sm:w-24 sm:shrink-0">
+                    <CriterionBadge status={criterion.status} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] text-fg">{criterion.text}</p>
+                    <p className="text-[12px] text-subtle">{criterion.evidence}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
-          <ul className="divide-y divide-line rounded-md border border-line">
-            {task.acceptanceCriteria.map((criterion) => (
-              <li key={criterion.id} className="flex flex-col gap-1 px-3 py-2.5 sm:flex-row sm:items-start sm:gap-3">
-                <div className="sm:w-24 sm:shrink-0">
-                  <CriterionBadge status={criterion.status} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] text-fg">{criterion.text}</p>
-                  <p className="text-[12px] text-subtle">{criterion.evidence}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
+        )}
 
         <div className="grid gap-5 sm:grid-cols-2">
           <StepList title="Completed steps" steps={task.completedSteps} done />
