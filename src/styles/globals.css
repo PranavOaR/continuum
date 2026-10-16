@@ -1,0 +1,233 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/*
+ * Design tokens. Visual language: white canvas, near-black ink, a single blue accent,
+ * hairline borders, square corners, Geist + Geist Mono. Light is the default theme.
+ */
+:root,
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f4f6;
+  --surface-3: #ededed;
+  --line: #dfdfdf;
+  --line-strong: #c8c9cc;
+  --fg: #0b1015;
+  --muted: #595c60;
+  --subtle: #8e9196;
+  --accent: #0562ef;
+  --accent-strong: #0562ef;
+  --accent-hover: #0450c8;
+  --accent-fg: #ffffff;
+  --success: #00894a;
+  --live: #00c763;
+  --warning: #a86400;
+  --danger: #d1281f;
+  --backdrop: rgb(11 16 21 / 0.32);
+  --dot: rgb(11 16 21 / 0.14);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b1015;
+  --surface: #0f151b;
+  --surface-2: #151c23;
+  --surface-3: #1c242c;
+  --line: #242c35;
+  --line-strong: #344049;
+  --fg: #fffbf5;
+  --muted: #a9adb2;
+  --subtle: #747a81;
+  --accent: #3f86ff;
+  --accent-strong: #0562ef;
+  --accent-hover: #2a74f5;
+  --accent-fg: #ffffff;
+  --success: #2fcf80;
+  --live: #00c763;
+  --warning: #e3a640;
+  --danger: #f0645b;
+  --backdrop: rgb(0 0 0 / 0.6);
+  --dot: rgb(255 251 245 / 0.12);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-live: var(--live);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* Square corners throughout; rounded-full remains for dots and switches. */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+}
+
+/* Small uppercase mono label used for eyebrows, metadata and section captions. */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Tight display tracking for regular-weight headings. */
+@utility tracking-display {
+  letter-spacing: -0.03em;
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+
+/* Corner tick marks framing a bordered surface. */
+.cn-ticks {
+  --tick: var(--line-strong);
+  background-image:
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick)),
+    linear-gradient(var(--tick), var(--tick)), linear-gradient(var(--tick), var(--tick));
+  background-repeat: no-repeat;
+  background-size: 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px, 7px 1px, 1px 7px;
+  background-position:
+    left 6px top 6px, left 6px top 6px,
+    right 6px top 6px, right 6px top 6px,
+    left 6px bottom 6px, left 6px bottom 6px,
+    right 6px bottom 6px, right 6px bottom 6px;
+}
+
+/* Dotted grid used behind diagrams and the graph canvas. */
+.cn-dots {
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-position: 8px 8px;
+}
+
+/* Diagonal hatching used for tertiary bars. */
+.cn-hatch {
+  background-color: var(--surface-2);
+  background-image: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--fg) 6%, transparent) 5px 6px);
+}
+
+/* Native <dialog> styling shared by modals and drawers. */
+dialog.cn-dialog {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border: 0;
+  max-width: 100vw;
+  max-height: 100dvh;
+}
+
+dialog.cn-dialog::backdrop {
+  background: var(--backdrop);
+}
+
+dialog.cn-dialog[open] .cn-dialog-panel {
+  animation: cn-pop 160ms ease-out;
+}
+
+dialog.cn-drawer[open] .cn-dialog-panel {
+  animation: cn-slide 180ms ease-out;
+}
+
+@keyframes cn-pop {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes cn-slide {
+  from { opacity: 0.4; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes cn-fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.cn-toast {
+  animation: cn-fade-up 180ms ease-out;
+}
+
+.cn-page {
+  animation: cn-fade-up 200ms ease-out;
+}
+
+.cn-skeleton {
+  background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size: 200% 100%;
+  animation: cn-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes cn-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Honour both the OS setting and the in-app "Reduce motion" preference. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+:root[data-reduce-motion="true"] *,
+:root[data-reduce-motion="true"] *::before,
+:root[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+html {
+  scroll-behavior: smooth;
+}
