@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -24,5 +24,13 @@ describe('continuum binary', () => {
     expect(continuum(repo.root, '--version').trim()).toBe('0.0.0-dev')
     expect(continuum(repo.root, 'init')).toContain('Initialized Continuum')
     expect(continuum(repo.root, 'status')).toContain('1 tracked file · all recorded')
+  }, 20_000)
+
+  it("keeps stderr free of Node's SQLite experimental warning", () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    const result = spawnSync(process.execPath, ['--import', TSX_LOADER, BIN, 'init'], { cwd: repo.root, encoding: 'utf8' })
+    expect(result.status).toBe(0)
+    expect(result.stderr).not.toMatch(/ExperimentalWarning/)
   }, 20_000)
 })

@@ -1,6 +1,5 @@
 import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import {
   anchorStatus,
   checkStatus,
@@ -17,6 +16,11 @@ import { keys, kindOf } from './keys'
 import { project, type Mutations } from './projector'
 import { migrate, readSchemaVersion } from './migrations'
 import { SCHEMA } from './schema'
+
+// Loaded at run time rather than by a static import, which Node resolves before any code runs:
+// the CLI first installs a filter for Node 22's "SQLite is experimental" warning.
+const { DatabaseSync } = process.getBuiltinModule('node:sqlite')
+type DatabaseSync = InstanceType<typeof DatabaseSync>
 
 const PRIVATE_DIR_MODE = 0o700
 const PRIVATE_FILE_MODE = 0o600
