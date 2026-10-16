@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -77,7 +77,50 @@ describe('setupClaudeCode', () => {
   })
 })
 
+describe('setupClaudeCode with existing team configuration', () => {
+  it('leaves a git-tracked .mcp.json alone and explains how to add the server privately', async () => {
+    const created = repo()
+    writeJson(created.root, MCP_FILE, { mcpServers: { github: { command: 'gh-mcp' } } })
+    created.commit('share mcp config')
+    const result = await setupClaudeCode(created.root, INVOCATION)
+    expect(result.files[1]).toMatchObject({ path: MCP_FILE, action: 'skipped', note: expect.stringContaining('claude mcp add continuum -- /usr/local/bin/node') })
+    expect(readJson(created.root, MCP_FILE)).toEqual({ mcpServers: { github: { command: 'gh-mcp' } } })
+    expect(created.git('status', '--porcelain')).toBe('')
+  })
+
+  it('refuses to replace a "continuum" server it did not write, changing nothing', async () => {
+    const { root } = repo()
+    writeJson(root, MCP_FILE, { mcpServers: { continuum: { command: 'python', args: ['my_continuum_server.py'] } } })
+    await expect(setupClaudeCode(root, INVOCATION)).rejects.toThrow(/did not write/)
+    expect(existsSync(join(root, HOOKS_FILE))).toBe(false)
+  })
+
+  it('never mistakes a user hook for its own', async () => {
+    const { root } = repo()
+    const lookalike = { type: 'command', command: 'node', args: ['/home/me/continuum-tools/sync.js', 'ingest'] }
+    writeJson(root, HOOKS_FILE, { hooks: { Stop: [{ hooks: [lookalike] }], Notification: 'custom-value' } })
+    await setupClaudeCode(root, INVOCATION)
+    await removeClaudeCodeSetup(root)
+    expect(readJson(root, HOOKS_FILE)).toEqual({ hooks: { Stop: [{ hooks: [lookalike] }], Notification: 'custom-value' } })
+  })
+
+  it('recognizes its own entries from a published package', async () => {
+    const { root } = repo()
+    await setupClaudeCode(root, { command: 'npx', args: ['-y', '@acme/continuum@0.1.0'] })
+    await setupClaudeCode(root, INVOCATION)
+    expect(readJson(root, HOOKS_FILE).hooks.SessionStart).toHaveLength(1)
+  })
+})
+
 describe('removeClaudeCodeSetup', () => {
+  it('deletes files that held nothing but its own entries', async () => {
+    const { root } = repo()
+    await setupClaudeCode(root, INVOCATION)
+    expect((await removeClaudeCodeSetup(root)).files.map((file) => file.action)).toEqual(['removed', 'removed'])
+    expect(existsSync(join(root, HOOKS_FILE))).toBe(false)
+    expect(existsSync(join(root, MCP_FILE))).toBe(false)
+  })
+
   it('removes only what setup added', async () => {
     const { root } = repo()
     const theirHook = { type: 'command', command: 'npx prettier --write' }

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
@@ -49,7 +49,14 @@ describe('continuum setup claude-code', () => {
 
     const removed = await cli(repo.root, ['setup', 'claude-code', '--remove'])
     expect(removed.out).toContain('removed   .claude/settings.local.json')
-    expect(JSON.parse(readFileSync(join(repo.root, '.mcp.json'), 'utf8'))).toEqual({ mcpServers: {} })
+    expect(existsSync(join(repo.root, '.mcp.json'))).toBe(false)
+  })
+
+  it('removing from a repository that never used Continuum creates nothing', async () => {
+    const repo = sandbox()
+    const result = await cli(repo.root, ['setup', 'claude-code', '--remove'])
+    expect(result.out).toContain('nothing to remove')
+    expect(existsSync(join(repo.root, '.continuum'))).toBe(false)
   })
 
   it('validates its arguments', async () => {

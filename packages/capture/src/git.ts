@@ -109,6 +109,17 @@ export async function isIgnored(root: string, path: string): Promise<boolean> {
   }
 }
 
+/** Whether git tracks a repository-relative path (it is in the index). */
+export async function isTracked(root: string, path: string): Promise<boolean> {
+  try {
+    await git(root, ['ls-files', '--error-unmatch', '--', path])
+    return true
+  } catch (error) {
+    if (error instanceof GitCommandError && error.exitCode === 1) return false
+    throw error
+  }
+}
+
 async function hashBatch(root: string, paths: readonly string[]): Promise<Map<string, ContentHash>> {
   const hashes = (await git(root, ['hash-object', '--stdin-paths'], `${paths.join('\n')}\n`)).trim().split('\n')
   if (hashes.length !== paths.length) throw new Error(`git hash-object returned ${hashes.length} hashes for ${paths.length} files`)
