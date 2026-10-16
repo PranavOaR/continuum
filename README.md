@@ -57,7 +57,7 @@ Restart Claude Code in that repository and approve the `continuum` server when p
 
 ```bash
 npm run build                                          # once, and after pulling changes
-npm run continuum -- serve ~/code/my-app ~/code/api    # http://127.0.0.1:4747
+npm run continuum -- serve ~/code/my-app ~/code/api    # prints http://127.0.0.1:4747/?token=…
 ```
 
 `serve` opens a read-only dashboard for one or more initialized repositories:
@@ -66,9 +66,9 @@ npm run continuum -- serve ~/code/my-app ~/code/api    # http://127.0.0.1:4747
 - checks, with whether they still cover the current code;
 - recorded decisions, and the context graph.
 
-It listens on 127.0.0.1 only and accepts requests only from its own origin. *Prepare handoff* shows the exact briefing a new agent session receives. Some data is not captured yet: line-level diffs and tasks. Screens say so rather than showing placeholders.
+It listens on 127.0.0.1 only and accepts requests only from its own origin. It also requires the access token in the printed link, which changes on every run, so other users on the machine cannot read it. *Prepare handoff* shows the exact briefing a new agent session receives. Some data is not captured yet: line-level diffs and tasks. Screens say so rather than showing placeholders.
 
-To work on the UI against live data, run `continuum serve` and then `CONTINUUM_API=http://127.0.0.1:4747 VITE_CONTINUUM_DATA=local npm run dev`.
+To work on the UI against live data, run `continuum serve`, open its link once in the browser to set the access cookie, and then run `CONTINUUM_API=http://127.0.0.1:4747 VITE_CONTINUUM_DATA=local npm run dev`.
 
 Every item in a handoff is labelled with its evidence:
 
