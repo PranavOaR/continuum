@@ -184,7 +184,7 @@ describe('ingestHook for checks the agent runs', () => {
     const { repo } = await initialized()
     await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { stdout: 'ok' } }), { now: () => NOW })
     const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: () => NOW })
-    expect(next.status === 'recorded' && next.additionalContext).toContain('[observed: run by an agent] passed: `npm test`')
+    expect(next.status === 'recorded' && next.additionalContext).toContain('[observed: run by an agent] passed: `npm test`. Ran')
   })
 })
 

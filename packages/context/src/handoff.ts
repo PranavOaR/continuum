@@ -106,7 +106,7 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
 function describeCheck(check: CheckSummary, now: Date): string {
   const tag = check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'
   const ran = `Ran ${agoFromIso(check.ranAt, now)}`
-  const label = `${code(check.name)} (${code(check.command)})`
+  const label = check.name === check.command ? code(check.name) : `${code(check.name)} (${code(check.command)})`
   switch (check.status) {
     case 'out-of-date':
       return `- ${tag} OUT OF DATE: ${label}. ${ran}; changed since: ${listPaths(check.changed)}`
