@@ -175,6 +175,8 @@ export async function setupClaudeCode(root: string, invocation: Invocation): Pro
 }
 
 async function apply(root: string, file: string, before: Json | null, after: Json, keepOutOfGit: boolean): Promise<FileAction> {
+  // A config that became portable may be committed, so lift an exclude an earlier machine-specific setup added.
+  if (!keepOutOfGit) await removeGitExclude(root, `/${file}`, GIT_EXCLUDE_COMMENT)
   if (before && JSON.stringify(before) === JSON.stringify(after)) return 'unchanged'
   await writeAtomically(join(root, file), after)
   if (before === null && keepOutOfGit) await addGitExclude(root, `/${file}`, GIT_EXCLUDE_COMMENT)

@@ -34,8 +34,8 @@ function packAndInstall() {
   return join(project, 'node_modules/.bin/continuum')
 }
 
-function makeRepo() {
-  const repo = join(scratch, 'repo')
+function makeRepo(name = 'repo') {
+  const repo = join(scratch, name)
   run('mkdir', ['-p', repo], scratch)
   run('git', ['init', '-q'], repo)
   writeFileSync(join(repo, 'a.txt'), 'hello\n')
@@ -117,6 +117,20 @@ try {
 
   const dashboard = await serveDashboard(bin, repo)
   check('serve opens the bundled dashboard', dashboard.status === 200 && dashboard.html.includes('continuum-data'), `HTTP ${dashboard.status}`)
+
+  // A bundle run from outside node_modules writes machine-specific `node <bundle>` commands instead.
+  const local = makeRepo('local')
+  const bundle = join(RELEASE, 'continuum.js')
+  run(process.execPath, [bundle, 'setup', 'claude-code'], local)
+  const localServer = JSON.parse(readFileSync(join(local, '.mcp.json'), 'utf8')).mcpServers.continuum
+  check('a local bundle configures node with its own path', localServer.args[0] === bundle, JSON.stringify(localServer))
+  const configured = JSON.parse(readFileSync(join(local, '.claude/settings.local.json'), 'utf8')).hooks.SessionStart[0].hooks[0]
+  run(configured.command, configured.args, local, JSON.stringify({ hook_event_name: 'SessionStart', session_id: 'local-1', cwd: local, source: 'startup' }))
+  check('the configured hook command runs', true)
+  const doctor = run(process.execPath, [bundle, 'doctor'], local)
+  check('doctor passes after setup', /✓ Claude Code hooks registered/.test(doctor) && !/✗/.test(doctor), doctor)
+  run(process.execPath, [bundle, 'uninstall', '--purge'], local)
+  check('uninstall --purge leaves only the original file', run('git', ['status', '--porcelain', '--ignored'], local).trim() === '?? a.txt')
 } catch (error) {
   check('smoke test ran to completion', false, error instanceof Error ? (error.stderr || error.message) : String(error))
 } finally {

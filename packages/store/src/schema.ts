@@ -1,4 +1,9 @@
-/** SQLite schema for a workspace's context store. Idempotent; safe to run on every open. */
+/**
+ * SQLite schema for a workspace's context store, frozen at schema version 1.
+ * It runs on every open, before migrations, including on stores newer than
+ * this code: keep it to IF NOT EXISTS / INSERT OR IGNORE and never edit it.
+ * Every change goes in a new migration (migrations.ts).
+ */
 export const SCHEMA = `
 -- Wait for another process (watcher, CLI) to finish writing instead of failing with SQLITE_BUSY.
 PRAGMA busy_timeout = 5000;

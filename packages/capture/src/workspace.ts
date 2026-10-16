@@ -64,10 +64,12 @@ export async function addGitExclude(root: string, entry: string, comment: string
 export async function removeGitExclude(root: string, entry: string, comment: string): Promise<boolean> {
   const excludePath = await gitPath(root, 'info/exclude')
   if (!existsSync(excludePath)) return false
-  const lines = (await readFile(excludePath, 'utf8')).split('\n')
+  const content = await readFile(excludePath, 'utf8')
+  const eol = content.includes('\r\n') ? '\r\n' : '\n'
+  const lines = content.split(eol)
   const kept = lines.filter((line, index) => !(line === `# ${comment}` && lines[index + 1] === entry) && !(line === entry && lines[index - 1] === `# ${comment}`))
   if (kept.length === lines.length) return false
-  await writeFile(excludePath, kept.join('\n'))
+  await writeFile(excludePath, kept.join(eol))
   return true
 }
 

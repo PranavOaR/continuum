@@ -31,6 +31,13 @@ describe('git exclude entries', () => {
     expect(readFileSync(excludeFile(root), 'utf8')).toBe(before)
   })
 
+  it('handles an exclude file with Windows line endings', async () => {
+    const { root } = repo()
+    writeFileSync(excludeFile(root), '*.log\r\n# Continuum local context store\r\n/.continuum/\r\n')
+    expect(await includeInGit(root)).toBe(true)
+    expect(readFileSync(excludeFile(root), 'utf8')).toBe('*.log\r\n')
+  })
+
   it('leaves a pattern the user wrote themselves', async () => {
     const { root } = repo()
     writeFileSync(excludeFile(root), '/.continuum/\n')

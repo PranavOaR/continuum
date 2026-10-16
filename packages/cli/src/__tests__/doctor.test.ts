@@ -82,6 +82,22 @@ describe('continuum doctor', () => {
     expect(find(await doctor(repo.root, { invocation: other }), /different Continuum install/)?.status).toBe('warn')
   })
 
+  it('reports a damaged store without suggesting deletion for other errors', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    writeFileSync(join(repo.root, '.continuum/context.db'), 'not a database at all, just text that is long enough to have a header')
+    expect(find(await doctor(repo.root), /Store is damaged/)).toMatchObject({ status: 'fail', fix: expect.stringContaining('--purge') })
+  })
+
+  it('never upgrades or writes the store it inspects', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const path = join(repo.root, '.continuum/context.db')
+    const before = readFileSync(path)
+    await doctor(repo.root)
+    expect(readFileSync(path).equals(before)).toBe(true)
+  })
+
   it('reports missing hooks and exits non-zero when anything fails', async () => {
     const repo = sandbox()
     await cli(repo.root, ['init'])

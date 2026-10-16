@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError } from '@continuum/capture'
 import { HOOK_EVENTS, HOOKS_FILE, isContinuumHandler, isContinuumServer, MCP_FILE, MCP_SERVER_NAME, type Invocation } from '@continuum/claude-code'
-import { ContextStore, StoreVersionError } from '@continuum/store'
+import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@continuum/store'
 
 /** node:sqlite works without a flag from this version on. */
 export const MIN_NODE_VERSION: readonly [number, number] = [22, 13]
@@ -60,18 +60,22 @@ async function checkGit(): Promise<Finding> {
   }
 }
 
+/** Read-only: diagnosing a store never migrates or writes it. */
 function checkStore(storePath: string): Finding {
-  let store: ContextStore | undefined
   try {
-    store = ContextStore.open(storePath)
-    const events = store.eventCount()
-    const last = store.recentEvents(1)[0]?.event.occurredAt
-    return { status: 'ok', label: 'Store opens', detail: `${events} event${events === 1 ? '' : 's'}, schema v${store.schemaVersion()}${last ? `, last activity ${last}` : ''}` }
+    const { schemaVersion, events, lastActivity } = inspectStore(storePath)
+    const detail = `${events} event${events === 1 ? '' : 's'}, schema v${schemaVersion}${lastActivity ? `, last activity ${lastActivity}` : ''}`
+    if (schemaVersion > LATEST_SCHEMA_VERSION) {
+      return { status: 'fail', label: 'Store is from a newer Continuum', detail: `schema v${schemaVersion}; this version reads up to v${LATEST_SCHEMA_VERSION}`, fix: 'Upgrade Continuum.' }
+    }
+    if (schemaVersion < LATEST_SCHEMA_VERSION) return { status: 'ok', label: 'Store opens', detail: `${detail}; upgraded to v${LATEST_SCHEMA_VERSION} on next use` }
+    return { status: 'ok', label: 'Store opens', detail }
   } catch (error) {
-    if (error instanceof StoreVersionError) return { status: 'fail', label: 'Store is from a newer Continuum', detail: error.message, fix: 'Upgrade Continuum.' }
-    return { status: 'fail', label: 'Store cannot be opened', detail: error instanceof Error ? error.message : String(error), fix: 'Run `continuum uninstall --purge`, then set up again. This deletes the recorded history.' }
-  } finally {
-    store?.close()
+    const message = error instanceof Error ? error.message : String(error)
+    if (isCorruptStoreError(error)) {
+      return { status: 'fail', label: 'Store is damaged', detail: message, fix: 'Run `continuum uninstall --purge`, then set up again. This deletes the recorded history.' }
+    }
+    return { status: 'fail', label: 'Store cannot be read', detail: message, fix: `Check that you can read ${storePath}, then try again.` }
   }
 }
 

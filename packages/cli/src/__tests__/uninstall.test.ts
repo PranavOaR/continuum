@@ -2,8 +2,10 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
-import { EXIT_OK, EXIT_USAGE } from '../io'
+import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from '../io'
 import { cli } from './harness'
+
+const { DatabaseSync } = process.getBuiltinModule('node:sqlite')
 
 const sandboxes: Sandbox[] = []
 afterEach(() => {
@@ -62,6 +64,22 @@ describe('continuum uninstall', () => {
     expect(result.out).toContain('uninstall --purge')
     expect(existsSync(join(repo.root, '.continuum/context.db'))).toBe(true)
     expect(existsSync(join(repo.root, '.mcp.json'))).toBe(false)
+  })
+
+  it('refuses to purge while another process is writing to the store', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    const writer = new DatabaseSync(join(repo.root, '.continuum/context.db'))
+    writer.exec('BEGIN IMMEDIATE')
+    try {
+      const result = await cli(repo.root, ['uninstall', '--purge'])
+      expect(result.code).toBe(EXIT_FAILURE)
+      expect(result.err).toContain('Nothing was changed')
+      expect(existsSync(join(repo.root, '.mcp.json'))).toBe(true)
+    } finally {
+      writer.exec('ROLLBACK')
+      writer.close()
+    }
   })
 
   it('says so when there is nothing to remove, and rejects unknown options', async () => {

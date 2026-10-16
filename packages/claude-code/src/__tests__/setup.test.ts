@@ -72,6 +72,14 @@ describe('setupClaudeCode', () => {
     expect(git('status', '--porcelain').split('\n').sort()).toEqual(['?? .mcp.json', '?? a.ts'])
   })
 
+  it('lifts the git exclude when a machine-specific setup becomes portable', async () => {
+    const { root, git } = repo()
+    await setupClaudeCode(root, INVOCATION)
+    expect(git('status', '--porcelain')).toBe('?? a.ts')
+    await setupClaudeCode(root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
+    expect(git('status', '--porcelain').split('\n').sort()).toEqual(['?? .mcp.json', '?? a.ts'])
+  })
+
   it('refuses to overwrite invalid JSON', async () => {
     const { root } = repo()
     mkdirSync(join(root, '.claude'))

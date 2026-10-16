@@ -3,7 +3,8 @@ import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { CONTINUUM_DIR, includeInGit, locateWorkspace } from '@continuum/capture'
 import { HOOKS_FILE, removeClaudeCodeSetup } from '@continuum/claude-code'
-import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
+import { isStoreBusy } from '@continuum/store'
+import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 export const UNINSTALL_USAGE = 'Usage: continuum uninstall [--purge]'
 
@@ -24,6 +25,10 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
     return EXIT_USAGE
   }
   const { root, storePath } = await locateWorkspace(io.cwd)
+  if (purge && existsSync(storePath) && isStoreBusy(storePath)) {
+    io.err('continuum: another Continuum process is writing to this repository. Stop `continuum start` and `continuum serve` here, then run uninstall again. Nothing was changed.')
+    return EXIT_FAILURE
+  }
   const result = await removeClaudeCodeSetup(root)
   removeIfEmpty(join(root, dirname(HOOKS_FILE)))
   for (const file of result.files) io.out(`  ${file.action.padEnd(9)} ${file.path}`)
@@ -38,6 +43,8 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
     io.out('To delete it as well, stop any `continuum start` or `continuum serve` for this repository and run `continuum uninstall --purge`.')
     return EXIT_OK
   }
+  // Idle watchers are not detectable; a running `continuum start` would keep writing to the deleted file.
+  io.out('If `continuum start` or `continuum serve` is still running for this repository, stop it now.')
   await rm(storeDir, { recursive: true, force: true })
   await includeInGit(root)
   io.out(`  removed   ${CONTINUUM_DIR}/ (all recorded history)`)
