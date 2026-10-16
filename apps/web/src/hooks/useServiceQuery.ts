@@ -31,11 +31,12 @@ interface Settled {
  * `key` must uniquely identify the request; the fetcher is only re-run when it changes.
  * Cached data always wins over an error: a failed refresh keeps showing the last good result.
  */
-export function useServiceQuery<T>(key: string, fetcher: () => Promise<T>): QueryState<T> {
+export function useServiceQuery<T>(key: string | null, fetcher: () => Promise<T>): QueryState<T> {
   const [settled, setSettled] = useState<Settled | undefined>(undefined)
 
   useEffect(() => {
-    if (cache.isFresh(key)) return
+    // A null key means "not ready to ask yet" (e.g. which project is still being resolved).
+    if (key === null || cache.isFresh(key)) return
     let isCancelled = false
     cache.load(key, fetcher).then(
       () => {
@@ -54,6 +55,7 @@ export function useServiceQuery<T>(key: string, fetcher: () => Promise<T>): Quer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  if (key === null) return { data: undefined, error: undefined, isLoading: true }
   if (cache.has(key)) return { data: cache.get<T>(key), error: undefined, isLoading: false }
   const current = settled?.key === key ? settled : undefined
   return { data: undefined, error: current?.error, isLoading: current === undefined }

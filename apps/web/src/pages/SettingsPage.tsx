@@ -7,7 +7,7 @@ import { PageHeader } from '../components/shared/PageHeader'
 import { Panel } from '../components/shared/Panel'
 import { AGENTS } from '@continuum/core'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { useProjects } from '../hooks/useWorkspace'
+import { useProjects, usePreferredProjectId } from '../hooks/useWorkspace'
 import { useHandoffs } from '../state/handoffs'
 import { usePreferences, type ThemePreference } from '../state/preferences'
 import { useToast } from '../state/toasts'
@@ -61,6 +61,7 @@ export function SettingsPage() {
   const isLive = useIsLive()
   useDocumentTitle('Settings')
   const { preferences, updatePreferences, resetPreferences } = usePreferences()
+  const preferredProjectId = usePreferredProjectId()
   const { restoreSeedData, clearHistory } = useHandoffs()
   const projects = useProjects()
   const notify = useToast()
@@ -115,7 +116,7 @@ export function SettingsPage() {
               </div>
             </SettingRow>
             <SettingRow label="Default project" description="Opened by “Open Project” and preselected in handoffs.">
-              <SelectField label="Default project" hideLabel value={preferences.defaultProjectId} onChange={(event) => updatePreferences({ defaultProjectId: event.target.value })}>
+              <SelectField label="Default project" hideLabel value={preferredProjectId ?? ''} onChange={(event) => updatePreferences({ defaultProjectId: event.target.value })}>
                 {(projects.data ?? []).map(({ project }) => (
                   <option key={project.id} value={project.id}>
                     {project.name}

@@ -117,7 +117,13 @@ test('prepare handoff shows the briefing a new agent session receives', async ({
   await expect(dialog.getByRole('button', { name: 'Copy briefing' })).toBeVisible()
 })
 
+test('handoff history starts empty instead of showing demo samples', async ({ page }) => {
+  await page.goto(`${url}/app/handoffs`)
+  await expect(page.getByText('startup-app')).toHaveCount(0)
+})
+
 test('memory graph comes from the local context graph', async ({ page }) => {
+  // No ?project=: the page must pick a project that exists locally, not the demo default.
   await page.goto(`${url}/app/memory`)
   await expect(page.getByText('straight from the local context graph')).toBeVisible()
 })

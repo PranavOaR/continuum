@@ -2,7 +2,7 @@ import { ArrowRight, Info } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AGENTS, getAgent } from '@continuum/core'
-import { useProjects, useWorkspace } from '../../hooks/useWorkspace'
+import { usePreferredProjectId, useProjects, useWorkspace } from '../../hooks/useWorkspace'
 import type { ProjectWorkspace } from '../../services'
 import { useHandoffs } from '../../state/handoffs'
 import { usePreferences } from '../../state/preferences'
@@ -50,7 +50,9 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
   const navigate = useNavigate()
   const projects = useProjects()
 
-  const [projectId, setProjectId] = useState(initial.projectId ?? preferences.defaultProjectId)
+  const preferredProjectId = usePreferredProjectId()
+  const [chosenProjectId, setProjectId] = useState(initial.projectId)
+  const projectId = chosenProjectId ?? preferredProjectId ?? ''
   const [requestedTaskId, setRequestedTaskId] = useState(initial.taskId ?? '')
   const [sourceAgent, setSourceAgent] = useState<AgentType>(preferences.preferredSourceAgent)
   const [targetAgent, setTargetAgent] = useState<AgentType>(() =>
@@ -58,7 +60,7 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
   )
   const [included, setIncluded] = useState<ContextCategory[]>(preferences.defaultContext)
 
-  const workspace = useWorkspace(projectId)
+  const workspace = useWorkspace(projectId || undefined)
   const isLive = useIsLive()
   const task = workspace.data ? resolveTask(workspace.data, requestedTaskId) : undefined
 
