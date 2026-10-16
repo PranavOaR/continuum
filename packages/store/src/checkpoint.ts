@@ -52,3 +52,18 @@ export interface RewriteResult {
   removedEvents: number
   changedEvents: number
 }
+
+export const EXPORT_FORMAT = 'continuum-history'
+export const EXPORT_VERSION = 1
+
+/**
+ * A store's whole history as plain JSON, independent of how objects are
+ * stored: coverage manifests and check runs are written inline.
+ */
+export interface HistoryExport {
+  format: typeof EXPORT_FORMAT
+  version: typeof EXPORT_VERSION
+  exportedAt: string
+  checkpoint: Checkpoint | null
+  events: FirstEvent[]
+}

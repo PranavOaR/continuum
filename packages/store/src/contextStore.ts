@@ -11,7 +11,7 @@ import {
   type IdentityKey,
   type RecordedRun,
 } from '@continuum/core'
-import { mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState, type HistoryRewrite, type RewriteResult } from './checkpoint'
+import { EXPORT_FORMAT, EXPORT_VERSION, mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState, type HistoryExport, type HistoryRewrite, type RewriteResult } from './checkpoint'
 import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
@@ -242,6 +242,48 @@ export class ContextStore implements Mutations {
       this.deleteUnreferencedObjects()
     })
     return { removedEvents, changedEvents }
+  }
+
+  /** The whole history as self-contained JSON, for backup or moving to another machine. */
+  exportHistory(at: Date = new Date()): HistoryExport {
+    const rows = this.db.prepare('SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq').all() as unknown as (EventRow & { seq: number })[]
+    const checkpoint = this.checkpoint()
+    return {
+      format: EXPORT_FORMAT,
+      version: EXPORT_VERSION,
+      exportedAt: at.toISOString(),
+      checkpoint: checkpoint
+        ? {
+            ...checkpoint,
+            state: this.inlineRuns(checkpoint.state),
+            firstEvents: checkpoint.firstEvents.map((entry) => ({ seq: entry.seq, event: this.selfContained(entry.event) })),
+          }
+        : null,
+      events: rows.map((row) => ({ seq: row.seq, event: this.selfContained(toEvent(row)) })),
+    }
+  }
+
+  /** Loads an export into this store, which must be empty. Replaying it gives the exported graph. */
+  importHistory(history: HistoryExport): void {
+    if (history.format !== EXPORT_FORMAT || history.version !== EXPORT_VERSION) throw new Error('This file is not a Continuum history export this version can read.')
+    if (this.eventCount() > 0 || this.checkpoint()) throw new Error('This store already has history; import only into a freshly initialized repository.')
+    this.transaction(() => {
+      const { checkpoint } = history
+      if (checkpoint) {
+        const state = this.externalizeRuns(checkpoint.state)
+        const firstEvents = checkpoint.firstEvents.map((entry) => ({ seq: entry.seq, event: this.withStoredCoverage(entry.event) }))
+        this.db
+          .prepare('INSERT INTO checkpoints (id, seq, created_at, state, first_events) VALUES (1, ?, ?, ?, ?)')
+          .run(checkpoint.seq, checkpoint.createdAt, gzipSync(JSON.stringify(state)), JSON.stringify(firstEvents))
+        this.writeState(state)
+      }
+      const insert = this.db.prepare('INSERT INTO events (seq, type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      for (const { seq, event } of history.events) {
+        const stored = this.withStoredCoverage(event)
+        insert.run(seq, stored.type, canonicalJson(stored.payload), stored.evidence, stored.source, stored.occurredAt, stored.revision ?? null)
+        project(this, stored)
+      }
+    })
   }
 
   /** The latest compaction checkpoint, if the log was ever compacted. */

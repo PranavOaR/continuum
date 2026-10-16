@@ -7,6 +7,7 @@ import { configCommand } from './commands/config'
 import { doctorCommand } from './commands/doctor'
 import { forgetCommand } from './commands/forget'
 import { handoffCommand } from './commands/handoff'
+import { exportCommand, importCommand } from './commands/history'
 import { ingestCommand } from './commands/ingest'
 import { initCommand } from './commands/init'
 import { mcpCommand } from './commands/mcp'
@@ -40,6 +41,7 @@ Commands
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
   config [name on|off] Show or change settings: agent-checks, prompts
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
+  export <file>        Write the recorded history to a JSON file (import <file> restores it)
   forget               Permanently remove recorded data: --path, --session or --before
   doctor               Check the install and this repository's setup, with fixes
   uninstall [--purge]  Disconnect Claude Code; --purge also deletes .continuum/
@@ -73,6 +75,8 @@ const COMMANDS: Record<string, Command> = {
   compact: (io, args) => compactCommand(io, args),
   config: (io, args) => configCommand(io, args),
   forget: (io, args) => forgetCommand(io, args),
+  export: (io, args) => exportCommand(io, args),
+  import: (io, args) => importCommand(io, args),
   doctor: (io, args) => doctorCommand(io, args, selfInvocation()),
   uninstall: (io, args) => uninstallCommand(io, args),
 }
