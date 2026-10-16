@@ -31,8 +31,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        # 22.13 is the oldest supported: node:sqlite runs without a flag from there.
-        node: ['22.13', 22, 24]
+        # Vitest itself needs a newer 22.x; the release job below covers the 22.13 floor.
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -50,6 +50,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        # 22.13 is the oldest supported Node.js: node:sqlite runs without a flag from there.
         node: ['22.13', 24]
     steps:
       - uses: actions/checkout@v4
