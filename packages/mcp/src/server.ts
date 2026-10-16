@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
+import { applyRepositoryRedactions, hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
 import { currentTaskId, DEFAULT_HANDOFF_CHARS, projectState, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
@@ -38,6 +38,7 @@ export class ToolInputError extends Error {
 async function withStore<T>(cwd: string, work: (store: ContextStore, root: string) => Promise<T>): Promise<T> {
   const { workspace, store } = await openWorkspace(cwd)
   try {
+    await applyRepositoryRedactions(workspace.root)
     return await work(store, workspace.root)
   } finally {
     store.close()

@@ -1,7 +1,7 @@
 import type { ContentHash, ContinuumEvent, IdentityKey } from '@continuum/core'
 import type { EdgeType, UpsertInput } from './graphIndex'
 import { hashRecord } from './hash'
-import { keys } from './keys'
+import { keys, REPOSITORY_NODE } from './keys'
 
 /** The write operations a projection may perform. ContextStore implements them with write-through persistence. */
 export interface Mutations {
@@ -9,6 +9,16 @@ export interface Mutations {
   upsertNode(key: IdentityKey, input: UpsertInput): void
   link(from: IdentityKey, type: EdgeType, to: IdentityKey): void
   putObject(kind: string, value: unknown): ContentHash
+  getObject(hash: ContentHash): { kind: string; value: unknown } | undefined
+}
+
+/** Object kind of a check's coverage manifest: identity → content hash of everything it ran against. */
+export const COVERAGE_KIND = 'coverage'
+
+function coverageManifest(store: Mutations, hash: ContentHash): Record<IdentityKey, ContentHash> {
+  const object = store.getObject(hash)
+  if (object?.kind !== COVERAGE_KIND) throw new Error(`Coverage manifest ${hash} is missing from the store.`)
+  return object.value as Record<IdentityKey, ContentHash>
 }
 
 /** Creates a node only if it does not exist yet, e.g. a task referenced before it was described. */
@@ -59,6 +69,29 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       store.upsertNode(session, { hash: hashRecord('session-progress', event.payload), props: { lastNote: event.payload.note, lastActivityAt: at }, at })
       return
     }
+    case 'session.task': {
+      const { sessionId, taskId } = event.payload
+      const session = keys.session(sessionId)
+      ensure(store, session, at)
+      ensure(store, keys.task(taskId), at)
+      store.upsertNode(session, { hash: hashRecord('session-task', event.payload), props: { taskId, lastActivityAt: at }, at })
+      store.link(session, 'worked_on', keys.task(taskId))
+      return
+    }
+    case 'session.prompted': {
+      const session = keys.session(event.payload.sessionId)
+      ensure(store, session, at)
+      store.upsertNode(session, { hash: hashRecord('session-prompt', event.payload), props: { lastPrompt: event.payload.prompt, lastActivityAt: at }, at })
+      return
+    }
+    case 'commit.recorded': {
+      const { hash, message } = event.payload
+      store.upsertNode(REPOSITORY_NODE, { hash: null, props: { head: hash, headMessage: message, headRecordedAt: at }, at })
+      return
+    }
+    case 'data.forgotten':
+      // A marker in the log only; the rewrite it records already changed the graph.
+      return
     case 'session.ended': {
       const session = keys.session(event.payload.sessionId)
       ensure(store, session, at)
@@ -68,7 +101,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
     case 'file.changed': {
       const { path, contentHash, changeType, additions, deletions, sessionId, taskId } = event.payload
       const file = keys.file(path)
-      store.upsertNode(file, { hash: contentHash, props: { path: file.slice('file:'.length), changeType, additions, deletions, revision: event.revision }, at })
+      store.upsertNode(file, { hash: contentHash, props: { path: file.slice('file:'.length), changeType, additions, deletions, revision: event.revision, changedBy: sessionId ?? null }, at })
       if (sessionId) {
         ensure(store, keys.session(sessionId), at)
         store.link(keys.session(sessionId), 'modified', file)
@@ -81,13 +114,16 @@ export function project(store: Mutations, event: ContinuumEvent): void {
     }
     case 'check.recorded': {
       const check = keys.check(event.payload.name)
-      const runHash = store.putObject('check-run', { ...event.payload, ranAt: at, revision: event.revision })
+      const { ranAgainst: inline, coverage, ...run } = event.payload
+      const ranAgainst = inline ?? (coverage ? coverageManifest(store, coverage) : {})
+      const coverageHash = coverage ?? store.putObject(COVERAGE_KIND, ranAgainst)
+      const runHash = store.putObject('check-run', { ...run, coverage: coverageHash, ranAt: at, revision: event.revision })
       store.upsertNode(check, {
         hash: runHash,
-        props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at },
+        props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at, evidence: event.evidence, source: event.source },
         at,
       })
-      for (const covered of ensureAnchors(store, event.payload.ranAgainst, at)) store.link(check, 'ran_against', covered)
+      for (const covered of ensureAnchors(store, ranAgainst, at)) store.link(check, 'ran_against', covered)
       return
     }
     case 'memory.recorded': {

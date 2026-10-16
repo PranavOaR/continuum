@@ -1,5 +1,6 @@
 import { chmodSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { gunzipSync, gzipSync } from 'node:zlib'
 import {
   anchorStatus,
   checkStatus,
@@ -10,10 +11,11 @@ import {
   type IdentityKey,
   type RecordedRun,
 } from '@continuum/core'
+import { EXPORT_FORMAT, EXPORT_VERSION, mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState, type HistoryExport, type HistoryRewrite, type RewriteResult, type VacuumResult } from './checkpoint'
 import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
-import { project, type Mutations } from './projector'
+import { COVERAGE_KIND, project, type Mutations } from './projector'
 import { migrate, readSchemaVersion } from './migrations'
 import { SCHEMA } from './schema'
 
@@ -35,6 +37,12 @@ interface NodeRow {
   hash: string | null
   props: string
   updated_at: string
+}
+
+interface ObjectRow {
+  hash: string
+  kind: string
+  body: string
 }
 
 interface EventRow {
@@ -136,8 +144,11 @@ export class ContextStore implements Mutations {
     return row.count
   }
 
-  /** The oldest event in the log, optionally the oldest from one source and of one type. */
+  /** The oldest event ever recorded, optionally the oldest from one source and of one type, including events compacted away. */
   firstEvent(filter: { source?: string; type?: ContinuumEvent['type'] } = {}): ContinuumEvent | undefined {
+    const matches = (event: ContinuumEvent) => (filter.source === undefined || event.source === filter.source) && (filter.type === undefined || event.type === filter.type)
+    const compacted = this.compactedFirstEvents().find((entry) => matches(entry.event))
+    if (compacted) return compacted.event
     const row = this.db
       .prepare(
         // Plain placeholders: node:sqlite before 22.14 cannot bind a numbered one (?1) used twice.
@@ -160,14 +171,189 @@ export class ContextStore implements Mutations {
     for (const row of rows) yield toEvent(row)
   }
 
-  /** Discards all projections and replays the event log. */
+  /** Discards all projections and replays the event log, starting from the compaction checkpoint if there is one. */
   rebuild(): void {
-    const events = [...this.events()]
     this.transaction(() => {
-      this.db.exec('DELETE FROM edges; DELETE FROM node_history; DELETE FROM nodes;')
-      this.graphIndex = new GraphIndex()
-      for (const event of events) project(this, event)
+      this.writeState(this.checkpoint()?.state ?? { nodes: [], edges: [] })
+      for (const event of this.events()) project(this, event)
     })
+  }
+
+  /**
+   * Returns freed pages to the file system after a compaction. Needs a moment
+   * with no other connection reading; returns false if one was, and SQLite
+   * reuses the space instead.
+   */
+  vacuum(): VacuumResult {
+    const attempt = (sql: string) => {
+      try {
+        return this.db.prepare(sql).get() as Record<string, number> | undefined
+      } catch {
+        return null
+      }
+    }
+    const shrunk = attempt('VACUUM') !== null
+    // busy = 1 means another connection kept the log from being emptied.
+    const checkpoint = attempt('PRAGMA wal_checkpoint(TRUNCATE)')
+    return { shrunk, walCleared: checkpoint !== null && checkpoint?.busy !== 1 }
+  }
+
+  /**
+   * Rewrites recorded history in place, for `forget`. Events, the compaction
+   * checkpoint and every projection are rewritten in one transaction. Objects
+   * nothing refers to any more are then deleted, and SQLite overwrites freed
+   * pages (secure_delete), so removed text does not linger in the file.
+   * Call vacuum() afterwards to shrink the file.
+   */
+  rewriteHistory(rewrite: HistoryRewrite): RewriteResult {
+    const rows = this.db.prepare('SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq').all() as unknown as (EventRow & { seq: number })[]
+    const previous = this.checkpoint()
+    let removedEvents = 0
+    let changedEvents = 0
+    let changedCheckpoint = false
+    this.db.exec('PRAGMA secure_delete = ON')
+    this.transaction(() => {
+      const kept: { seq: number; event: ContinuumEvent }[] = []
+      for (const row of rows) {
+        const original = this.selfContained(toEvent(row))
+        const next = rewrite.event(original)
+        if (!next) removedEvents += 1
+        else {
+          if (canonicalJson(next) !== canonicalJson(original)) changedEvents += 1
+          kept.push({ seq: row.seq, event: next })
+        }
+      }
+      const checkpoint = previous && {
+        ...previous,
+        state: this.externalizeRuns(rewrite.state(this.inlineRuns(previous.state))),
+        firstEvents: previous.firstEvents.flatMap((entry) => {
+          const event = rewrite.event(this.selfContained(entry.event))
+          return event ? [{ seq: entry.seq, event: this.withStoredCoverage(event) }] : []
+        }),
+      }
+      this.db.exec('DELETE FROM events')
+      const insert = this.db.prepare('INSERT INTO events (seq, type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      for (const { seq, event } of kept) {
+        const stored = this.withStoredCoverage(event)
+        insert.run(seq, stored.type, canonicalJson(stored.payload), stored.evidence, stored.source, stored.occurredAt, stored.revision ?? null)
+      }
+      if (checkpoint && previous) {
+        changedCheckpoint =
+          canonicalJson(checkpoint.state) !== canonicalJson(previous.state) || canonicalJson(checkpoint.firstEvents) !== canonicalJson(previous.firstEvents)
+        this.db
+          .prepare('UPDATE checkpoints SET state = ?, first_events = ? WHERE id = 1')
+          .run(gzipSync(JSON.stringify(checkpoint.state)), JSON.stringify(checkpoint.firstEvents))
+      }
+      this.writeState(checkpoint?.state ?? { nodes: [], edges: [] })
+      for (const { event } of kept) project(this, this.withStoredCoverage(event))
+      this.deleteUnreferencedObjects()
+    })
+    return { removedEvents, changedEvents, changedCheckpoint }
+  }
+
+  /** The whole history as self-contained JSON, for backup or moving to another machine. */
+  exportHistory(at: Date = new Date()): HistoryExport {
+    const rows = this.db.prepare('SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq').all() as unknown as (EventRow & { seq: number })[]
+    const checkpoint = this.checkpoint()
+    return {
+      format: EXPORT_FORMAT,
+      version: EXPORT_VERSION,
+      exportedAt: at.toISOString(),
+      checkpoint: checkpoint
+        ? {
+            ...checkpoint,
+            state: this.inlineRuns(checkpoint.state),
+            firstEvents: checkpoint.firstEvents.map((entry) => ({ seq: entry.seq, event: this.selfContained(entry.event) })),
+          }
+        : null,
+      events: rows.map((row) => ({ seq: row.seq, event: this.selfContained(toEvent(row)) })),
+    }
+  }
+
+  /** Loads an export into this store, which must be empty. Replaying it gives the exported graph. */
+  importHistory(history: HistoryExport): void {
+    assertValidExport(history)
+    if (this.eventCount() > 0 || this.checkpoint()) throw new Error('This store already has history; import only into a freshly initialized repository.')
+    this.transaction(() => {
+      const { checkpoint } = history
+      if (checkpoint) {
+        const state = this.externalizeRuns(checkpoint.state)
+        const firstEvents = checkpoint.firstEvents.map((entry) => ({ seq: entry.seq, event: this.withStoredCoverage(entry.event) }))
+        this.db
+          .prepare('INSERT INTO checkpoints (id, seq, created_at, state, first_events) VALUES (1, ?, ?, ?, ?)')
+          .run(checkpoint.seq, checkpoint.createdAt, gzipSync(JSON.stringify(state)), JSON.stringify(firstEvents))
+        this.writeState(state)
+      }
+      const insert = this.db.prepare('INSERT INTO events (seq, type, payload, evidence, source, occurred_at, revision) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      for (const { seq, event } of history.events) {
+        const stored = this.withStoredCoverage(event)
+        insert.run(seq, stored.type, canonicalJson(stored.payload), stored.evidence, stored.source, stored.occurredAt, stored.revision ?? null)
+        project(this, stored)
+      }
+    })
+  }
+
+  /** The latest compaction checkpoint, if the log was ever compacted. */
+  /** Just the first events kept by compaction, without unpacking the graph state. */
+  private compactedFirstEvents(): FirstEvent[] {
+    const row = this.db.prepare('SELECT first_events FROM checkpoints WHERE id = 1').get() as { first_events: string } | undefined
+    return row ? JSON.parse(row.first_events) : []
+  }
+
+  checkpoint(): Checkpoint | undefined {
+    const row = this.db.prepare('SELECT seq, created_at, state, first_events FROM checkpoints WHERE id = 1').get() as
+      | { seq: number; created_at: string; state: Uint8Array; first_events: string }
+      | undefined
+    if (!row) return undefined
+    return { seq: row.seq, createdAt: row.created_at, state: JSON.parse(gunzipSync(row.state).toString('utf8')), firstEvents: JSON.parse(row.first_events) }
+  }
+
+  /**
+   * Folds every event that occurred before `before` into a checkpoint of the
+   * graph state and removes them from the log, so the store stops growing
+   * with old history. Replaying the checkpoint plus the remaining events gives
+   * exactly the current graph. The replay runs outside the write lock, so hooks
+   * and watchers are never kept waiting; only the swap is transactional.
+   */
+  compact(before: Date, at: Date = new Date()): CompactionResult {
+    const previous = this.checkpoint()
+    const fromSeq = previous?.seq ?? 0
+    // Everything before the first event inside the window: occurred_at is not strictly ordered by seq.
+    const { cutoff } = this.db
+      .prepare('SELECT COALESCE((SELECT MIN(seq) - 1 FROM events WHERE occurred_at >= ?1), (SELECT MAX(seq) FROM events)) AS cutoff')
+      .get(before.toISOString()) as { cutoff: number | null }
+    if (cutoff === null || cutoff <= fromSeq) return { removedEvents: 0, checkpointSeq: previous?.seq ?? null }
+
+    const rows = this.db
+      .prepare('SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events WHERE seq > ? AND seq <= ? ORDER BY seq')
+      .all(fromSeq, cutoff) as unknown as (EventRow & { seq: number })[]
+    const folded = rows.map((row) => ({ seq: row.seq, event: toEvent(row) }))
+    const scratch = ContextStore.open(':memory:')
+    let state: GraphState
+    let objects: ObjectRow[]
+    try {
+      scratch.transaction(() => scratch.writeState(previous?.state ?? { nodes: [], edges: [] }))
+      scratch.recordAll(folded.map(({ event }) => this.selfContained(event)))
+      state = scratch.captureState()
+      // The replay may create objects the live store lacks (e.g. run records of legacy inline-coverage checks).
+      objects = scratch.db.prepare('SELECT hash, kind, body FROM objects').all() as unknown as ObjectRow[]
+    } finally {
+      scratch.close()
+    }
+    const firstEvents: FirstEvent[] = mergeFirstEvents(previous?.firstEvents ?? [], folded)
+
+    let removedEvents = 0
+    this.transaction(() => {
+      // Another process compacted meanwhile: its checkpoint wins and this one is discarded.
+      if ((this.checkpoint()?.seq ?? 0) !== fromSeq) return
+      const insertObject = this.db.prepare('INSERT OR IGNORE INTO objects (hash, kind, body) VALUES (?, ?, ?)')
+      for (const object of objects) insertObject.run(object.hash, object.kind, object.body)
+      this.db
+        .prepare('INSERT OR REPLACE INTO checkpoints (id, seq, created_at, state, first_events) VALUES (1, ?, ?, ?, ?)')
+        .run(cutoff, at.toISOString(), gzipSync(JSON.stringify(state)), JSON.stringify(firstEvents))
+      removedEvents = Number(this.db.prepare('DELETE FROM events WHERE seq <= ?').run(cutoff).changes)
+    })
+    return { removedEvents, checkpointSeq: removedEvents > 0 ? cutoff : (this.checkpoint()?.seq ?? null) }
   }
 
   // ── Layer 1: content-addressed objects ─────────────────────────
@@ -213,10 +399,31 @@ export class ContextStore implements Mutations {
 
   // ── Evidence queries ───────────────────────────────────────────
 
+  /** Stores a check's coverage manifest once per distinct tree and returns its hash for `check.recorded`. */
+  putCoverage(ranAgainst: Readonly<Record<IdentityKey, ContentHash>>): ContentHash {
+    return this.putObject(COVERAGE_KIND, ranAgainst)
+  }
+
+  /**
+   * The event with any stored objects it refers to written inline, so it can
+   * be recorded in another store (export, rebuilding a log) on its own.
+   */
+  selfContained(event: ContinuumEvent): ContinuumEvent {
+    if (event.type !== 'check.recorded' || !event.payload.coverage) return event
+    const { coverage, ...payload } = event.payload
+    const manifest = this.getObject(coverage)
+    if (manifest?.kind !== COVERAGE_KIND) throw new Error(`Coverage manifest ${coverage} is missing from the store.`)
+    return { ...event, payload: { ...payload, ranAgainst: manifest.value as Record<IdentityKey, ContentHash> } }
+  }
+
   checkRun(name: string): RecordedRun | undefined {
     const runHash = this.graphIndex.get(keys.check(name))?.props.lastRunHash
     if (typeof runHash !== 'string') return undefined
-    return this.getObject(runHash)?.value as RecordedRun | undefined
+    const run = this.getObject(runHash)?.value as (Omit<RecordedRun, 'ranAgainst'> & { ranAgainst?: RecordedRun['ranAgainst']; coverage?: ContentHash }) | undefined
+    if (!run) return undefined
+    // Runs recorded before manifests carry their coverage inline.
+    const ranAgainst = run.ranAgainst ?? ((run.coverage ? this.getObject(run.coverage)?.value : undefined) as RecordedRun['ranAgainst'] | undefined) ?? {}
+    return { ...run, ranAgainst }
   }
 
   checkStatus(name: string): { status: CheckStatus; changed: IdentityKey[] } {
@@ -259,6 +466,89 @@ export class ContextStore implements Mutations {
     }
   }
 
+  /** A check.recorded event with inline coverage, as stored: the manifest becomes an object named by hash. */
+  private withStoredCoverage(event: ContinuumEvent): ContinuumEvent {
+    if (event.type !== 'check.recorded' || !event.payload.ranAgainst) return event
+    const { ranAgainst, ...payload } = event.payload
+    return { ...event, payload: { ...payload, coverage: this.putCoverage(ranAgainst) } }
+  }
+
+  /** Check nodes carry their last run inline (`props.lastRun`), so a rewrite can see and change its coverage. */
+  private inlineRuns(state: GraphState): GraphState {
+    return {
+      ...state,
+      nodes: state.nodes.map((node) => {
+        if (node.kind !== 'check' || typeof node.props.lastRunHash !== 'string') return node
+        const run = this.getObject(node.props.lastRunHash)?.value as (Record<string, unknown> & { coverage?: ContentHash; ranAgainst?: unknown }) | undefined
+        if (!run) return node
+        const { coverage, ...rest } = run
+        const ranAgainst = rest.ranAgainst ?? (coverage ? this.getObject(coverage)?.value : undefined) ?? {}
+        const { lastRunHash: _hash, ...props } = node.props
+        return { ...node, props: { ...props, lastRun: { ...rest, ranAgainst } } }
+      }),
+    }
+  }
+
+  /** Stores inline runs and memory records again under their new hashes, the reverse of inlineRuns. */
+  private externalizeRuns(state: GraphState): GraphState {
+    const informs = new Map(state.edges.filter((edge) => edge.type === 'informs').map((edge) => [edge.from, edge.to.slice('task:'.length)]))
+    return {
+      ...state,
+      nodes: state.nodes.map((node) => {
+        if (node.kind === 'check' && node.props.lastRun) {
+          const { lastRun, ...props } = node.props
+          const { ranAgainst, ...run } = lastRun as { ranAgainst: Record<IdentityKey, ContentHash> }
+          const runHash = this.putObject('check-run', { ...run, coverage: this.putCoverage(ranAgainst) })
+          return { ...node, hash: runHash, history: node.history.includes(runHash) ? node.history : [...node.history, runHash], props: { ...props, lastRunHash: runHash } }
+        }
+        if (node.kind === 'memory') {
+          const { anchors, kind, title, body } = node.props
+          const id = node.key.slice('memory:'.length)
+          const recordHash = this.putObject('memory', { id, kind, title, body, taskId: informs.get(node.key), anchors })
+          return { ...node, hash: recordHash, props: { ...node.props, recordHash } }
+        }
+        return node
+      }),
+    }
+  }
+
+  /** Objects reachable from the log and the graph; everything else is removed (forgotten data must not linger). */
+  private deleteUnreferencedObjects(): void {
+    const referenced = new Set<string>()
+    const events = [...this.events(), ...this.compactedFirstEvents().map((entry) => entry.event)]
+    for (const event of events) if (event.type === 'check.recorded' && event.payload.coverage) referenced.add(event.payload.coverage)
+    for (const kind of ['check', 'memory'] as const) {
+      for (const key of this.graphIndex.keysOfKind(kind)) {
+        const node = this.graphIndex.get(key) as GraphNode
+        for (const hash of [node.props.lastRunHash, node.props.recordHash]) if (typeof hash === 'string') referenced.add(hash)
+      }
+    }
+    for (const hash of [...referenced]) {
+      const coverage = (this.getObject(hash)?.value as { coverage?: unknown } | undefined)?.coverage
+      if (typeof coverage === 'string') referenced.add(coverage)
+    }
+    const remove = this.db.prepare('DELETE FROM objects WHERE hash = ?')
+    for (const { hash } of this.db.prepare('SELECT hash FROM objects').all() as { hash: string }[]) if (!referenced.has(hash)) remove.run(hash)
+  }
+
+  private captureState(): GraphState {
+    return { nodes: sortedNodes(this.graphIndex), edges: this.graphIndex.allEdges().map(({ from, type, to }) => ({ from, type, to })) }
+  }
+
+  /** Replaces every projection with `state`. Call inside a transaction. */
+  private writeState(state: GraphState): void {
+    this.db.exec('DELETE FROM edges; DELETE FROM node_history; DELETE FROM nodes;')
+    const insertNode = this.db.prepare('INSERT INTO nodes (key, kind, hash, props, updated_at) VALUES (?, ?, ?, ?, ?)')
+    const insertHistory = this.db.prepare('INSERT INTO node_history (key, seq, hash) VALUES (?, ?, ?)')
+    const insertEdge = this.db.prepare('INSERT INTO edges (from_key, type, to_key) VALUES (?, ?, ?)')
+    for (const node of state.nodes) {
+      insertNode.run(node.key, node.kind, node.hash, canonicalJson(node.props), node.updatedAt)
+      node.history.forEach((hash, index) => insertHistory.run(node.key, index, hash))
+    }
+    for (const edge of state.edges) insertEdge.run(edge.from, edge.type, edge.to)
+    this.loadGraph()
+  }
+
   private loadGraph(): void {
     const graph = new GraphIndex()
     const history = new Map<string, string[]>()
@@ -280,6 +570,41 @@ export class ContextStore implements Mutations {
     }
     this.graphIndex = graph
     this.loadedSeq = this.maxSeq()
+  }
+}
+
+const EVIDENCE = new Set(['verified', 'observed', 'agent-reported'])
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+function isExportedEvent(entry: unknown): entry is FirstEvent {
+  if (!isRecord(entry) || !Number.isSafeInteger(entry.seq) || (entry.seq as number) < 1 || !isRecord(entry.event)) return false
+  const { type, payload, evidence, source, occurredAt } = entry.event
+  return typeof type === 'string' && isRecord(payload) && typeof evidence === 'string' && EVIDENCE.has(evidence) && typeof source === 'string' && typeof occurredAt === 'string'
+}
+
+function isGraphState(state: unknown): state is GraphState {
+  if (!isRecord(state) || !Array.isArray(state.nodes) || !Array.isArray(state.edges)) return false
+  const nodesOk = state.nodes.every(
+    (node) => isRecord(node) && typeof node.key === 'string' && typeof node.kind === 'string' && Array.isArray(node.history) && isRecord(node.props) && typeof node.updatedAt === 'string',
+  )
+  return nodesOk && state.edges.every((edge) => isRecord(edge) && typeof edge.from === 'string' && typeof edge.type === 'string' && typeof edge.to === 'string')
+}
+
+/** Rejects anything that is not a well-formed export, before any of it is written. */
+function assertValidExport(history: unknown): asserts history is HistoryExport {
+  const invalid = (reason: string) => new Error(`This file is not a valid Continuum history export: ${reason}.`)
+  if (!isRecord(history) || history.format !== EXPORT_FORMAT) throw invalid('unknown format')
+  if (history.version !== EXPORT_VERSION) throw invalid(`version ${String(history.version)} is not supported`)
+  if (!Array.isArray(history.events) || !history.events.every(isExportedEvent)) throw invalid('malformed events')
+  const checkpoint = history.checkpoint
+  if (checkpoint !== null) {
+    if (!isRecord(checkpoint) || !Number.isSafeInteger(checkpoint.seq) || typeof checkpoint.createdAt !== 'string') throw invalid('malformed checkpoint')
+    if (!isGraphState(checkpoint.state) || !Array.isArray(checkpoint.firstEvents) || !checkpoint.firstEvents.every(isExportedEvent)) throw invalid('malformed checkpoint')
+  }
+  let previous = checkpoint === null ? 0 : (checkpoint.seq as number)
+  for (const { seq } of history.events) {
+    if (seq <= previous) throw invalid('event sequence numbers must increase and follow the checkpoint')
+    previous = seq
   }
 }
 

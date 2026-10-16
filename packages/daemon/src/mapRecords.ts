@@ -30,7 +30,7 @@ export function toVerification(snapshot: RepoSnapshot): VerificationRecord[] {
     name: check.name,
     command: check.command,
     status: check.status,
-    evidenceType: 'verified',
+    evidenceType: check.evidence,
     ...(check.ranAt ? { lastRunAt: check.ranAt } : {}),
     detail: checkDetail(check, Object.keys(snapshot.checkCoverage.get(check.name) ?? {}).length),
   }))

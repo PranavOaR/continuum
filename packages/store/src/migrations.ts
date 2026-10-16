@@ -11,7 +11,20 @@ export interface Migration {
 }
 
 /** Append-only: never edit a released migration, add a new one instead. */
-export const MIGRATIONS: readonly Migration[] = []
+export const MIGRATIONS: readonly Migration[] = [
+  {
+    version: 2,
+    description: 'checkpoints for log compaction',
+    // One row: the graph state up to `seq` (gzipped JSON), whose events were removed, plus the first removed event of each source and type.
+    sql: `CREATE TABLE checkpoints (
+      id           INTEGER PRIMARY KEY CHECK (id = 1),
+      seq          INTEGER NOT NULL,
+      created_at   TEXT NOT NULL,
+      state        BLOB NOT NULL,
+      first_events TEXT NOT NULL
+    );`,
+  },
+]
 
 export const LATEST_SCHEMA_VERSION = BASE_SCHEMA_VERSION + MIGRATIONS.length
 

@@ -103,7 +103,7 @@ describe('continuum doctor', () => {
     await cli(repo.root, ['init'])
     const result = await cli(repo.root, ['doctor'])
     expect(result.code).toBe(EXIT_FAILURE)
-    expect(result.out).toContain('✗ Claude Code hooks are not registered (missing: SessionStart, SessionEnd, Stop, PostToolUse)')
+    expect(result.out).toContain('✗ Claude Code hooks are not registered (missing: SessionStart, SessionEnd, Stop, PostToolUse, PostToolUseFailure, UserPromptSubmit)')
     expect(result.out).toMatch(/problems? to fix/)
     await cli(repo.root, ['setup', 'claude-code'])
     expect((await cli(repo.root, ['doctor'])).code).toBe(EXIT_OK)

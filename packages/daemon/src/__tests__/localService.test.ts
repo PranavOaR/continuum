@@ -42,9 +42,10 @@ describe('LocalContinuumService', () => {
       status: 'verified',
       evidenceType: 'verified',
       summary: 'Modified by Claude Code.',
-      additions: 0,
-      diff: [],
+      diffSource: 'uncommitted',
+      additions: 1,
     })
+    expect(files[0].diff).toContainEqual({ kind: 'add', text: expect.stringContaining('auth') })
     expect(files[0].relevance).toContain('Covered by passing check unit')
   })
 
@@ -187,7 +188,7 @@ describe('LocalContinuumService resilience', () => {
     const { repo, storePath } = await seededRepo()
     sandboxes.push(repo)
     const store = openStore(storePath)
-    const events = [...store.events()]
+    const events = [...store.events()].map((event) => store.selfContained(event))
     store.close()
     // Rebuild the log with a session event first, then the original history.
     const { ContextStore } = await import('@continuum/store')

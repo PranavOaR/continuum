@@ -6,6 +6,7 @@ import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
 import { pipeline } from 'node:stream'
 import { NotFoundError, type ContinuumService } from '@continuum/core'
+import type { ChangeFeed } from './changeFeed'
 import { ProjectUnavailableError } from './localService'
 
 export const LOOPBACK = '127.0.0.1'
@@ -13,6 +14,9 @@ export const DEFAULT_PORT = 4747
 const MAX_QUERY_CHARS = 200
 const TOKEN_BYTES = 24
 const TOKEN_PARAM = 'token'
+const EVENTS_PATH = '/api/events'
+/** A comment line now and then keeps idle connections (and proxies) from timing out. */
+const HEARTBEAT_MS = 25_000
 
 /** A fresh secret per `continuum serve`: other users and processes on this machine cannot read the dashboard without it. */
 export function createAccessToken(): string {
@@ -48,6 +52,8 @@ export interface DaemonOptions {
   staticDir?: string
   port?: number
   onError?: (error: unknown) => void
+  /** Pushes "something was recorded" to open dashboards; without it they refresh on a timer. */
+  changes?: ChangeFeed
 }
 
 export interface RunningDaemon {
@@ -140,6 +146,21 @@ function safeDecode(value: string): string | null {
   }
 }
 
+/** Server-Sent Events: one `change` event naming the projects with new records. */
+function handleEvents(request: IncomingMessage, response: ServerResponse, changes: ChangeFeed | undefined): void {
+  if (!changes) return fail(response, 404, 'not-found', 'Live updates are not available.')
+  response.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive', ...SECURITY_HEADERS })
+  if (request.method === 'HEAD') return void response.end()
+  response.write(': connected\n\n')
+  const unsubscribe = changes.subscribe((projectIds) => response.write(`event: change\ndata: ${JSON.stringify({ projectIds })}\n\n`))
+  const heartbeat = setInterval(() => response.write(': heartbeat\n\n'), HEARTBEAT_MS)
+  heartbeat.unref()
+  response.on('close', () => {
+    clearInterval(heartbeat)
+    unsubscribe()
+  })
+}
+
 async function handleApi(service: ContinuumService, url: URL, response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
   if (url.pathname === '/api/health') return send(response, 200, { data: { ok: true, mode: 'local' } })
   for (const [pattern, handler] of ROUTES) {
@@ -219,6 +240,7 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
       const access = authorize(request, response, url, options.token, port())
       if (access === 'redirected') return
       if (access === 'denied') return deny(response, isApi)
+      if (url.pathname === EVENTS_PATH) return handleEvents(request, response, options.changes)
       if (isApi) return handleApi(options.service, url, response, options.onError)
       if (!staticRoot) return fail(response, 404, 'not-found', 'The dashboard is not built. Run `npm run build` in the Continuum checkout.')
       return handleStatic(staticRoot, url, response)
@@ -250,7 +272,13 @@ export function startDaemon(options: DaemonOptions): Promise<RunningDaemon> {
         // Straight to the dashboard: the site root is the product's landing page.
         launchUrl: `http://${LOOPBACK}:${boundPort}/app?${TOKEN_PARAM}=${options.token}`,
         port: boundPort,
-        close: () => new Promise((done) => server.close(() => done())),
+        close: () =>
+          new Promise((done) => {
+            // Open event streams would otherwise keep the server from closing.
+            options.changes?.close()
+            server.closeAllConnections()
+            server.close(() => done())
+          }),
       })
     })
   })

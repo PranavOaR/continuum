@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { isInitialized, locateWorkspace, NotInitializedError } from '@continuum/capture'
-import { createAccessToken, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
+import { createAccessToken, createChangeFeed, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
 import { basename, resolve } from 'node:path'
 import { BUILD_INFO } from '../build'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
@@ -61,12 +61,18 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
     { onError: (projectId, error) => io.err(`continuum: could not read ${projectId}: ${describeError(error)}`) },
   )
   const hasDashboard = existsSync(webDist)
+  // New records must not wait out the service's short snapshot cache.
+  const changes = createChangeFeed(
+    unique.map((workspace, index) => ({ projectId: ids[index], storePath: workspace.storePath })),
+    { onChange: () => service.invalidate() },
+  )
 
   const daemon = await startDaemon({
     service,
     version,
     token: createAccessToken(),
     port: parsed.port,
+    changes,
     ...(hasDashboard ? { staticDir: webDist } : {}),
     onError: (error) => io.err(`continuum: ${describeError(error)}`),
   })

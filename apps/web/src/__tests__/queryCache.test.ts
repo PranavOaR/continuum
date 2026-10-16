@@ -39,6 +39,29 @@ describe('QueryCache', () => {
     expect(await cache.load('k', async () => 'recovered')).toBe('recovered')
   })
 
+  it('keeps serving stale results after markAllStale, refreshing each on next use', async () => {
+    const cache = new QueryCache({ ttlMs: Number.POSITIVE_INFINITY, maxEntries: 10 })
+    await cache.load('a', async () => 1)
+    cache.markAllStale()
+    expect(cache.isFresh('a')).toBe(false)
+    expect(cache.get('a')).toBe(1)
+    expect(await cache.load('a', async () => 2)).toBe(2)
+    expect(cache.isFresh('a')).toBe(true)
+  })
+
+  it('does not treat a request that was in flight during markAllStale as fresh', async () => {
+    const cache = new QueryCache({ ttlMs: Number.POSITIVE_INFINITY, maxEntries: 10 })
+    let finishOld: (value: number) => void = () => {}
+    const old = cache.load('a', () => new Promise<number>((resolve) => (finishOld = resolve)))
+    cache.markAllStale()
+    const fresh = cache.load('a', async () => 2)
+    finishOld(1)
+    expect(await old).toBe(1)
+    expect(await fresh).toBe(2)
+    expect(cache.get('a')).toBe(2)
+    expect(cache.isFresh('a')).toBe(true)
+  })
+
   it('evicts the oldest entries beyond its size', async () => {
     const cache = new QueryCache({ ttlMs: 1_000, maxEntries: 2 })
     for (const key of ['a', 'b', 'c']) await cache.load(key, async () => key)

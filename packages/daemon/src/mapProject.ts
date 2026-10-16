@@ -1,4 +1,5 @@
 import { getAgent, type FileStatus, type Project, type ProjectFile } from '@continuum/core'
+import type { UncommittedDiff } from '@continuum/capture'
 import type { GraphNode } from '@continuum/store'
 import { asAgent, ids, text } from './ids'
 import type { RepoSnapshot } from './snapshot'
@@ -97,12 +98,14 @@ export function toFile(snapshot: RepoSnapshot, node: GraphNode): ProjectFile {
     relevance: relevance.join(' ') || 'Not yet covered by a recorded check.',
     symbols: [],
     decisionIds: decisions.map((id) => ids.memory(snapshot.projectId, id)),
-    // Line counts and diffs are not captured yet; zero with an empty diff means "not recorded".
-    additions: 0,
-    deletions: 0,
-    diff: [],
+    ...lineDetail(snapshot.diffs.get(path)),
     updatedAt: node.updatedAt,
   }
+}
+
+function lineDetail(diff: UncommittedDiff | undefined): Pick<ProjectFile, 'additions' | 'deletions' | 'diff' | 'diffSource' | 'diffTruncated'> {
+  if (!diff) return { additions: 0, deletions: 0, diff: [], diffSource: 'none' }
+  return { additions: diff.additions ?? 0, deletions: diff.deletions ?? 0, diff: diff.excerpt, diffSource: 'uncommitted', ...(diff.truncated ? { diffTruncated: true } : {}) }
 }
 
 const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)

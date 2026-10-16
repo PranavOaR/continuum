@@ -3,6 +3,7 @@ import { lstat, realpath } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import type { ContentHash } from '@continuum/core'
 import { normalizePath } from '@continuum/store'
+import { loadContinuumIgnore } from './continuumIgnore'
 
 /** Directory where a workspace keeps its local context store. Never captured as project content. */
 export const CONTINUUM_DIR = '.continuum'
@@ -52,6 +53,9 @@ function git(cwd: string, args: readonly string[], input?: string): Promise<stri
   })
 }
 
+/** Runs a git command in `cwd` and returns its stdout; rejects with GitCommandError on a non-zero exit. */
+export const gitOutput = git
+
 export async function findRepoRoot(cwd: string): Promise<string> {
   try {
     return (await git(cwd, ['rev-parse', '--show-toplevel'])).trim()
@@ -100,17 +104,9 @@ async function isRegularFile(root: string, path: string): Promise<boolean> {
   }
 }
 
-/** Lists tracked and untracked-but-not-ignored files that exist on disk as regular files. */
-async function listFiles(root: string): Promise<string[]> {
-  const listed = (await git(root, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])).split('\0').filter(Boolean)
-  const unique = [...new Set(listed.map(normalizePath))].filter(isCapturable)
-  const present = await Promise.all(unique.map(async (path) => ((await isRegularFile(root, path)) ? path : null)))
-  return present.filter((path): path is string => path !== null)
-}
-
 /** Whether git ignores a repository-relative path, matching what scans capture: tracked files are never ignored. `.continuum/` always is. */
 export async function isIgnored(root: string, path: string): Promise<boolean> {
-  if (!isCapturable(path)) return true
+  if (!isCapturable(path) || (await loadContinuumIgnore(root))(path)) return true
   try {
     await git(root, ['check-ignore', '--quiet', '--', path])
     return true
@@ -177,7 +173,66 @@ export async function hashFiles(root: string, paths: readonly string[]): Promise
   }
 }
 
+/** Index modes of entries that are regular files; symlinks (120000) and submodules (160000) are never captured. */
+const REGULAR_MODES = new Set(['100644', '100755'])
+
+interface IndexEntry {
+  mode: string
+  hash: ContentHash
+  /** Sparse checkout: git does not expect the file on disk and never reports it as changed. */
+  skipWorktree: boolean
+}
+
+/** Stage-0 index entries; conflicted paths are left to `changedPaths`. */
+async function readIndex(root: string): Promise<Map<string, IndexEntry>> {
+  const entries = new Map<string, IndexEntry>()
+  for (const record of (await git(root, ['ls-files', '-z', '--stage', '-t'])).split('\0')) {
+    const match = /^(\S) (\d{6}) ([0-9a-f]+) 0\t(.+)$/s.exec(record)
+    if (match) entries.set(normalizePath(match[4]), { mode: match[2], hash: match[3], skipWorktree: match[1] === 'S' })
+  }
+  return entries
+}
+
+/** Fields before the path in each `git status --porcelain=v2` record type. */
+const STATUS_FIELDS: Record<string, number> = { '1': 8, '2': 9, u: 10 }
+
+/**
+ * Paths whose working-tree content may differ from the index (modified, type-
+ * changed, deleted, conflicted) plus untracked, not-ignored files. Does not
+ * take the index lock, so it never blocks or races the user's own git commands.
+ */
+async function changedPaths(root: string): Promise<string[]> {
+  const records = (await git(root, ['--no-optional-locks', 'status', '--porcelain=v2', '-z', '--untracked-files=all', '--ignore-submodules=all'])).split('\0')
+  const paths: string[] = []
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index]
+    const type = record[0]
+    if (type === '?') paths.push(record.slice(2))
+    else if (type in STATUS_FIELDS) {
+      const fields = record.split(' ')
+      const worktreeChanged = type === 'u' || fields[1][1] !== '.'
+      if (worktreeChanged) paths.push(fields.slice(STATUS_FIELDS[type]).join(' '))
+      if (type === '2') index += 1 // a rename or copy is followed by its original path
+    }
+  }
+  return paths.map(normalizePath)
+}
+
+/**
+ * Hashes the working tree as `git add` would, without reading every file:
+ * clean tracked files take their blob hash from the index, and only files git
+ * reports as changed or untracked are hashed from disk.
+ */
 export async function readWorkingTree(root: string): Promise<WorkingTree> {
-  const [paths, revision] = await Promise.all([listFiles(root), headRevision(root)])
-  return { root, revision, files: await hashFiles(root, paths) }
+  const [index, changed, revision, isContinuumIgnored] = await Promise.all([readIndex(root), changedPaths(root), headRevision(root), loadContinuumIgnore(root)])
+  const fromDisk = new Set(changed)
+  const files = new Map<string, ContentHash>()
+  for (const [path, entry] of index) {
+    if (entry.skipWorktree) fromDisk.add(path)
+    else if (!fromDisk.has(path) && REGULAR_MODES.has(entry.mode) && isCapturable(path) && !isContinuumIgnored(path)) files.set(path, entry.hash)
+  }
+  const candidates = [...fromDisk].filter((path) => isCapturable(path) && !isContinuumIgnored(path))
+  const present = (await Promise.all(candidates.map(async (path) => ((await isRegularFile(root, path)) ? path : null)))).filter((path): path is string => path !== null)
+  for (const [path, hash] of await hashFiles(root, present)) files.set(path, hash)
+  return { root, revision, files: new Map([...files].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) }
 }

@@ -212,3 +212,42 @@ describe('ContextStore persistence', () => {
     store.close()
   })
 })
+
+describe('ContextStore coverage manifests', () => {
+  const run = (store: ContextStore, name: string, ranAgainst: Record<string, string>) =>
+    store.transact(() => [ev.checkCovered(name, store.putCoverage(ranAgainst))])
+
+  it('keeps a check event small and shares one manifest between runs against the same tree', () => {
+    const store = ContextStore.open(':memory:')
+    const tree = Object.fromEntries(Array.from({ length: 2000 }, (_, index) => [`file:src/f${index}.ts`, `h${index}`]))
+    run(store, 'npm test', tree)
+    run(store, 'npm test', tree)
+    run(store, 'lint', tree)
+    const checks = store.recentEvents(10).map((entry) => entry.event).filter((event) => event.type === 'check.recorded')
+    for (const event of checks) expect(JSON.stringify(event.payload).length).toBeLessThan(1024)
+    expect(new Set(checks.map((event) => (event.payload as { coverage?: string }).coverage)).size).toBe(1)
+    expect(store.checkRun('npm test')?.ranAgainst).toEqual(tree)
+    expect(store.checkStatus('npm test').status).toBe('passed')
+    store.close()
+  })
+
+  it('reads runs recorded with their coverage inline', () => {
+    const store = ContextStore.open(':memory:')
+    seed(store)
+    expect(store.checkRun('npm test')?.ranAgainst).toEqual({ 'file:src/auth/login.ts': 'h-login-1', 'file:src/auth/session.ts': 'h-session-1' })
+    expect(store.checkStatus('npm test').status).toBe('passed')
+    store.close()
+  })
+
+  it('makes an event self-contained for another store and replays it identically', () => {
+    const source = ContextStore.open(':memory:')
+    source.record(ev.file('a.ts', 'h-a'))
+    run(source, 'npm test', { 'file:a.ts': 'h-a' })
+    const copy = ContextStore.open(':memory:')
+    copy.recordAll([...source.events()].map((event) => source.selfContained(event)))
+    expect(copy.checkStatus('npm test')).toEqual(source.checkStatus('npm test'))
+    expect(copy.checkStatus('npm test').status).toBe('passed')
+    source.close()
+    copy.close()
+  })
+})

@@ -133,3 +133,132 @@ describe('ingestHook', () => {
     expect(first).toEqual({ status: 'recorded', events: 1 })
   })
 })
+
+describe('ingestHook for checks the agent runs', () => {
+  const bash = (command: string) => ({ tool_name: 'Bash', tool_input: { command, description: 'run tests' } })
+
+  it('records a passing test run as observed, against the files as they are now', async () => {
+    const { repo, storePath } = await initialized()
+    repo.write('src/a.ts', 'a2')
+    const outcome = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { stdout: '3 passed', stderr: '', interrupted: false }, duration_ms: 1500 }), { now: () => NOW })
+    expect(outcome).toEqual({ status: 'recorded', events: 1 })
+    withStore(storePath, (store) => {
+      expect(store.checkStatus('npm test').status).toBe('passed')
+      expect(store.graph.get('check:npm test')?.props).toMatchObject({ evidence: 'observed', source: 'adapter:claude-code', exitCode: 0 })
+      expect(store.checkRun('npm test')?.ranAgainst).toHaveProperty('file:src/a.ts')
+    })
+  })
+
+  it('records a failing run with the exit code Claude Code reported', async () => {
+    const { repo, storePath } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUseFailure', ...bash('npx vitest run'), error: 'Exit code 1\nFAIL src/a.test.ts' }), { now: () => NOW })
+    withStore(storePath, (store) => {
+      expect(store.checkStatus('npx vitest run').status).toBe('failed')
+      expect(store.graph.get('check:npx vitest run')?.props.exitCode).toBe(1)
+    })
+  })
+
+  it('ignores other commands, interrupted runs and failures without an exit code', async () => {
+    const { repo, storePath } = await initialized()
+    const events = withStore(storePath, (store) => store.eventCount())
+    const ignored = [
+      { hook_event_name: 'PostToolUse', ...bash('ls -la'), tool_response: { stdout: '' } },
+      { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { interrupted: true } },
+      { hook_event_name: 'PostToolUseFailure', ...bash('npm test'), error: 'Command timed out' },
+      { hook_event_name: 'PostToolUseFailure', ...bash('npm test'), error: 'Exit code 130', is_interrupt: true },
+      { hook_event_name: 'PostToolUseFailure', tool_name: 'Write', tool_input: { file_path: join(repo.root, 'src/a.ts') }, error: 'denied' },
+    ]
+    for (const fields of ignored) expect((await ingestHook(hook(repo, fields), { now: () => NOW })).status).toBe('ignored')
+    expect(withStore(storePath, (store) => store.eventCount())).toBe(events)
+  })
+
+  it('respects agent checks being turned off', async () => {
+    const { repo } = await initialized()
+    const { updateConfig } = await import('@continuum/capture')
+    await updateConfig(repo.root, { agentChecks: false })
+    const outcome = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { stdout: 'ok' } }), { now: () => NOW })
+    expect(outcome).toEqual({ status: 'ignored', reason: 'agent checks are turned off for this repository' })
+  })
+
+  it('labels agent runs differently from verified runs in the next briefing', async () => {
+    const { repo } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash('npm test'), tool_response: { stdout: 'ok' } }), { now: () => NOW })
+    const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: () => NOW })
+    expect(next.status === 'recorded' && next.additionalContext).toContain('[observed: run by an agent] passed: `npm test`. Ran')
+  })
+})
+
+describe('ingestHook per-session tasks', () => {
+  const startTask = (title: string, id: string) => ({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'mcp__continuum__start_task',
+    tool_input: { title },
+    tool_response: [{ type: 'text', text: `Task ${id}: "${title}" is in-progress.\nNext: write it` }],
+  })
+
+  it("attributes each session's edits to the task it took up, not the latest one", async () => {
+    const { repo, storePath } = await initialized()
+    withStore(storePath, (store) => {
+      store.record({ type: 'task.upserted', payload: { id: 'auth-1', title: 'Auth', status: 'in-progress' }, evidence: 'agent-reported', source: 'mcp', occurredAt: NOW.toISOString() })
+      store.record({ type: 'task.upserted', payload: { id: 'docs-2', title: 'Docs', status: 'in-progress' }, evidence: 'agent-reported', source: 'mcp', occurredAt: new Date(NOW.getTime() + 1000).toISOString() })
+    })
+    const later = () => new Date(NOW.getTime() + 2000)
+    await ingestHook(hook(repo, startTask('Auth', 'auth-1'), 'agent-a'), { now: later })
+    await ingestHook(hook(repo, startTask('Docs', 'docs-2'), 'agent-b'), { now: later })
+
+    repo.write('src/a.ts', 'by agent a')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/a.ts') } }, 'agent-a'), { now: later })
+    withStore(storePath, (store) => {
+      expect(store.graph.neighbors('task:auth-1', { direction: 'out', types: ['touches'] })).toContain('file:src/a.ts')
+      expect(store.graph.neighbors('task:docs-2', { direction: 'out', types: ['touches'] })).not.toContain('file:src/a.ts')
+      expect(store.graph.get('session:agent-a')?.props.taskId).toBe('auth-1')
+    })
+  })
+})
+
+describe('ingestHook prompts', () => {
+  const prompt = (text: string) => ({ hook_event_name: 'UserPromptSubmit', prompt: text })
+
+  it('records nothing unless prompt capture is turned on', async () => {
+    const { repo } = await initialized()
+    expect((await ingestHook(hook(repo, prompt('fix the login bug')), { now: () => NOW })).status).toBe('ignored')
+  })
+
+  it('keeps prompts redacted, without pasted content, once turned on', async () => {
+    const { repo, storePath } = await initialized()
+    const { updateConfig } = await import('@continuum/capture')
+    await updateConfig(repo.root, { capturePrompts: true })
+    const pasted = '<pasted_content id="p1">\nAPI_KEY=abc123secretvalue\n</pasted_content id="p1">'
+    await ingestHook(hook(repo, prompt(`Fix login, here is the log:\n${pasted}\nToken: Bearer ${'x'.repeat(30)}`)), { now: () => NOW })
+    const kept = withStore(storePath, (store) => store.graph.get('session:sess-1')?.props.lastPrompt) as string
+    expect(kept).toContain('Fix login')
+    expect(kept).toContain('[pasted content]')
+    expect(kept).not.toContain('abc123secretvalue')
+    expect(kept).not.toContain('x'.repeat(30))
+    const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: () => NOW })
+    expect(next.status === 'recorded' && next.additionalContext).toContain('Last request [said by you]: "Fix login')
+  })
+})
+
+describe('changes outside agent sessions', () => {
+  it('tells the next session which edits no agent made', async () => {
+    const { repo, storePath } = await initialized({ 'src/a.ts': 'a', 'about.html': '<p>hi</p>' })
+    // After the helper's first scan, which uses the real clock.
+    const start = Date.now()
+    const later = (ms: number) => () => new Date(start + ms)
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: later(1000) })
+    repo.write('src/a.ts', 'by the agent')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/a.ts') } }), { now: later(2000) })
+    repo.write('about.html', '<p>edited by hand</p>')
+    const { scanRepository: scan } = await import('@continuum/capture')
+    const store = ContextStore.open(storePath)
+    await scan(store, repo.root, { now: later(3000) })
+    store.close()
+
+    const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: later(4000) })
+    const context = next.status === 'recorded' ? (next.additionalContext ?? '') : ''
+    const section = context.slice(context.indexOf('## Changed outside agent sessions'))
+    expect(section).toContain('- modified `about.html`')
+    expect(section).not.toContain('src/a.ts')
+  })
+})
