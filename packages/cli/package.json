@@ -18,5 +18,8 @@
     "@continuum/capture": "*",
     "@continuum/core": "*",
     "@continuum/store": "*"
+  },
+  "engines": {
+    "node": ">=22.5"
   }
 }

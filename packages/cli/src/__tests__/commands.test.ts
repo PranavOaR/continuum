@@ -130,6 +130,27 @@ describe('continuum run', () => {
     expect(result.err).toContain('Command not found: continuum-no-such-command')
   })
 
+  it('stops the command on Ctrl-C, records nothing and exits like the command', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const controller = new AbortController()
+    const running = cli(repo.root, ['run', '--name', 'slow', '--', NODE, '-e', 'setTimeout(() => {}, 10000)'], { signal: controller.signal })
+    setTimeout(() => controller.abort(), 150)
+    const result = await running
+    expect(result.code).toBe(143)
+    expect(result.err).toContain('Interrupted; nothing was recorded.')
+    expect((await cli(repo.root, ['status'])).out).toContain('none recorded yet')
+  })
+
+  it('warns but keeps the exit code when the rescan after a run fails', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const script = "require('node:fs').rmSync('.git', { recursive: true, force: true })"
+    const result = await cli(repo.root, ['run', '--name', 'x', '--', NODE, '-e', script])
+    expect(result.code).toBe(0)
+    expect(result.err).toContain('warning: Could not rescan after the run')
+  })
+
   it('validates its arguments', async () => {
     const repo = sandbox()
     await cli(repo.root, ['init'])

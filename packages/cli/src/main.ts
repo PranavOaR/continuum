@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { CommandNotFoundError, NotAGitRepositoryError } from '@continuum/capture'
+import { CommandNotFoundError, NotAGitRepositoryError, WatchUnavailableError } from '@continuum/capture'
 import { initCommand } from './commands/init'
 import { RUN_USAGE, runCommand } from './commands/run'
 import { scanCommand } from './commands/scan'
@@ -73,7 +73,12 @@ function exitCodeFor(error: unknown): number {
 }
 
 function isExpected(error: unknown): error is Error {
-  return error instanceof NotAGitRepositoryError || error instanceof NotInitializedError || error instanceof CommandNotFoundError
+  return (
+    error instanceof NotAGitRepositoryError ||
+    error instanceof NotInitializedError ||
+    error instanceof CommandNotFoundError ||
+    error instanceof WatchUnavailableError
+  )
 }
 
 export async function main(argv: readonly string[], io: Io): Promise<number> {

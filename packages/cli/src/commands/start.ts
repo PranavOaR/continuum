@@ -4,9 +4,8 @@ import { EXIT_OK, type Io } from '../io'
 import { openWorkspace } from '../workspace'
 import { listChanges } from './scan'
 
-function untilAborted(signal: AbortSignal | undefined): Promise<void> {
+function untilAborted(signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
-    if (!signal) return
     if (signal.aborted) resolve()
     else signal.addEventListener('abort', () => resolve(), { once: true })
   })

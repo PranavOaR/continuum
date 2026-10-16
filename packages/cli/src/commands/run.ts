@@ -1,4 +1,4 @@
-import { runCheck } from '@continuum/capture'
+import { CheckInterruptedError, runCheck } from '@continuum/capture'
 import { CHECK_LABELS, formatDuration } from '../format'
 import { EXIT_USAGE, type Io } from '../io'
 import { openWorkspace } from '../workspace'
@@ -54,9 +54,14 @@ export async function runCommand(io: Io, argv: readonly string[]): Promise<numbe
   }
   const { workspace, store } = await openWorkspace(io.cwd)
   try {
-    const result = await runCheck(store, { root: workspace.root, ...parsed, stdout: io.stdout, stderr: io.stderr, now: io.now })
+    const result = await runCheck(store, { root: workspace.root, ...parsed, stdout: io.stdout, stderr: io.stderr, now: io.now, signal: io.signal })
     io.err(`continuum: recorded "${result.name}" · ${CHECK_LABELS[result.status]} · exit ${result.exitCode} · ${formatDuration(result.durationMs)}`)
+    if (result.warning) io.err(`continuum: warning: ${result.warning}`)
     return result.exitCode
+  } catch (error) {
+    if (!(error instanceof CheckInterruptedError)) throw error
+    io.err(`continuum: ${error.message}`)
+    return error.exitCode
   } finally {
     store.close()
   }

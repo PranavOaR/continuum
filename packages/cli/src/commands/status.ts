@@ -1,6 +1,6 @@
 import { relative } from 'node:path'
 import { diffSnapshots, readWorkingTree, recordedFiles, type WorkingTree } from '@continuum/capture'
-import { checkStatus, type CurrentHashes } from '@continuum/core'
+import { checkStatus, type CheckStatus, type CurrentHashes } from '@continuum/core'
 import { keys, type ContextStore } from '@continuum/store'
 import { CHECK_LABELS, columns, formatAgo, plural } from '../format'
 import { EXIT_OK, type Io } from '../io'
@@ -13,6 +13,12 @@ function liveHashes(store: ContextStore, tree: WorkingTree): CurrentHashes {
   return new Map([...nonFiles, ...files])
 }
 
+function checkDetail(status: CheckStatus, changedCount: number, ranAt: unknown, now: Date): string {
+  if (status === 'out-of-date') return `${plural(changedCount, 'file')} changed since it ran`
+  const when = typeof ranAt === 'string' ? new Date(ranAt) : null
+  return when && !Number.isNaN(when.getTime()) ? `ran ${formatAgo(when, now)}` : 'run time unknown'
+}
+
 function checkRows(store: ContextStore, current: CurrentHashes, now: Date): string[][] {
   return store.graph
     .keysOfKind('check')
@@ -20,10 +26,9 @@ function checkRows(store: ContextStore, current: CurrentHashes, now: Date): stri
     .filter((node) => node !== undefined)
     .sort((a, b) => a.key.localeCompare(b.key))
     .map((node) => {
-      const name = String(node.props.name)
+      const name = typeof node.props.name === 'string' ? node.props.name : node.key.slice('check:'.length)
       const { status, changed } = checkStatus(store.checkRun(name), current)
-      const detail = status === 'out-of-date' ? `${plural(changed.length, 'file')} changed since it ran` : `ran ${formatAgo(new Date(String(node.props.ranAt)), now)}`
-      return [CHECK_LABELS[status], name, detail]
+      return [CHECK_LABELS[status], name, checkDetail(status, changed.length, node.props.ranAt, now)]
     })
 }
 

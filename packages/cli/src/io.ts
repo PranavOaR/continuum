@@ -6,8 +6,8 @@ export interface Io {
   out: (line: string) => void
   err: (line: string) => void
   now: () => Date
-  /** Aborted when a long-running command (start) should stop, e.g. on Ctrl-C. */
-  signal?: AbortSignal
+  /** Aborted on Ctrl-C / SIGTERM: stops `start` and the command under `run`. */
+  signal: AbortSignal
   /** Raw streams for child-process output (`run`); default to the process's own. */
   stdout?: Writable
   stderr?: Writable
