@@ -72,8 +72,37 @@ function untilAborted(signal: AbortSignal): Promise<void> {
   })
 }
 
+/** Exit code a serve worker uses to ask its supervisor for a fresh start with the new code. */
+export const RESTART_EXIT = 75
+/** How often a worker checks whether Continuum's code changed. */
+export const UPDATE_POLL_MS = 2_000
+
+export interface ServeOptions {
+  webDist?: string
+  /** Reuse an access token, so a restarted server keeps open dashboards signed in. */
+  token?: string
+  /** When given, the server exits with RESTART_EXIT as soon as this value changes. */
+  codeFingerprint?: () => string
+  updatePollMs?: number
+}
+
+/** Resolves once the code the server runs from has changed. */
+function untilCodeChanges(fingerprint: () => string, pollMs: number, signal: AbortSignal): Promise<void> {
+  const initial = fingerprint()
+  return new Promise((done) => {
+    const timer = setInterval(() => {
+      if (fingerprint() === initial) return
+      clearInterval(timer)
+      done()
+    }, pollMs)
+    timer.unref()
+    signal.addEventListener('abort', () => clearInterval(timer), { once: true })
+  })
+}
+
 /** Serves the dashboard for one or more initialized repositories on 127.0.0.1 until Ctrl-C. */
-export async function serveCommand(io: Io, args: readonly string[], version: string, webDist = WEB_DIST): Promise<number> {
+export async function serveCommand(io: Io, args: readonly string[], version: string, options: ServeOptions = {}): Promise<number> {
+  const webDist = options.webDist ?? WEB_DIST
   const parsed = parseServeArgs(args)
   if ('error' in parsed) {
     io.err(`continuum: ${parsed.error}`)
@@ -98,7 +127,7 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   const daemon = await startDaemon({
     service,
     version,
-    token: createAccessToken(),
+    token: options.token ?? createAccessToken(),
     port: parsed.port,
     changes,
     ...(hasDashboard ? { staticDir: webDist } : {}),
@@ -109,8 +138,17 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   for (const workspace of unique) io.out(`  serving ${workspace.root}`)
   if (!hasDashboard) io.out(`  (the dashboard was not found at ${webDist}, so only the API is available; in a checkout, run \`npm run build\`)`)
   io.out('Open that exact link: it carries a one-time access token. Only this machine can reach the dashboard. Press Ctrl-C to stop.')
-  await untilAborted(io.signal)
+  const stopUpdateWatch = new AbortController()
+  const updated = options.codeFingerprint
+    ? untilCodeChanges(options.codeFingerprint, options.updatePollMs ?? UPDATE_POLL_MS, stopUpdateWatch.signal).then(() => 'updated' as const)
+    : new Promise<never>(() => {})
+  const reason = await Promise.race([untilAborted(io.signal).then(() => 'stopped' as const), updated])
+  stopUpdateWatch.abort()
   await daemon.close()
+  if (reason === 'updated') {
+    io.out("Continuum's code changed; restarting the dashboard with it…")
+    return RESTART_EXIT
+  }
   io.out('Stopped.')
   return EXIT_OK
 }

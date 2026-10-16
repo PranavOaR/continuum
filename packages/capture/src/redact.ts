@@ -16,6 +16,9 @@ const MIN_VALUE_LENGTH = 6
 /** Type names and literals that follow `token:` in code rather than a credential. */
 const CODE_WORDS = 'string|number|boolean|unknown|undefined|null|true|false|never|any|void|object|bigint|symbol|readonly'
 
+/** 'GITHUB_TOKEN' in quotes is the name of a variable holding a secret, not the secret. */
+const ENV_NAME = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/
+
 /** `options.token`, `process.env.API_KEY`: code that refers to a secret, not the secret. */
 const PROPERTY_PATH = String.raw`[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?![\w$.-])`
 
@@ -24,7 +27,13 @@ const MIN_ENTROPY_LENGTH = 32
 /** Bits per character above which a mixed-case alphanumeric string is too random to be a word, path or identifier. */
 const MIN_BITS_PER_CHAR = 4.2
 
-const RULES: readonly (readonly [RegExp, string])[] = [
+/** A rule's pattern, its replacement, and optionally a test that leaves a particular match alone. */
+type Rule = readonly [RegExp, string, ((match: string, ...groups: string[]) => boolean)?]
+
+/** The quoted value of a NAME="value" match, checked case-sensitively (the rule itself ignores case). */
+const quotesVariableName = (match: string, name: string, separator: string) => ENV_NAME.test(match.slice(name.length + separator.length + 1, -1))
+
+const RULES: readonly Rule[] = [
   // PEM, OpenSSH and PGP private keys, whole block
   [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY(?: BLOCK)?-----|$)/g, REDACTED],
   // Credentials embedded in URLs: scheme://user:pass@host, up to the last @ (passwords may contain @ and /)
@@ -46,7 +55,7 @@ const RULES: readonly (readonly [RegExp, string])[] = [
   // --token value, --api-key=value (a real flag: not the "-password" in "email-and-password")
   [new RegExp(String.raw`(?<![\w-])(--?${SECRET_NAME})(=|\s+)(?!\[redacted\])([^\s"']+)`, 'gi'), `$1$2${REDACTED}`],
   // NAME="value" and name: 'value' in configs and shells
-  [new RegExp(String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(["'])(?!\[redacted\])[^"'\n]{${MIN_VALUE_LENGTH},}\3`, 'gi'), `$1$2$3${REDACTED}$3`],
+  [new RegExp(String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(["'])(?!\[redacted\])[^"'\n]{${MIN_VALUE_LENGTH},}\3`, 'gi'), `$1$2$3${REDACTED}$3`, quotesVariableName],
   // NAME=value and name: value, unquoted. Code is left alone: comparisons (===), type annotations
   // (token: string), short values (TOKEN_BYTES = 24), calls (apiToken = link.get('token')) and
   // property paths (password = process.env.DB_PASSWORD).
@@ -124,13 +133,14 @@ export function redactWithCount(text: string): { text: string; count: number } {
 
 function redactChunk(text: string): { text: string; count: number } {
   let count = 0
-  const replaceCounting = (current: string, pattern: RegExp, replacement: string) =>
+  const replaceCounting = (current: string, pattern: RegExp, replacement: string, keep?: Rule[2]) =>
     current.replace(pattern, (...match) => {
+      if (keep?.(...(match.filter((part) => typeof part === 'string') as [string, ...string[]]))) return match[0] as string
       count += 1
       // Re-run the single match so $1-style references in the replacement still work.
       return (match[0] as string).replace(new RegExp(pattern.source, pattern.flags.replace('g', '')), replacement)
     })
-  let result = RULES.reduce((current, [pattern, replacement]) => replaceCounting(current, pattern, replacement), text)
+  let result = RULES.reduce((current, [pattern, replacement, keep]) => replaceCounting(current, pattern, replacement, keep), text)
   result = result.replace(ENTROPY_CANDIDATE, (candidate) => {
     if (!looksRandom(candidate)) return candidate
     count += 1

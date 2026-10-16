@@ -68,6 +68,7 @@ describe('redactSecrets, stronger rules', () => {
       'https://github.com/PranavOaR/continuum/pull/12',
       'const csrfToken = options.csrfToken ?? createAccessToken()',
       'password = process.env.DB_PASSWORD',
+      "export const TOKEN_ENV = 'CONTINUUM_SERVE_TOKEN'",
     ].join('\n')
     expect(redactSecrets(ordinary)).toBe(ordinary)
   })
@@ -118,6 +119,7 @@ describe('redactSecrets robustness', () => {
     ['a JSON password', `{"password":"${VALUE}"}`, '{"password":"[redacted]"}'],
     ['a JSON client secret', `{"client_secret": "${VALUE}"}`, '{"client_secret": "[redacted]"}'],
     ['pass=', `pass=${VALUE}`, 'pass=[redacted]'],
+    ['a quoted lowercase snake-case password', `password: 'correct_horse_battery'`, "password: '[redacted]'"],
     ['curl -u', `curl -u admin:${VALUE} https://example.com`, 'curl -u admin:[redacted] https://example.com'],
     ['a raw Authorization header', `Authorization: ${VALUE}x9`, 'Authorization: [redacted]'],
     ['a URL password with @ and /', `postgres://user:p@ss/word@db.internal:5432/app`, 'postgres://[redacted]@db.internal:5432/app'],

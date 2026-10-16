@@ -20,6 +20,7 @@ import { statusCommand } from './commands/status'
 import { uninstallCommand } from './commands/uninstall'
 import { VERSION } from './build'
 import { selfInvocation } from './invocation'
+import { serveWorkerOptions } from './supervisor'
 import { EXIT_FAILURE, EXIT_NOT_FOUND, EXIT_OK, EXIT_USAGE, type Io } from './io'
 import { NotInitializedError } from '@continuum/capture'
 import { StoreVersionError } from '@continuum/store'
@@ -68,7 +69,7 @@ const COMMANDS: Record<string, Command> = {
   status: (io) => statusCommand(io),
   run: (io, args) => runCommand(io, args),
   handoff: (io, args) => handoffCommand(io, args),
-  serve: (io, args) => serveCommand(io, args, VERSION),
+  serve: (io, args) => serveCommand(io, args, VERSION, serveWorkerOptions()),
   setup: (io, args) => setupCommand(io, args, selfInvocation()),
   mcp: (io) => mcpCommand(io, VERSION),
   ingest: (io) => ingestCommand(io),
@@ -111,6 +112,12 @@ function parseGlobal(argv: readonly string[]): GlobalArgs | { error: string } {
 
 /** Commands that stop gracefully on Ctrl-C/SIGTERM; every other command keeps Node's default of exiting at once. */
 const INTERRUPTIBLE = new Set(['start', 'run', 'serve'])
+
+/** The command argv runs, e.g. "serve" for `continuum -C repo serve`; null when there is none. */
+export function commandName(argv: readonly string[]): string | null {
+  const parsed = parseGlobal(argv)
+  return 'error' in parsed ? null : (parsed.rest[0] ?? null)
+}
 
 export function handlesInterrupts(argv: readonly string[]): boolean {
   const parsed = parseGlobal(argv)
