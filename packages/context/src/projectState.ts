@@ -11,6 +11,7 @@ import {
   type MemoryKind,
 } from '@continuum/core'
 import { keys, type ContextStore, type GraphNode } from '@continuum/store'
+import { currentTaskId, taskSummaries, type TaskSummary } from './tasks'
 
 const FILE_PREFIX = 'file:'
 
@@ -55,6 +56,10 @@ export interface ProjectState {
   sessions: SessionSummary[]
   checks: CheckSummary[]
   decisions: DecisionSummary[]
+  /** Most recently updated first. */
+  tasks: TaskSummary[]
+  /** The in-progress or blocked task most recently updated, if any. */
+  currentTaskId: string | null
 }
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null)
@@ -139,5 +144,7 @@ export function projectState(store: ContextStore, tree: WorkingTree, now: Date):
     decisions: nodesOfKind(store, 'memory')
       .map((node) => summarizeDecision(node, current))
       .sort((a, b) => newestFirst(a.recordedAt, b.recordedAt)),
+    tasks: taskSummaries(store),
+    currentTaskId: currentTaskId(store) ?? null,
   }
 }
