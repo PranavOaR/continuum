@@ -1,4 +1,5 @@
-import { rmSync } from 'node:fs'
+import { EventEmitter } from 'node:events'
+import { rmSync, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -97,6 +98,28 @@ describe('startCapture', () => {
     const store = ContextStore.open(':memory:')
     store.close()
     await expect(startCapture(store, repo.root, { debounceMs: 20 })).rejects.toThrow()
+  })
+
+  it('does not leave a queued rescan rejected when the first scan fails', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    const store = ContextStore.open(':memory:')
+    store.close()
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => unhandled.push(reason)
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      // A watcher event lands while the first scan is still running and queues a rescan.
+      const openWatcher = (_root: string, onPath: (path: string | null) => void) => {
+        setTimeout(() => onPath('a.ts'), 0)
+        return Object.assign(new EventEmitter(), { close: () => {} }) as unknown as FSWatcher
+      }
+      await expect(startCapture(store, repo.root, { debounceMs: 1, openWatcher })).rejects.toThrow()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
   })
 
   it('survives an error reporter that itself throws', async () => {

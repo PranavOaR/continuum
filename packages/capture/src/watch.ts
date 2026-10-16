@@ -105,7 +105,7 @@ export async function startCapture(store: ContextStore, root: string, options: C
 
   const rescan = (): Promise<void> => {
     if (queued) return queued
-    queued = running.then(async () => {
+    const next = async () => {
       queued = null
       if (closed) return
       try {
@@ -113,7 +113,10 @@ export async function startCapture(store: ContextStore, root: string, options: C
       } catch (error) {
         report(error)
       }
-    })
+    }
+    // Runs after the previous scan whether it succeeded or failed: a failed first scan must not
+    // turn every queued rescan into an unhandled rejection.
+    queued = running.then(next, next)
     running = queued
     return queued
   }
