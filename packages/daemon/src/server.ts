@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
@@ -113,12 +113,24 @@ async function fileAt(root: string, pathname: string): Promise<string | null> {
   }
 }
 
+/** Tells the web app it is served by a daemon, so it reads live data instead of the demo dataset. */
+export const DATA_MODE_TAG = '<meta name="continuum-data" content="local">'
+
+function markAsLocal(html: string): string {
+  return html.includes('</head>') ? html.replace('</head>', `${DATA_MODE_TAG}</head>`) : `${DATA_MODE_TAG}${html}`
+}
+
 async function handleStatic(root: string, url: URL, response: ServerResponse): Promise<void> {
   // Client-side routes fall back to the app shell; real files are served as-is.
   const file = (await fileAt(root, url.pathname)) ?? (extname(url.pathname) === '' ? join(root, 'index.html') : null)
   if (!file) {
     response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', ...SECURITY_HEADERS })
     response.end('Not found')
+    return
+  }
+  if (extname(file) === '.html') {
+    response.writeHead(200, { 'Content-Type': CONTENT_TYPES['.html'], 'Cache-Control': 'no-cache', ...SECURITY_HEADERS })
+    response.end(markAsLocal(await readFile(file, 'utf8')))
     return
   }
   const isHashedAsset = url.pathname.startsWith('/assets/')

@@ -31,7 +31,7 @@ function webBuild() {
   const dir = mkdtempSync(join(tmpdir(), 'continuum-web-'))
   dirs.push(dir)
   mkdirSync(join(dir, 'assets'))
-  writeFileSync(join(dir, 'index.html'), '<!doctype html><title>Continuum</title>')
+  writeFileSync(join(dir, 'index.html'), '<!doctype html><html><head><title>Continuum</title></head><body></body></html>')
   writeFileSync(join(dir, 'assets', 'app-123.js'), 'console.log(1)')
   writeFileSync(join(dir, '..', 'outside-secret.txt'), 'secret')
   return dir
@@ -104,6 +104,7 @@ describe('daemon static files', () => {
     expect(shell.status).toBe(200)
     expect(shell.body).toContain('<title>Continuum</title>')
     expect(shell.headers['content-security-policy']).toContain("default-src 'self'")
+    expect(shell.body).toContain('<meta name="continuum-data" content="local"></head>')
     const asset = await raw(daemon, '/assets/app-123.js')
     expect(asset.headers['content-type']).toContain('text/javascript')
     expect(asset.headers['cache-control']).toContain('immutable')
