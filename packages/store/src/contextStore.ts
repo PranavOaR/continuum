@@ -33,6 +33,7 @@ interface NodeRow {
 }
 
 interface EventRow {
+  seq?: number
   type: string
   payload: string
   evidence: string
@@ -120,18 +121,17 @@ export class ContextStore implements Mutations {
     return row.count
   }
 
+  /** The newest events first, with their log sequence numbers (stable ids). */
+  recentEvents(limit: number): { seq: number; event: ContinuumEvent }[] {
+    const rows = this.db
+      .prepare('SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq DESC LIMIT ?')
+      .all(limit) as unknown as EventRow[]
+    return rows.map((row) => ({ seq: row.seq as number, event: toEvent(row) }))
+  }
+
   *events(): Generator<ContinuumEvent> {
     const rows = this.db.prepare('SELECT type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq').all() as unknown as EventRow[]
-    for (const row of rows) {
-      yield {
-        type: row.type,
-        payload: JSON.parse(row.payload),
-        evidence: row.evidence,
-        source: row.source,
-        occurredAt: row.occurred_at,
-        ...(row.revision ? { revision: row.revision } : {}),
-      } as ContinuumEvent
-    }
+    for (const row of rows) yield toEvent(row)
   }
 
   /** Discards all projections and replays the event log. */
@@ -255,6 +255,17 @@ export class ContextStore implements Mutations {
     this.graphIndex = graph
     this.loadedSeq = this.maxSeq()
   }
+}
+
+function toEvent(row: EventRow): ContinuumEvent {
+  return {
+    type: row.type,
+    payload: JSON.parse(row.payload),
+    evidence: row.evidence,
+    source: row.source,
+    occurredAt: row.occurred_at,
+    ...(row.revision ? { revision: row.revision } : {}),
+  } as ContinuumEvent
 }
 
 function sortedNodes(graph: GraphIndex): GraphNode[] {

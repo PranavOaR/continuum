@@ -1,4 +1,4 @@
-export { CONTINUUM_DIR, findRepoRoot, gitPath, hashFiles, isIgnored, isRegularFileInRepo, isTracked, GitCommandError, headRevision, NotAGitRepositoryError, readWorkingTree, type WorkingTree } from './git'
+export { CONTINUUM_DIR, currentBranch, findRepoRoot, gitPath, hashFiles, isIgnored, isRegularFileInRepo, isTracked, GitCommandError, headRevision, NotAGitRepositoryError, readWorkingTree, type WorkingTree } from './git'
 export { diffSnapshots, recordedFiles, SCAN_SOURCE, scanRepository, type FileChange, type ScanOptions, type ScanResult } from './scan'
 export { CheckInterruptedError, CommandNotFoundError, finalizeTail, MAX_OUTPUT_TAIL_CHARS, RUN_SOURCE, runCheck, type RunCheckOptions, type RunCheckResult } from './runCheck'
 export { DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_WAIT_MS, DEFAULT_RECONCILE_MS, isIgnoredPath, startCapture, WatchUnavailableError, type CaptureHandle, type CaptureOptions } from './watch'
