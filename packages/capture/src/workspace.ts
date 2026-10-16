@@ -39,13 +39,18 @@ export async function openWorkspace(cwd: string): Promise<{ workspace: Workspace
  * Keeps the store out of git without editing the project's .gitignore:
  * the entry goes in .git/info/exclude, which is local to this clone.
  */
-export async function excludeFromGit(root: string): Promise<boolean> {
+export function excludeFromGit(root: string): Promise<boolean> {
+  return addGitExclude(root, EXCLUDE_ENTRY, 'Continuum local context store')
+}
+
+/** Adds one pattern to .git/info/exclude (local to this clone) unless it is already there. */
+export async function addGitExclude(root: string, entry: string, comment: string): Promise<boolean> {
   const excludePath = await gitPath(root, 'info/exclude')
   const current = existsSync(excludePath) ? await readFile(excludePath, 'utf8') : ''
-  if (current.split(/\r?\n/).includes(EXCLUDE_ENTRY)) return false
+  if (current.split(/\r?\n/).includes(entry)) return false
   await mkdir(join(excludePath, '..'), { recursive: true })
   const separator = current === '' || current.endsWith('\n') ? '' : '\n'
-  await appendFile(excludePath, `${separator}# Continuum local context store\n${EXCLUDE_ENTRY}\n`)
+  await appendFile(excludePath, `${separator}# ${comment}\n${entry}\n`)
   return true
 }
 
