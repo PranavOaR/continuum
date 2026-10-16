@@ -1,7 +1,7 @@
 import { Writable } from 'node:stream'
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it } from 'vitest'
-import { CommandNotFoundError, runCheck } from '../runCheck'
+import { CheckInterruptedError, CommandNotFoundError, finalizeTail, MAX_OUTPUT_TAIL_CHARS, runCheck } from '../runCheck'
 import { createSandbox, type Sandbox } from '../testing'
 
 const NODE = process.execPath
@@ -101,5 +101,60 @@ describe('runCheck', () => {
     const checks = [...store.events()].filter((recorded) => recorded.type === 'check.recorded')
     expect(checks).toEqual([])
     expect(store.eventCount()).toBeGreaterThanOrEqual(before)
+  })
+
+  it('redacts secrets from the stored command, name and output', async () => {
+    const { repo, store } = setup()
+    const script = "console.log('API_KEY=abc123def and done')"
+    const result = await runCheck(store, { root: repo.root, command: NODE, args: ['-e', script, '--', '--token', 's3cr3t'], ...quiet() })
+    expect(result.name).not.toContain('s3cr3t')
+    const stored = JSON.stringify([...store.events()])
+    expect(stored).not.toContain('s3cr3t')
+    expect(stored).not.toContain('abc123def')
+    expect(stored).toContain('API_KEY=[redacted] and done')
+  })
+
+  it('stops the command on abort and records nothing', async () => {
+    const { repo, store } = setup()
+    const controller = new AbortController()
+    const running = runCheck(store, { root: repo.root, command: NODE, args: ['-e', 'setTimeout(() => {}, 10000)'], name: 'slow', signal: controller.signal, ...quiet() })
+    setTimeout(() => controller.abort(), 150)
+    await expect(running).rejects.toBeInstanceOf(CheckInterruptedError)
+    expect(store.checkRun('slow')).toBeUndefined()
+  })
+
+  it('keeps running and records when the output destination breaks', async () => {
+    const { repo, store } = setup()
+    const broken = new Writable({
+      write(_chunk, _encoding, done) {
+        done(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+      },
+    })
+    const script = "for (let i = 0; i < 200; i++) console.log('line ' + i)"
+    const result = await runCheck(store, { root: repo.root, command: NODE, args: ['-e', script], name: 'piped', stdout: broken, stderr: sink().stream })
+    expect(result.status).toBe('passed')
+    expect(store.checkRun('piped')).toBeDefined()
+  })
+
+  it('keeps the exit code and warns when the rescan after the run fails', async () => {
+    const { repo, store } = setup()
+    const script = "require('node:fs').rmSync('.git', { recursive: true, force: true }); process.exit(2)"
+    const result = await runCheck(store, { root: repo.root, command: NODE, args: ['-e', script], name: 'breaks-git', ...quiet() })
+    expect(result.exitCode).toBe(2)
+    expect(result.warning).toMatch(/Could not rescan after the run/)
+    expect(store.checkRun('breaks-git')?.exitCode).toBe(2)
+  })
+})
+
+describe('finalizeTail', () => {
+  it('never starts with half a surrogate pair', () => {
+    const raw = `${'😀'.repeat(MAX_OUTPUT_TAIL_CHARS)}x` // odd length: a naive cut lands mid-pair
+    const tail = finalizeTail(raw)
+    expect(tail.length).toBeLessThanOrEqual(MAX_OUTPUT_TAIL_CHARS)
+    expect(tail.codePointAt(0)).toBe(0x1f600)
+  })
+
+  it('keeps multibyte text intact', () => {
+    expect(finalizeTail('café €5 ✓ done\n')).toBe('café €5 ✓ done')
   })
 })
