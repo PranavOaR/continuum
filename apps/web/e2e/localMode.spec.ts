@@ -16,6 +16,7 @@ const GIT_IDENTITY = ['-c', 'user.name=Continuum Test', '-c', 'user.email=test@e
 let repo = ''
 let server: ChildProcess | undefined
 let url = ''
+let launchUrl = ''
 
 function continuum(args: string[], input?: string): string {
   return execFileSync(process.execPath, [...CLI, '-C', repo, ...args], { cwd: ROOT, input, encoding: 'utf8' })
@@ -49,15 +50,28 @@ test.beforeAll(async () => {
   continuum(['run', '--name', 'unit', '--', process.execPath, '-e', '0'])
 
   server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] })
-  url = await new Promise<string>((resolve, reject) => {
+  launchUrl = await new Promise<string>((resolve, reject) => {
     let output = ''
     server?.stdout?.on('data', (chunk: Buffer) => {
       output += chunk.toString()
-      const match = /http:\/\/127\.0\.0\.1:\d+/.exec(output)
+      const match = /http:\/\/127\.0\.0\.1:\d+\/\?token=[\w-]+/.exec(output)
       if (match) resolve(match[0])
     })
     server?.once('exit', (code) => reject(new Error(`continuum serve exited with ${code}: ${output}`)))
   })
+  url = new URL(launchUrl).origin
+})
+
+// Every test opens the launch link first, as a person would; it sets the access cookie.
+test.beforeEach(async ({ page }) => {
+  await page.goto(launchUrl)
+})
+
+test('refuses visitors without the access token', async ({ browser }) => {
+  const stranger = await browser.newPage()
+  const response = await stranger.goto(`${url}/app`)
+  expect(response?.status()).toBe(401)
+  await stranger.close()
 })
 
 test.afterAll(async () => {

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { isInitialized, locateWorkspace, NotInitializedError } from '@continuum/capture'
-import { DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
+import { createAccessToken, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
 import { basename, resolve } from 'node:path'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -52,20 +52,26 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   if (missing) throw new NotInitializedError(missing.root)
   const unique = [...new Map(workspaces.map((workspace) => [workspace.root, workspace])).values()]
   const ids = projectIds(unique.map((workspace) => basename(workspace.root)))
-  const service = new LocalContinuumService(unique.map((workspace, index) => ({ projectId: ids[index], cwd: workspace.root })))
+  const describeError = (error: unknown) => (error instanceof Error ? (error.stack ?? error.message) : String(error))
+  const service = new LocalContinuumService(
+    unique.map((workspace, index) => ({ projectId: ids[index], cwd: workspace.root })),
+    { onError: (projectId, error) => io.err(`continuum: could not read ${projectId}: ${describeError(error)}`) },
+  )
   const hasDashboard = existsSync(webDist)
 
   const daemon = await startDaemon({
     service,
     version,
+    token: createAccessToken(),
     port: parsed.port,
     ...(hasDashboard ? { staticDir: webDist } : {}),
-    onError: (error) => io.err(`continuum: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`),
+    onError: (error) => io.err(`continuum: ${describeError(error)}`),
   })
-  io.out(`Continuum dashboard: ${daemon.url}`)
+  // The link carries this run's access token; other users on this machine cannot open the dashboard without it.
+  io.out(`Continuum dashboard: ${daemon.launchUrl}`)
   for (const workspace of unique) io.out(`  serving ${workspace.root}`)
   if (!hasDashboard) io.out('  (the web app is not built, so only the API is available; run `npm run build` in the Continuum checkout)')
-  io.out('Only this machine can reach it. Press Ctrl-C to stop.')
+  io.out('Open that exact link: it carries a one-time access token. Only this machine can reach the dashboard. Press Ctrl-C to stop.')
   await untilAborted(io.signal)
   await daemon.close()
   io.out('Stopped.')
