@@ -1,5 +1,6 @@
 import { basename } from 'node:path'
 import type { CheckSummary, DecisionSummary, ProjectState, SessionSummary } from './projectState'
+import { isQuiet, type SinceYouLeft } from './sinceYouLeft'
 import type { TaskSummary } from './tasks'
 import { agoFromIso } from './time'
 
@@ -12,6 +13,8 @@ const EARLIER_SESSIONS = 3
 export interface HandoffOptions {
   maxChars?: number
   now?: Date
+  /** For an agent resuming here: what changed since its previous session. Shown first. */
+  since?: SinceYouLeft | null
 }
 
 const KIND_LABELS: Record<DecisionSummary['kind'], string> = {
@@ -111,6 +114,28 @@ const FIELD_LABEL: Record<TaskSummary['userEdited'][number], string> = {
   criteria: 'acceptance criteria met',
 }
 
+/** Everything recorded while this agent was away, so it does not assume the code is as it left it. */
+function sinceSection(since: SinceYouLeft | null | undefined, now: Date): string[] {
+  if (!since) return []
+  const heading = `## Since your last session (${agoFromIso(since.since, now)})`
+  if (isQuiet(since)) return [heading, 'Nothing was recorded since then.']
+  const lines = [heading]
+  for (const session of since.otherSessions) {
+    const files = session.files.length > 0 ? `changed ${listPaths(session.files)}` : 'changed no files'
+    lines.push(`- [observed] A ${code(session.agent)} session ${files}.${session.note ? ` Its last note [agent-reported]: ${quote(session.note, 200)}` : ''}`)
+  }
+  if (since.outsideChanges.length > 0) lines.push(`- [observed] Changed outside agent sessions: ${listPaths(since.outsideChanges)}`)
+  for (const edit of since.taskEdits) {
+    lines.push(`- [set by you] You changed ${edit.fields.map((field) => FIELD_LABEL[field]).join(', ') || 'the task'} of ${quote(edit.title, 120)} in the dashboard.`)
+  }
+  for (const check of since.checks) {
+    lines.push(`- ${check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'} ${code(check.name)} ${check.passed ? 'passed' : 'FAILED'}.`)
+  }
+  for (const commit of since.commits.slice(-MAX_LISTED)) lines.push(`- [observed] Committed ${code(commit.hash.slice(0, 7))} ${quote(commit.message, 120)}`)
+  for (const title of since.decisions) lines.push(`- [agent-reported] Decision recorded: ${quote(title, 160)}`)
+  return lines
+}
+
 function describeCheck(check: CheckSummary, now: Date): string {
   const tag = check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'
   const ran = `Ran ${agoFromIso(check.ranAt, now)}`
@@ -201,7 +226,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
     'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.',
   ]
   return fit(
-    [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
+    [header, sinceSection(options.since, now), taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }
