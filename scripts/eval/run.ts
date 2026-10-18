@@ -2,18 +2,17 @@
 //
 //   npm run eval                        # is every answer in the briefing? (deterministic, free, run in CI)
 //   npm run eval -- --agent claude      # ask Claude Code the questions from the briefing alone (uses your account)
-//   npm run eval -- --update-baseline   # accept the current briefing-mode scores
 //
-// A briefing change may not lower the briefing-mode score below scripts/eval/baseline.json.
+// Briefing mode must score 100%: every answer is in its section in exactly the
+// expected words, and no section makes a misleading claim. CI runs it.
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { projectState, renderHandoff, sinceYouLeft } from '../../packages/context/src/index'
 import { ContextStore } from '../../packages/store/src/index'
 import { EVAL_NOW, SCENARIOS, type Question, type Scenario } from './scenarios'
 
-const BASELINE = join(import.meta.dirname, 'baseline.json')
 /** The same budget a real session start gets. */
 const BRIEFING_CHARS = 6_000
 const CLAUDE_TIMEOUT_MS = 180_000
@@ -78,7 +77,10 @@ function evaluate(scenario: Scenario, mode: Mode): { score: number; failed: stri
   // Briefing mode only asks whether the facts are there to be found; forbidden claims are about answers.
   const answers = mode === 'claude' ? askClaude(briefing, scenario.questions) : null
   const failed = scenario.questions.filter((question) => {
-    if (!answers) return !(question.inBriefing ?? question.expect).every((pattern) => pattern.test(sectionOf(briefing, question.section)))
+    if (!answers) {
+      const section = sectionOf(briefing, question.section)
+      return !question.inBriefing.every((pattern) => pattern.test(section)) || (question.notInBriefing ?? []).some((pattern) => pattern.test(section))
+    }
     return !passes(question, answers.get(question.id) ?? '')
   })
   return { score: (scenario.questions.length - failed.length) / scenario.questions.length, failed: failed.map((question) => `${question.id}: ${question.ask}${answers ? ` → ${answers.get(question.id) ?? '(no answer)'}` : ''}`) }
@@ -86,30 +88,17 @@ function evaluate(scenario: Scenario, mode: Mode): { score: number; failed: stri
 
 const args = process.argv.slice(2)
 const mode: Mode = args.includes('--agent') && args[args.indexOf('--agent') + 1] === 'claude' ? 'claude' : 'briefing'
-const baseline: Record<string, number> = (() => {
-  try {
-    return JSON.parse(readFileSync(BASELINE, 'utf8'))
-  } catch {
-    return {}
-  }
-})()
-
 let regressed = false
-const scores: Record<string, number> = {}
 for (const scenario of SCENARIOS) {
   const { score, failed } = evaluate(scenario, mode)
-  scores[scenario.name] = score
-  const floor = baseline[scenario.name]
-  const mark = mode === 'briefing' && floor !== undefined && score < floor ? 'REGRESSED' : 'ok'
-  if (mark === 'REGRESSED') regressed = true
-  console.log(`${mark.padEnd(9)} ${(score * 100).toFixed(0).padStart(3)}%  ${scenario.name}${floor !== undefined && mode === 'briefing' ? ` (baseline ${(floor * 100).toFixed(0)}%)` : ''}`)
+  // The deterministic mode has no excuse for missing anything.
+  const mark = mode === 'briefing' && score < 1 ? 'MISSING' : 'ok'
+  if (mark === 'MISSING') regressed = true
+  console.log(`${mark.padEnd(9)} ${(score * 100).toFixed(0).padStart(3)}%  ${scenario.name}`)
   for (const line of failed) console.log(`            missed ${line}`)
 }
 
-if (args.includes('--update-baseline') && mode === 'briefing') {
-  writeFileSync(BASELINE, `${JSON.stringify(scores, null, 2)}\n`)
-  console.log(`Baseline updated: ${BASELINE}`)
-} else if (regressed) {
-  console.error('\nA briefing change lost information a fresh agent needs (see "missed" above).')
+if (regressed) {
+  console.error('\nA briefing no longer carries something a fresh agent needs (see "missed" above).')
   process.exit(1)
 }

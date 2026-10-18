@@ -10,10 +10,12 @@ export interface Question {
   ask: string
   expect: RegExp[]
   forbid?: RegExp[]
-  /** Briefing mode: the section heading (start of) the answer must be found under, e.g. "Since your last session". */
-  section?: string
-  /** Briefing mode: exact wording the briefing must contain, when answers may phrase it freely. Defaults to `expect`. */
-  inBriefing?: RegExp[]
+  /** Briefing mode: the heading (or its start) of the section the answer must be found in. */
+  section: string
+  /** Briefing mode: the exact wording the section must contain (answers may phrase it freely). */
+  inBriefing: RegExp[]
+  /** Briefing mode: wording the section must never contain, e.g. calling an out-of-date check "passed". */
+  notInBriefing?: RegExp[]
 }
 
 export interface Scenario {
@@ -58,14 +60,14 @@ export const SCENARIOS: Scenario[] = [
     ],
     resumingSession: { sessionId: 'claude-2', agent: 'claude-code' },
     questions: [
-      { id: 'task', ask: 'What task is in progress?', expect: [/google sign-in/i], section: 'Current task' },
-      { id: 'next', ask: 'What is the next step?', expect: [/state/i] },
-      { id: 'unit-trust', ask: 'Can the passing "unit" check still be trusted? Why?', expect: [/out of date|no longer|stale|not.*trust/i, /login\.ts/], forbid: [/^\s*yes\b/i], section: 'Checks' },
-      { id: 'e2e', ask: 'What is the state of the "e2e" check?', expect: [/fail/i] },
-      { id: 'other-agent', ask: 'Did any other agent work here since your last session? What did it change?', expect: [/codex/i, /login\.ts/], section: 'Since your last session' },
-      { id: 'by-hand', ask: 'Which files were changed outside any agent session?', expect: [/README\.md/], section: 'Changed outside agent sessions' },
-      { id: 'decision', ask: 'Is there a recorded decision you should follow?', expect: [/createSession/], section: 'Decisions' },
-      { id: 'evidence', ask: 'Is the claim "Callback route wired" verified or only reported by an agent?', expect: [/agent|reported|not verified/i], forbid: [/\bit is verified\b/i] },
+      { id: 'task', ask: 'What task is in progress?', expect: [/google sign-in/i], section: 'Current task', inBriefing: [/"Add Google sign-in" \(in-progress\)/] },
+      { id: 'next', ask: 'What is the next step?', expect: [/state/i], section: 'Current task', inBriefing: [/Next action: "Validate the OAuth state parameter"/] },
+      { id: 'unit-trust', ask: 'Can the passing "unit" check still be trusted? Why?', expect: [/out of date|no longer|stale|not.*trust/i, /login\.ts/], forbid: [/^\s*yes\b/i], section: 'Checks', inBriefing: [/OUT OF DATE: `unit`[^\n]*src\/auth\/login\.ts/], notInBriefing: [/passed: `unit`/] },
+      { id: 'e2e', ask: 'What is the state of the "e2e" check?', expect: [/fail/i], section: 'Checks', inBriefing: [/FAILED: `e2e`/] },
+      { id: 'other-agent', ask: 'Did any other agent work here since your last session? What did it change?', expect: [/codex/i, /login\.ts/], section: 'Since your last session', inBriefing: [/A `codex` session changed `src\/auth\/login\.ts`/] },
+      { id: 'by-hand', ask: 'Which files were changed outside any agent session?', expect: [/README\.md/], section: 'Changed outside agent sessions', inBriefing: [/- modified `README\.md`/] },
+      { id: 'decision', ask: 'Is there a recorded decision you should follow?', expect: [/createSession/], section: 'Decisions', inBriefing: [/Callbacks reuse createSession/] },
+      { id: 'evidence', ask: 'Is the claim "Callback route wired" verified or only reported by an agent?', expect: [/agent|reported|not verified/i], forbid: [/\bit is verified\b/i], section: 'Earlier sessions', inBriefing: [/Callback route wired/], notInBriefing: [/\[verified\][^\n]*Callback route wired/] },
     ],
   },
   {
@@ -82,10 +84,10 @@ export const SCENARIOS: Scenario[] = [
     ],
     resumingSession: { sessionId: 'claude-b', agent: 'claude-code' },
     questions: [
-      { id: 'left-off', ask: 'Where did the last session leave off?', expect: [/csv export/i, /pagination/i], section: 'Where we left off' },
-      { id: 'tests', ask: 'Do the tests pass on the current code?', expect: [/out of date|changed|not.*current|re-?run/i, /app\.py/] },
-      { id: 'how-run', ask: 'Who ran the pytest check: Continuum or an agent?', expect: [/agent/i], inBriefing: [/run by an agent/i], section: 'Checks' },
-      { id: 'pending', ask: 'Which changes have not been recorded yet?', expect: [/app\.py|notes\.txt/] },
+      { id: 'left-off', ask: 'Where did the last session leave off?', expect: [/csv export/i, /pagination/i], section: 'Where we left off', inBriefing: [/Last note \[agent-reported\]: "Added the CSV export endpoint\. Pagination is still missing\."/] },
+      { id: 'tests', ask: 'Do the tests pass on the current code?', expect: [/out of date|changed|not.*current|re-?run/i, /app\.py/], section: 'Checks', inBriefing: [/OUT OF DATE: `pytest -q`[^\n]*app\.py/], notInBriefing: [/passed: `pytest -q`/] },
+      { id: 'how-run', ask: 'Who ran the pytest check: Continuum or an agent?', expect: [/agent/i], section: 'Checks', inBriefing: [/\[observed: run by an agent\][^\n]*`pytest -q`/], notInBriefing: [/\[verified\][^\n]*`pytest -q`/] },
+      { id: 'pending', ask: 'Which changes have not been recorded yet?', expect: [/app\.py|notes\.txt/], section: 'Changed outside agent sessions', inBriefing: [/`app\.py` \(not yet recorded\)/, /`notes\.txt` \(not yet recorded\)/] },
     ],
   },
   {
@@ -100,10 +102,10 @@ export const SCENARIOS: Scenario[] = [
     ],
     resumingSession: { sessionId: 'claude-y', agent: 'claude-code' },
     questions: [
-      { id: 'status', ask: 'What is the status of the refunds task, and who set it?', expect: [/blocked/i, /\byou\b|dashboard|user|person/i], inBriefing: [/blocked/i, /set by you/i], section: 'Current task' },
+      { id: 'status', ask: 'What is the status of the refunds task, and who set it?', expect: [/blocked/i, /\byou\b|dashboard|user|person/i], section: 'Current task', inBriefing: [/\(blocked\)/, /\[set by you\] Changed in the dashboard: [^\n]*status/] },
       { id: 'when', ask: 'Roughly how long ago did you change the refunds task in the dashboard?', expect: [/\b1\s*h|an hour|one hour|60 min/i], inBriefing: [/in the dashboard \(1h ago\)/], section: 'Since your last session' },
-      { id: 'next', ask: 'What should happen next?', expect: [/finance/i] },
-      { id: 'title-source', ask: 'Was the task title written by you (the person) or by an agent?', expect: [/agent/i] },
+      { id: 'next', ask: 'What should happen next?', expect: [/finance/i], section: 'Current task', inBriefing: [/Next action: "Wait for finance to approve the refund rules"/] },
+      { id: 'title-source', ask: 'Was the task title written by you (the person) or by an agent?', expect: [/agent/i], section: 'Current task', inBriefing: [/^\[agent-reported\] "Support partial refunds"/m], notInBriefing: [/\[set by you\] "Support partial refunds"/] },
     ],
   },
 ]

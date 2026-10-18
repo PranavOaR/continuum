@@ -67,7 +67,7 @@ npm run eval                     # does each briefing contain what a fresh agent
 npm run eval -- --agent claude   # ask Claude Code the standard questions from the briefing alone (uses your account)
 ```
 
-`scripts/eval/scenarios.ts` holds recorded histories (resuming after another agent and a hand edit, a project with no task, a task changed in the dashboard) and the questions a new session must answer: the current task, the next step, which checks can be trusted, what changed by hand, who set what. Briefing mode checks that each answer appears in the right section, and CI fails if a change loses one (`scripts/eval/baseline.json`). Claude mode scores real answers, including that misleading claims are absent. With Claude Code it scored 100% on all three scenarios after the first run surfaced a missing timestamp.
+`scripts/eval/scenarios.ts` holds recorded histories (resuming after another agent and a hand edit, a project with no task, a task changed in the dashboard) and the questions a new session must answer: the current task, the next step, which checks can be trusted, what changed by hand, who set what. Briefing mode checks that each answer appears in its section in the expected words, and that no section makes a misleading claim (such as calling an out-of-date check passed); it must score 100%, and CI runs it. Claude mode scores real answers, including that misleading claims are absent. With Claude Code it scored 100% on all three scenarios after the first run surfaced a missing timestamp.
 
 ## Release package
 
