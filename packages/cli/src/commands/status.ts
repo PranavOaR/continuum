@@ -1,5 +1,5 @@
 import { relative } from 'node:path'
-import { diffSnapshots, readWorkingTree, recordedFiles } from '@continuum/capture'
+import { diffSnapshots, readWorkingTreeWithSymbols, recordedFiles } from '@continuum/capture'
 import { liveHashes } from '@continuum/context'
 import { checkStatus, type CheckStatus, type CurrentHashes } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
@@ -29,7 +29,7 @@ function checkRows(store: ContextStore, current: CurrentHashes, now: Date): stri
 export async function statusCommand(io: Io): Promise<number> {
   const { workspace, store } = await openWorkspace(io.cwd)
   try {
-    const tree = await readWorkingTree(workspace.root)
+    const tree = await readWorkingTreeWithSymbols(store, workspace.root)
     const pending = diffSnapshots(recordedFiles(store), tree.files).length
     const pendingNote = pending === 0 ? 'all recorded' : `${plural(pending, 'unrecorded change')} (run \`continuum scan\` or \`continuum start\`)`
     const summary = columns([

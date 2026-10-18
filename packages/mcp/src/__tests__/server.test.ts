@@ -138,3 +138,31 @@ describe('Continuum MCP server', () => {
     expect(text(await (await connect(plain)).callTool({ name: 'get_project_state', arguments: {} }))).toContain('Not inside a git repository')
   })
 })
+
+describe('decisions anchored to a symbol', () => {
+  const AUTH = 'export function login(user: string) {\n  return user\n}\n\nexport function logout() {\n  return null\n}\n'
+
+  it('go stale only when that symbol changes, not when the rest of its file does', async () => {
+    const repo = await initializedRepo({ 'src/auth.ts': AUTH })
+    const client = await connect(repo.root)
+    const recorded = await client.callTool({ name: 'record_decision', arguments: { title: 'login returns the raw user', files: ['src/auth.ts#login'] } })
+    expect(recorded.isError).toBeFalsy()
+
+    repo.write('src/auth.ts', AUTH.replace('return null', 'return undefined'))
+    const afterOther = text(await client.callTool({ name: 'get_handoff', arguments: {} }))
+    expect(afterOther).toContain('login returns the raw user')
+    expect(afterOther).not.toContain('anchored code changed')
+
+    repo.write('src/auth.ts', AUTH.replace('return user', 'return user.trim()'))
+    const afterLogin = text(await client.callTool({ name: 'get_handoff', arguments: {} }))
+    expect(afterLogin).toContain('(anchored code changed since: `src/auth.ts#login`)')
+  })
+
+  it('names the symbols that do exist when asked for one that does not', async () => {
+    const repo = await initializedRepo({ 'src/auth.ts': AUTH })
+    const client = await connect(repo.root)
+    const result = await client.callTool({ name: 'record_decision', arguments: { title: 't', files: ['src/auth.ts#signin'] } })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('No top-level "signin" in src/auth.ts. Its symbols: login, logout.')
+  })
+})

@@ -1,5 +1,6 @@
 import type { AgentSession, MemoryRecord, VerificationRecord } from '@continuum/core'
 import type { CheckSummary } from '@continuum/context'
+import { anchoredPath } from '@continuum/store'
 import { asAgent, ids } from './ids'
 import type { RepoSnapshot } from './snapshot'
 
@@ -41,7 +42,7 @@ export function toMemory(snapshot: RepoSnapshot): MemoryRecord[] {
   return snapshot.state.decisions.map((decision) => {
     const taskId = taskOf.get(`memory:${decision.id}`)
     const node = snapshot.nodeByKey.get(`memory:${decision.id}`)
-    const anchors = Object.keys((node?.props.anchors ?? {}) as Record<string, string>).map((key) => key.slice('file:'.length))
+    const anchors = [...new Set(Object.keys((node?.props.anchors ?? {}) as Record<string, string>).flatMap((key) => anchoredPath(key) ?? []))]
     const stale = decision.status === 'anchor-changed' ? ` Anchored code changed since: ${list(decision.changed)}.` : ''
     return {
       id: ids.memory(snapshot.projectId, decision.id),

@@ -52,7 +52,7 @@ It writes two project-scoped files and nothing in `~/.claude`:
 - `.mcp.json`: the `continuum` MCP server.
   - Reading: `get_handoff`, `get_project_state`, and `get_context`. `get_context` ranks recorded context for a task by its graph links, evidence, recency and whether it needs action (a failing check, a stale decision), then cuts it to a token budget, showing each item's score and why.
   - Tasks: `start_task` and `update_task` record what Claude is working on (objective, acceptance criteria, steps and next action), and edits are attributed to the current task.
-  - Decisions: `record_decision` saves decisions, known issues and next steps tied to specific files.
+  - Decisions: `record_decision` saves decisions, known issues and next steps tied to specific files, or to one top-level function, class or constant as `path#name` (TypeScript, JavaScript and Python). A symbol anchor goes stale only when that symbol changes, not when anything else in its file does.
 
 Restart Claude Code in that repository and approve the `continuum` server when prompted. Run from a checkout, both files point at it, so they are kept out of git. Installed from npm, setup writes `npx -y <package>@<version>` instead, and `.mcp.json` can be committed to share the server with your team. `npm run continuum -- handoff` prints the same briefing for pasting into any other agent or chat.
 

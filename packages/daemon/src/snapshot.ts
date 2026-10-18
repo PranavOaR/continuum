@@ -1,7 +1,7 @@
 import { basename } from 'node:path'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { currentBranch, openWorkspace, readWorkingTree, uncommittedChanges, type UncommittedDiff, type WorkingTree } from '@continuum/capture'
+import { currentBranch, openWorkspace, readWorkingTreeWithSymbols, uncommittedChanges, type UncommittedDiff, type WorkingTree } from '@continuum/capture'
 import { HOOKS_FILE, isContinuumHandler } from '@continuum/claude-code'
 import { liveHashes, projectState, type ProjectState } from '@continuum/context'
 import type { ContinuumEvent, CurrentHashes } from '@continuum/core'
@@ -89,7 +89,7 @@ export async function loadSnapshot(projectId: string, cwd: string, now: Date): P
   const { workspace, store } = await openWorkspace(cwd)
   try {
     const [tree, branch, diffs, agentConnected] = await Promise.all([
-      readWorkingTree(workspace.root),
+      readWorkingTreeWithSymbols(store, workspace.root),
       currentBranch(workspace.root),
       uncommittedChanges(workspace.root),
       hasContinuumHooks(workspace.root),

@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { applyRepositoryRedactions, hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
+import { applyRepositoryRedactions, extractSymbols, hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, redactSecrets } from '@continuum/capture'
 import { currentTaskId, DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, projectState, rankContext, renderContext, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
@@ -60,26 +61,49 @@ async function guarded(run: () => Promise<ToolResult>): Promise<ToolResult> {
 }
 
 async function currentState(store: ContextStore, root: string, now: Date): Promise<ProjectState> {
-  return projectState(store, await readWorkingTree(root), now)
+  return projectState(store, await readWorkingTreeWithSymbols(store, root), now)
 }
+
+/** Most symbols listed when a requested one is not in the file. */
+const MAX_SUGGESTED_SYMBOLS = 20
 
 /**
  * Resolves agent-supplied paths (absolute, or relative to the agent's working
  * directory) to repository files and their current hashes, rejecting anything
- * outside what Continuum captures.
+ * outside what Continuum captures. `path#name` anchors to one top-level symbol
+ * instead, so the note goes stale only when that symbol changes.
  */
-async function anchorsFor(root: string, cwd: string, files: readonly string[]): Promise<Record<IdentityKey, ContentHash>> {
-  const paths = files.map((file) => normalizePath(relative(root, resolve(cwd, file))))
+async function anchorsFor(root: string, cwd: string, entries: readonly string[]): Promise<Record<IdentityKey, ContentHash>> {
+  const refs = entries.map((entry) => {
+    const symbol = parseSymbolRef(entry)
+    return { path: normalizePath(relative(root, resolve(cwd, symbol?.path ?? entry))), symbol: symbol?.name ?? null }
+  })
+  const paths = [...new Set(refs.map((ref) => ref.path))]
   const outside = paths.filter((path) => path === '' || path.startsWith('../') || isAbsolute(path))
   if (outside.length > 0) throw new ToolInputError(`Files must be inside the repository: ${outside.join(', ')}`)
   const notFiles = (await Promise.all(paths.map(async (path) => ((await isRegularFileInRepo(root, path)) ? null : path)))).filter(Boolean)
   if (notFiles.length > 0) throw new ToolInputError(`Files not found (symlinks are not followed): ${notFiles.join(', ')}`)
   const ignored = (await Promise.all(paths.map(async (path) => ((await isIgnored(root, path)) ? path : null)))).filter(Boolean)
   if (ignored.length > 0) throw new ToolInputError(`Files ignored by git cannot anchor a decision: ${ignored.join(', ')}`)
-  const hashes = await hashFiles(root, paths)
-  const vanished = paths.filter((path) => !hashes.has(path))
+
+  const filePaths = refs.filter((ref) => ref.symbol === null).map((ref) => ref.path)
+  const hashes = await hashFiles(root, filePaths)
+  const vanished = filePaths.filter((path) => !hashes.has(path))
   if (vanished.length > 0) throw new ToolInputError(`Files not found: ${vanished.join(', ')}`)
-  return Object.fromEntries([...hashes].map(([path, hash]) => [keys.file(path), hash]))
+  const anchors: Record<IdentityKey, ContentHash> = Object.fromEntries([...hashes].map(([path, hash]) => [keys.file(path), hash]))
+
+  for (const ref of refs) {
+    if (ref.symbol === null) continue
+    const symbols = extractSymbols(ref.path, await readFile(join(root, ref.path), 'utf8'))
+    if (!symbols) throw new ToolInputError(`Cannot read the symbols in ${ref.path}; anchor the whole file instead.`)
+    const found = symbols.find((candidate) => candidate.name === ref.symbol)
+    if (!found) {
+      const names = symbols.slice(0, MAX_SUGGESTED_SYMBOLS).map((candidate) => candidate.name).join(', ')
+      throw new ToolInputError(`No top-level "${ref.symbol}" in ${ref.path}. Its symbols: ${names || 'none'}.`)
+    }
+    anchors[keys.symbol(ref.path, found.name)] = found.hash
+  }
+  return anchors
 }
 
 const recordDecisionInput = {
@@ -90,7 +114,7 @@ const recordDecisionInput = {
     .array(z.string().min(1))
     .max(MAX_ANCHORED_FILES)
     .default([])
-    .describe('Repository files this applies to. If any later change, the note is flagged as possibly stale.'),
+    .describe('Repository files this applies to, or one top-level function/class/constant as path#name (e.g. src/auth.ts#login). If any later change, the note is flagged as possibly stale; a symbol anchor ignores edits elsewhere in its file.'),
 }
 
 /**
