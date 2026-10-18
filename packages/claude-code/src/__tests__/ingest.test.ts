@@ -326,6 +326,15 @@ describe('ingestHook path resolution', () => {
     )
     expect(outcome).toEqual({ status: 'recorded', events: 1 })
     withStore(storePath, (store) => expect(store.graph.get('file:src/a.ts')?.props.changedBy).toBe('s-link'))
+
+    // A deleted file whose directory went too still resolves through the symlink.
+    repo.write('gone/deep/x.ts', 'x')
+    rmSync(join(repo.root, 'gone'), { recursive: true, force: true })
+    const deleted = await ingestHook(
+      JSON.stringify({ session_id: 's-link', cwd: link, hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_input: { command: `*** Begin Patch\n*** Delete File: ${join(link, 'gone/deep/x.ts')}\n*** End Patch` } }),
+      { now: () => NOW, agent: 'codex' },
+    )
+    expect(deleted).toEqual({ status: 'recorded', events: 1 })
     rmSync(linkDir, { recursive: true, force: true })
   })
 })

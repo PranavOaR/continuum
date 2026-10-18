@@ -49,15 +49,22 @@ async function findWorkspace(cwd: string): Promise<Workspace | null> {
 
 /**
  * The path through real directories: agents may report /var/… where git says
- * /private/var/… (macOS), or a path through a symlinked checkout. The file
- * itself may be gone (a deleted file), so only its directory is resolved.
+ * /private/var/… (macOS), or a path through a symlinked checkout. The file, and
+ * even its directories, may be gone (a deleted file), so the nearest existing
+ * ancestor is resolved and the rest re-appended.
  */
 function canonical(absolute: string): string {
-  try {
-    return join(realpathSync(dirname(absolute)), basename(absolute))
-  } catch {
-    return absolute
+  let existing = absolute
+  const missing: string[] = []
+  while (existing !== dirname(existing)) {
+    try {
+      return join(realpathSync(existing), ...missing)
+    } catch {
+      missing.unshift(basename(existing))
+      existing = dirname(existing)
+    }
   }
+  return absolute
 }
 
 /**

@@ -50,6 +50,14 @@ describe('setupCursor', () => {
     await expect(setupCursor(other.root, CHECKOUT)).rejects.toThrow(/did not write/)
   })
 
+  it("removal leaves a continuum server it did not write untouched, without failing", async () => {
+    const { root } = repo()
+    const theirs = { mcpServers: { continuum: { command: 'python', args: ['mine.py'] } } }
+    write(root, CURSOR_MCP_FILE, JSON.stringify(theirs))
+    expect((await removeCursorSetup(root)).files).toEqual([])
+    expect(JSON.parse(readFileSync(join(root, CURSOR_MCP_FILE), 'utf8'))).toEqual(theirs)
+  })
+
   it('removes exactly what it added', async () => {
     const { root } = repo()
     await setupCursor(root, CHECKOUT)
