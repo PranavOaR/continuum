@@ -1,0 +1,12 @@
+{
+  "name": "continuum",
+  "owner": { "name": "Pranav Rao" },
+  "metadata": { "description": "Continuum: local project memory that keeps AI coding work continuous across sessions and agents." },
+  "plugins": [
+    {
+      "name": "continuum",
+      "source": "./plugin",
+      "description": "Each Claude Code session starts briefed on where the last one left off; edits, tasks, checks and decisions are recorded locally."
+    }
+  ]
+}

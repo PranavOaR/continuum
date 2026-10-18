@@ -15,5 +15,6 @@
     "@continuum/capture": "*",
     "@continuum/core": "*",
     "@continuum/store": "*"
-  }
+  },
+  "license": "MIT"
 }

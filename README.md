@@ -2,7 +2,31 @@
 
 **Your work continues. Your agents change.**
 
-Continuum is a local-first project-continuity layer for switching between AI coding agents. It is early: the repository capture engine and CLI work against real git repositories, while the web app is still an interactive prototype.
+Continuum is local project memory for AI coding agents. Every Claude Code, Codex or Cursor session starts briefed on where the work left off:
+- the current task and its next step;
+- which test results still hold for the code as it is now;
+- what another agent or a hand edit changed;
+- which decisions apply.
+
+Every claim is labelled **verified**, **observed**, **agent-reported** or **set by you**. Nothing leaves your machine.
+
+## Install
+
+Requires Node.js 22.13+ and git.
+
+```bash
+cd your-project
+npx @pranavoar/continuum setup claude-code   # or: setup codex, setup cursor
+npx @pranavoar/continuum serve               # the dashboard for every connected repository
+```
+
+With Claude Code, you can install the plugin instead (hooks, MCP server and a `/continuum:handoff` command, in one step):
+
+```
+/plugin install continuum --marketplace PranavOaR/continuum
+```
+
+New here? [docs/getting-started.md](docs/getting-started.md) walks through a first handoff in about ten minutes. `continuum doctor` diagnoses any setup problem. [CHANGELOG.md](CHANGELOG.md) lists what is in each release.
 
 > **Two modes, always labelled.** Served by `continuum serve`, the web app shows live data from your repositories ("Local workspace · Live"). Anywhere else, such as `npm run dev` or a static host, it shows a mock demo dataset ("Demo workspace · Mock data"). Nothing is sent anywhere in either mode.
 

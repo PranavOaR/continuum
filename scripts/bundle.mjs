@@ -15,19 +15,18 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = join(ROOT, 'dist/release')
 const WEB_DIST = join(ROOT, 'apps/web/dist')
 const CLI = JSON.parse(readFileSync(join(ROOT, 'packages/cli/package.json'), 'utf8'))
-/** Placeholder until the npm scope is chosen; see docs/ROADMAP.md item 1.2. */
-const PLACEHOLDER_NAME = '@your-scope/continuum'
+/** The published name; CONTINUUM_PACKAGE_NAME overrides it for test builds. */
+const DEFAULT_NAME = '@pranavoar/continuum'
 /** node:sqlite runs without a flag from 22.13. */
 const MIN_NODE = '>=22.13'
 
-const packageName = process.env.CONTINUUM_PACKAGE_NAME ?? PLACEHOLDER_NAME
+const packageName = process.env.CONTINUUM_PACKAGE_NAME ?? DEFAULT_NAME
 const version = process.env.CONTINUUM_VERSION ?? CLI.version
 
 if (!existsSync(join(WEB_DIST, 'index.html'))) {
   console.error('apps/web/dist is missing: run `npm run build` first.')
   process.exit(1)
 }
-if (packageName === PLACEHOLDER_NAME) console.warn(`CONTINUUM_PACKAGE_NAME is not set; using the placeholder ${PLACEHOLDER_NAME}.`)
 
 rmSync(OUT, { recursive: true, force: true })
 mkdirSync(OUT, { recursive: true })
@@ -60,7 +59,11 @@ const manifest = {
   bin: { continuum: './continuum.js' },
   files: ['continuum.js', 'web', 'README.md', 'LICENSE'],
   engines: { node: MIN_NODE },
-  keywords: ['claude-code', 'mcp', 'ai-agents', 'handoff', 'context', 'local-first'],
+  license: 'MIT',
+  author: 'Pranav Rao',
+  homepage: 'https://github.com/PranavOaR/continuum#readme',
+  bugs: { url: 'https://github.com/PranavOaR/continuum/issues' },
+  keywords: ['claude-code', 'codex', 'cursor', 'mcp', 'ai-agents', 'handoff', 'context', 'local-first'],
   repository: { type: 'git', url: 'git+https://github.com/PranavOaR/continuum.git' },
 }
 writeFileSync(join(OUT, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)

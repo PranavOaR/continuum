@@ -1,0 +1,105 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx",
+            "args": [
+              "-y",
+              "@pranavoar/continuum@0.1.0",
+              "ingest"
+            ],
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx",
+            "args": [
+              "-y",
+              "@pranavoar/continuum@0.1.0",
+              "ingest"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx",
+            "args": [
+              "-y",
+              "@pranavoar/continuum@0.1.0",
+              "ingest"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|mcp__continuum__start_task|mcp__continuum__update_task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx",
+            "args": [
+              "-y",
+              "@pranavoar/continuum@0.1.0",
+              "ingest"
+            ],
+            "async": true,
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx",
+            "args": [
+              "-y",
+              "@pranavoar/continuum@0.1.0",
+              "ingest"
+            ],
+            "async": true,
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx",
+            "args": [
+              "-y",
+              "@pranavoar/continuum@0.1.0",
+              "ingest"
+            ],
+            "async": true,
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
