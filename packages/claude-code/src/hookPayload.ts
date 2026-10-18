@@ -96,7 +96,11 @@ export interface EditedFile {
 const PATCH_HEADER = /^\*\*\* (Add|Update|Delete) File: (.+)$/
 const PATCH_MOVE = /^\*\*\* Move to: (.+)$/
 
-/** Every file an apply_patch call names: added, updated, deleted, and the new name of a moved file. */
+/**
+ * Every file an apply_patch call names: added, updated and deleted files, and
+ * for a move (`*** Update File: old` then `*** Move to: new`) the old path as
+ * deleted and the new one as added.
+ */
 export function patchedFiles(patch: string): EditedFile[] {
   const files: EditedFile[] = []
   for (const line of patch.split('\n')) {
@@ -107,7 +111,10 @@ export function patchedFiles(patch: string): EditedFile[] {
       continue
     }
     const moved = PATCH_MOVE.exec(line)
-    if (moved) files.push({ path: moved[1].trim(), changeType: 'added' })
+    if (!moved) continue
+    const source = files.at(-1)
+    if (source?.changeType === 'modified') files[files.length - 1] = { ...source, changeType: 'deleted' }
+    files.push({ path: moved[1].trim(), changeType: 'added' })
   }
   return files
 }

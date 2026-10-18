@@ -26,9 +26,16 @@ function shellQuote(part: string): string {
 
 const commandLine = (invocation: Invocation, ...rest: string[]) => [invocation.command, ...invocation.args, ...rest].map(shellQuote).join(' ')
 
-/** Ours: a command hook whose command runs Continuum's `ingest --agent codex`. */
+/** The program part of a command setup writes: this checkout's bin.ts, the release bundle, or the npm package. */
+const CONTINUUM_PROGRAM = /(^|[\\/'])packages[\\/]cli[\\/]src[\\/]bin\.ts'?$|(^|[\\/'])continuum\.js'?$|(^|[\\/@'])continuum(@[\w.-]+)?'?$/
+
+/** Ours: a command hook running Continuum's `ingest --agent codex` through a program setup would write. */
 function isOurHandler(handler: unknown): boolean {
-  return isObject(handler) && handler.type === 'command' && typeof handler.command === 'string' && handler.command.endsWith(INGEST_SUFFIX) && /continuum/.test(handler.command)
+  if (!isObject(handler) || handler.type !== 'command' || typeof handler.command !== 'string') return false
+  const { command } = handler
+  if (!command.endsWith(` ${INGEST_SUFFIX}`)) return false
+  const program = command.slice(0, -INGEST_SUFFIX.length).trim().split(/\s+/)
+  return program.some((part) => CONTINUUM_PROGRAM.test(part))
 }
 
 function ourHooks(invocation: Invocation): Record<string, Json[]> {
@@ -69,9 +76,13 @@ function mergeHooks(settings: Json, add: Record<string, Json[]>): Json {
 /** The config.toml text with our managed block replaced (or removed when `block` is null). */
 function withBlock(text: string, block: string | null): string {
   const start = text.indexOf(BLOCK_START)
-  const end = text.indexOf(BLOCK_END)
+  const end = text.indexOf(BLOCK_END, start)
+  if (start !== -1 && end === -1) {
+    throw new SetupError(`${CODEX_CONFIG_FILE} has the start of Continuum's block but not its end; restore or remove the block, then run setup again. Nothing was changed.`)
+  }
   const outside = start === -1 ? text : `${text.slice(0, start)}${text.slice(end + BLOCK_END.length)}`
-  if (/^\s*\[\s*mcp_servers\.continuum\s*\]/m.test(outside) || /^\s*\[\s*mcp_servers\.["']continuum["']\s*\]/m.test(outside)) {
+  // [mcp_servers.continuum], quoted keys, and subtables such as [mcp_servers.continuum.env] all define the same server.
+  if (/^\s*\[\s*mcp_servers\s*\.\s*["']?continuum["']?\s*(\.|\])/m.test(outside)) {
     throw new SetupError(`${CODEX_CONFIG_FILE} already has a "${MCP_SERVER_NAME}" server that Continuum did not write; rename or remove it, then run setup again. Nothing was changed.`)
   }
   const base = outside.replace(/\n{3,}/g, '\n\n').trim()
@@ -79,10 +90,12 @@ function withBlock(text: string, block: string | null): string {
   return `${base === '' ? '' : `${base}\n\n`}${block}\n`
 }
 
+/** A TOML basic string: JSON's escaping, plus DEL, which TOML (unlike JSON) does not allow raw. */
+const tomlString = (value: string) => JSON.stringify(value).replaceAll('\u007f', '\\u007F')
+
 function serverBlock(invocation: Invocation): string {
-  // JSON strings are valid TOML basic strings.
-  const args = [...invocation.args, 'mcp'].map((arg) => JSON.stringify(arg)).join(', ')
-  return [BLOCK_START, `[mcp_servers.${MCP_SERVER_NAME}]`, `command = ${JSON.stringify(invocation.command)}`, `args = [${args}]`, BLOCK_END].join('\n')
+  const args = [...invocation.args, 'mcp'].map(tomlString).join(', ')
+  return [BLOCK_START, `[mcp_servers.${MCP_SERVER_NAME}]`, `command = ${tomlString(invocation.command)}`, `args = [${args}]`, BLOCK_END].join('\n')
 }
 
 async function readText(path: string): Promise<string | null> {
