@@ -65,6 +65,36 @@ describe('extractSymbols for TypeScript', () => {
   })
 })
 
+describe('extractSymbols edge cases', () => {
+  const hashOf = (source: string, name: string) => extractSymbols('a.ts', source)?.find((symbol) => symbol.name === name)?.hash
+
+  it('covers every declaration of an overloaded function, so editing its implementation changes it', () => {
+    const source = 'export function f(a: string): void\nexport function f(a: number): void\nexport function f(a: unknown) {\n  return a\n}\n'
+    const symbols = extractSymbols('a.ts', source)
+    expect(symbols?.map((symbol) => [symbol.name, symbol.startLine, symbol.endLine])).toEqual([['f', 1, 5]])
+    expect(hashOf(source.replace('return a', 'return null'), 'f')).not.toBe(hashOf(source, 'f'))
+  })
+
+  it('treats a merged interface as one symbol', () => {
+    const source = 'interface I {\n  a: string\n}\n\ninterface I {\n  b: number\n}\n'
+    expect(hashOf(source.replace('b: number', 'b: string'), 'I')).not.toBe(hashOf(source, 'I'))
+  })
+
+  it('credits a multi-line decorator to the class it decorates, not the symbol before it', () => {
+    const source = 'export const before = 1\n\n@Component({\n  selector: "app",\n})\nexport class A {}\n'
+    const edited = source.replace('"app"', '"main"')
+    expect(extractSymbols('a.ts', source)?.find((symbol) => symbol.name === 'A')).toMatchObject({ startLine: 3, endLine: 6 })
+    expect(hashOf(edited, 'A')).not.toBe(hashOf(source, 'A'))
+    expect(hashOf(edited, 'before')).toBe(hashOf(source, 'before'))
+  })
+
+  it('names anonymous default exports "default", never "extends"', () => {
+    expect(extractSymbols('a.ts', 'export default class extends Base {}\n')?.map((symbol) => symbol.name)).toEqual(['default'])
+    expect(extractSymbols('a.ts', 'export const x = 1\nexport default function () {\n  return 2\n}\n')?.map((symbol) => symbol.name)).toEqual(['x', 'default'])
+    expect(extractSymbols('a.ts', 'export default class Named extends Base {}\n')?.map((symbol) => symbol.name)).toEqual(['Named'])
+  })
+})
+
 describe('extractSymbols for Python', () => {
   const PY = `import os
 

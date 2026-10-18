@@ -25,7 +25,7 @@ const SCRIPT_EXTENSIONS = /\.(?:[cm]?[jt]sx?)$/
 const PYTHON_EXTENSIONS = /\.pyi?$/
 
 const SCRIPT_DECLARATION =
-  /^(?:export\s+(?:default\s+)?)?(?:declare\s+)?(?:(?:async\s+)?function\*?\s+(?<function>[A-Za-z_$][\w$]*)|(?:abstract\s+)?class\s+(?<class>[A-Za-z_$][\w$]*)|interface\s+(?<interface>[A-Za-z_$][\w$]*)|type\s+(?<type>[A-Za-z_$][\w$]*)\s*[=<]|(?:const\s+)?enum\s+(?<enum>[A-Za-z_$][\w$]*)|(?:const|let|var)\s+(?<variable>[A-Za-z_$][\w$]*))/
+  /^(?:export\s+(?:default\s+)?)?(?:declare\s+)?(?:(?:async\s+)?function\*?\s+(?<function>[A-Za-z_$][\w$]*)|(?:abstract\s+)?class\s+(?!extends\b|implements\b)(?<class>[A-Za-z_$][\w$]*)|interface\s+(?<interface>[A-Za-z_$][\w$]*)|type\s+(?<type>[A-Za-z_$][\w$]*)\s*[=<]|(?:const\s+)?enum\s+(?<enum>[A-Za-z_$][\w$]*)|(?:const|let|var)\s+(?<variable>[A-Za-z_$][\w$]*))/
 const PYTHON_DECLARATION = /^(?:(?:async\s+)?def\s+(?<function>[A-Za-z_]\w*)|class\s+(?<class>[A-Za-z_]\w*)|(?<variable>[A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=))/
 
 /**
@@ -153,29 +153,57 @@ function pythonTopLevelLines(source: string): boolean[] | null {
   })
 }
 
-function declarationsAt(lines: readonly string[], topLevel: readonly boolean[], pattern: RegExp): { name: string; kind: SymbolKind; line: number }[] {
-  const found: { name: string; kind: SymbolKind; line: number }[] = []
+interface Declaration {
+  name: string
+  kind: SymbolKind
+  /** Where the declaration's own line is, and where it starts with its decorators and doc comment (0-based). */
+  line: number
+  start: number
+}
+
+/** `export default …` without a name (an anonymous function or class, an object) is the symbol `default`. */
+const ANONYMOUS_DEFAULT = /^export\s+default\b/
+
+/**
+ * Top-level declarations, each starting at its decorators or doc comment. A
+ * top-level `@decorator(…)` opens the next declaration however many lines its
+ * arguments take, so a decorator's text is never credited to the symbol before it.
+ */
+function declarationsAt(lines: readonly string[], topLevel: readonly boolean[], pattern: RegExp): Declaration[] {
+  const found: Declaration[] = []
+  let pendingStart: number | null = null
   lines.forEach((text, index) => {
     if (!topLevel[index]) return
+    if (text.startsWith('@')) {
+      pendingStart ??= index
+      return
+    }
     const groups = pattern.exec(text)?.groups
-    if (!groups) return
-    const kind = (Object.keys(groups) as SymbolKind[]).find((key) => groups[key] !== undefined)
-    if (kind) found.push({ name: groups[kind], kind, line: index })
+    const kind = groups ? (Object.keys(groups) as SymbolKind[]).find((key) => groups[key] !== undefined) : undefined
+    const declared = kind && groups ? { name: groups[kind], kind } : ANONYMOUS_DEFAULT.test(text) ? { name: 'default', kind: 'variable' as const } : null
+    if (!declared) {
+      if (text.trim() !== '' && !/^\s*(?:\/\/|\/\*|\*|#)/.test(text)) pendingStart = null
+      return
+    }
+    const floor = found.at(-1)?.line ?? -1
+    found.push({ ...declared, line: index, start: pendingStart ?? commentStart(lines, index, floor) })
+    pendingStart = null
   })
   return found
 }
 
-/** A declaration's decorators (Python) or doc comment belong to it: start where they start. */
-function startOf(lines: readonly string[], line: number, floor: number): number {
+/** A doc comment directly above a declaration belongs to it. */
+function commentStart(lines: readonly string[], line: number, floor: number): number {
   let start = line
-  while (start - 1 > floor && /^\s*(?:@|\/\/|\/\*|\*|#)/.test(lines[start - 1])) start -= 1
+  while (start - 1 > floor && /^\s*(?:\/\/|\/\*|\*|#)/.test(lines[start - 1])) start -= 1
   return start
 }
 
 /**
  * The top-level symbols of a file, or null when its language is not supported
- * or its structure cannot be read with confidence. Names that occur twice keep
- * only their first declaration (overloads in TypeScript come first).
+ * or its structure cannot be read with confidence. A name declared more than
+ * once (TypeScript overloads, merged interfaces) is one symbol covering every
+ * declaration, so editing any of them, the implementation included, changes it.
  */
 export function extractSymbols(path: string, source: string): SourceSymbol[] | null {
   const isPython = PYTHON_EXTENSIONS.test(path)
@@ -184,18 +212,17 @@ export function extractSymbols(path: string, source: string): SourceSymbol[] | n
   if (!topLevel) return null
   const lines = source.split('\n')
   const declarations = declarationsAt(lines, topLevel, isPython ? PYTHON_DECLARATION : SCRIPT_DECLARATION)
-  const seen = new Set<string>()
-  const symbols: SourceSymbol[] = []
-  declarations.forEach((declaration, index) => {
-    if (seen.has(declaration.name)) return
-    seen.add(declaration.name)
-    const previousEnd = index === 0 ? -1 : declarations[index - 1].line
-    const start = startOf(lines, declaration.line, previousEnd)
-    const nextStart = index + 1 < declarations.length ? startOf(lines, declarations[index + 1].line, declaration.line) : lines.length
-    let end = nextStart - 1
+  const spans = declarations.map((declaration, index) => {
+    let end = (declarations[index + 1]?.start ?? lines.length) - 1
     while (end > declaration.line && lines[end].trim() === '') end -= 1
-    symbols.push({ name: declaration.name, kind: declaration.kind, startLine: start + 1, endLine: end + 1, hash: hashText(lines.slice(start, end + 1).join('\n')) })
+    return { ...declaration, end }
   })
+  const symbols: SourceSymbol[] = []
+  for (const name of [...new Set(spans.map((span) => span.name))]) {
+    const parts = spans.filter((span) => span.name === name)
+    const text = parts.map((part) => lines.slice(part.start, part.end + 1).join('\n')).join('\n')
+    symbols.push({ name, kind: parts[0].kind, startLine: parts[0].start + 1, endLine: (parts.at(-1)?.end ?? parts[0].end) + 1, hash: hashText(text) })
+  }
   return symbols
 }
 

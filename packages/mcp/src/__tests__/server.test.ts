@@ -158,6 +158,12 @@ describe('decisions anchored to a symbol', () => {
     expect(afterLogin).toContain('(anchored code changed since: `src/auth.ts#login`)')
   })
 
+  it('treats an existing file whose name contains # as a file', async () => {
+    const repo = await initializedRepo({ 'docs/a#b.md': 'notes', 'src/auth.ts': AUTH })
+    const client = await connect(repo.root)
+    expect((await client.callTool({ name: 'record_decision', arguments: { title: 'Docs layout', files: ['docs/a#b.md'] } })).isError).toBeFalsy()
+  })
+
   it('names the symbols that do exist when asked for one that does not', async () => {
     const repo = await initializedRepo({ 'src/auth.ts': AUTH })
     const client = await connect(repo.root)

@@ -74,10 +74,14 @@ const MAX_SUGGESTED_SYMBOLS = 20
  * instead, so the note goes stale only when that symbol changes.
  */
 async function anchorsFor(root: string, cwd: string, entries: readonly string[]): Promise<Record<IdentityKey, ContentHash>> {
-  const refs = entries.map((entry) => {
-    const symbol = parseSymbolRef(entry)
-    return { path: normalizePath(relative(root, resolve(cwd, symbol?.path ?? entry))), symbol: symbol?.name ?? null }
-  })
+  const toPath = (file: string) => normalizePath(relative(root, resolve(cwd, file)))
+  const refs = await Promise.all(
+    entries.map(async (entry) => {
+      // A file whose name contains # (docs/a#b.md) is a file, not a symbol reference.
+      const symbol = (await isRegularFileInRepo(root, toPath(entry))) ? null : parseSymbolRef(entry)
+      return { path: toPath(symbol?.path ?? entry), symbol: symbol?.name ?? null }
+    }),
+  )
   const paths = [...new Set(refs.map((ref) => ref.path))]
   const outside = paths.filter((path) => path === '' || path.startsWith('../') || isAbsolute(path))
   if (outside.length > 0) throw new ToolInputError(`Files must be inside the repository: ${outside.join(', ')}`)
