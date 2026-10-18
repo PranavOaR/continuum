@@ -2,7 +2,7 @@
 // Exercises the release package the way a user gets it: `npm pack`, install the
 // tarball into a scratch project, then drive the installed `continuum` binary
 // against a fresh git repository. Run after `npm run bundle`.
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -26,7 +26,15 @@ function check(name, condition, detail = '') {
 const ENV = { ...process.env, CONTINUUM_CONFIG_DIR: join(scratch, 'config') }
 const run = (command, args, cwd, input) => execFileSync(command, args, { cwd, input, env: ENV, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
 
+/** npm silently rewrites fields it considers invalid at publish (once, a bin path, with a warning saying it was removed). */
+function publishesUnchanged() {
+  const dryRun = spawnSync('npm', ['publish', '--dry-run', '--access', 'public', '--loglevel', 'warn'], { cwd: RELEASE, env: ENV, encoding: 'utf8' })
+  const output = `${dryRun.stdout}${dryRun.stderr}`
+  check('npm publishes package.json without correcting it', !/auto-corrected|errors corrected/.test(output), output.split('\n').filter((line) => /corrected|invalid|removed/.test(line)).join(' | '))
+}
+
 function packAndInstall() {
+  publishesUnchanged()
   const tarball = join(scratch, run('npm', ['pack', '--silent', '--pack-destination', scratch], RELEASE).trim().split('\n').at(-1))
   check('tarball is under 5 MiB', statSync(tarball).size < MAX_TARBALL_BYTES, `${statSync(tarball).size} bytes`)
   const project = join(scratch, 'install')
