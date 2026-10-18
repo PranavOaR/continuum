@@ -62,6 +62,24 @@ describe('setupCodex', () => {
     expect(existsSync(join(root, CODEX_HOOKS_FILE))).toBe(false)
   })
 
+  it("leaves a user's hook alone even when its path mentions continuum", async () => {
+    const { root } = repo()
+    const theirs = { type: 'command', command: '/home/u/continuum-scripts/log.sh ingest --agent codex' }
+    write(root, CODEX_HOOKS_FILE, JSON.stringify({ hooks: { Stop: [{ hooks: [theirs] }] } }))
+    await setupCodex(root, CHECKOUT)
+    await removeCodexSetup(root)
+    expect(JSON.parse(read(root, CODEX_HOOKS_FILE)).hooks.Stop).toEqual([{ hooks: [theirs] }])
+  })
+
+  it('refuses a continuum server defined through a subtable, and a half-removed block', async () => {
+    const sub = repo()
+    write(sub.root, CODEX_CONFIG_FILE, '[mcp_servers.continuum.env]\nKEY = "x"\n')
+    await expect(setupCodex(sub.root, NPX)).rejects.toThrow(/did not write/)
+    const broken = repo()
+    write(broken.root, CODEX_CONFIG_FILE, '# >>> continuum: managed by `continuum setup codex`; do not edit inside >>>\n[mcp_servers.continuum]\n')
+    await expect(setupCodex(broken.root, NPX)).rejects.toThrow(/not its end/)
+  })
+
   it('removes exactly what it added', async () => {
     const { root } = repo()
     write(root, CODEX_CONFIG_FILE, 'model = "gpt-5.6-luna"\n')
