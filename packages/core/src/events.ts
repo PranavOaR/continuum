@@ -1,5 +1,5 @@
 import type { IdentityKey, ContentHash } from './evidenceRules'
-import type { AgentType, ChangeType, EvidenceType, MemoryKind } from './types'
+import type { AgentType, ChangeType, EvidenceType, MemoryKind, TaskField } from './types'
 
 /**
  * Immutable facts appended to a workspace's event log. Every adapter, watcher
@@ -67,6 +67,8 @@ export type TaskUpsertedEvent = EventBase<
     acceptanceCriteria?: RecordedCriterion[]
     completedSteps?: string[]
     remainingSteps?: string[]
+    /** Dashboard edits only: the fields you changed. Only these carry your label; the rest stays the agent's. */
+    editedFields?: TaskField[]
   }
 >
 

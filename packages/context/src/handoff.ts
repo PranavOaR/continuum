@@ -67,7 +67,8 @@ function recent(label: string, steps: readonly string[]): string[] {
 }
 
 function describeTask(task: TaskSummary): string[] {
-  const lines = [`${task.reportedBy === 'user-reported' ? '[set by you]' : '[agent-reported]'} ${quote(task.title, 200)} (${task.status})`]
+  const lines = [`[agent-reported] ${quote(task.title, 200)} (${task.status})`]
+  if (task.userEdited.length > 0) lines.push(`[set by you] Changed in the dashboard: ${task.userEdited.map((field) => FIELD_LABEL[field]).join(', ')}`)
   if (task.objective) lines.push(`Objective: ${quote(task.objective)}`)
   if (task.nextAction) lines.push(`Next action: ${quote(task.nextAction)}`)
   if (task.acceptanceCriteria.length > 0) {
@@ -101,6 +102,13 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
     lines.push(`Files it changed: ${files.length > MAX_LISTED ? `${shown} and ${files.length - MAX_LISTED} more` : shown}`)
   }
   return [...lines, ...commitLines(state, now)]
+}
+
+const FIELD_LABEL: Record<TaskSummary['userEdited'][number], string> = {
+  status: 'status',
+  nextAction: 'next action',
+  steps: 'steps done',
+  criteria: 'acceptance criteria met',
 }
 
 function describeCheck(check: CheckSummary, now: Date): string {

@@ -81,17 +81,27 @@ export interface ServeOptions {
   webDist?: string
   /** Reuse an access token, so a restarted server keeps open dashboards signed in. */
   token?: string
+  /** Reuse the CSRF token too, so pages opened before a restart can still save edits. */
+  csrfToken?: string
   /** When given, the server exits with RESTART_EXIT as soon as this value changes. */
   codeFingerprint?: () => string
   updatePollMs?: number
 }
 
-/** Resolves once the code the server runs from has changed. */
+/**
+ * Resolves once the code the server runs from has changed and then stayed the
+ * same for a poll: a `git pull` writes many files, and restarting halfway
+ * through would load a half-updated tree.
+ */
 function untilCodeChanges(fingerprint: () => string, pollMs: number, signal: AbortSignal): Promise<void> {
   const initial = fingerprint()
+  let previous = initial
   return new Promise((done) => {
     const timer = setInterval(() => {
-      if (fingerprint() === initial) return
+      const current = fingerprint()
+      const settled = current !== initial && current === previous
+      previous = current
+      if (!settled) return
       clearInterval(timer)
       done()
     }, pollMs)
@@ -128,6 +138,7 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
     service,
     version,
     token: options.token ?? createAccessToken(),
+    ...(options.csrfToken ? { csrfToken: options.csrfToken } : {}),
     port: parsed.port,
     changes,
     ...(hasDashboard ? { staticDir: webDist } : {}),

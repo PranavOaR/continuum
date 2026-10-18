@@ -69,6 +69,8 @@ describe('redactSecrets, stronger rules', () => {
       'const csrfToken = options.csrfToken ?? createAccessToken()',
       'password = process.env.DB_PASSWORD',
       "export const TOKEN_ENV = 'CONTINUUM_SERVE_TOKEN'",
+      'const SECRETS_TIMEOUT_MS = 10_000',
+      'const secrets: WorkerSecrets = { token: createAccessToken() }',
     ].join('\n')
     expect(redactSecrets(ordinary)).toBe(ordinary)
   })
@@ -119,6 +121,7 @@ describe('redactSecrets robustness', () => {
     ['a JSON password', `{"password":"${VALUE}"}`, '{"password":"[redacted]"}'],
     ['a JSON client secret', `{"client_secret": "${VALUE}"}`, '{"client_secret": "[redacted]"}'],
     ['pass=', `pass=${VALUE}`, 'pass=[redacted]'],
+    ['a dotted unquoted password', 'password=hunter.prod.x', 'password=[redacted]'],
     ['a quoted lowercase snake-case password', `password: 'correct_horse_battery'`, "password: '[redacted]'"],
     ['curl -u', `curl -u admin:${VALUE} https://example.com`, 'curl -u admin:[redacted] https://example.com'],
     ['a raw Authorization header', `Authorization: ${VALUE}x9`, 'Authorization: [redacted]'],

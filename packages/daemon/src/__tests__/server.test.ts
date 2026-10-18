@@ -30,7 +30,7 @@ const fakeService: ContinuumService = {
   updateTask: async (projectId, taskId, change) => {
     if (taskId === 'missing') throw new NotFoundError('Task', taskId)
     edits.push({ projectId, taskId, change })
-    return { id: taskId, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', reportedBy: 'user-reported' }
+    return { id: taskId, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', userEdited: ['status'] }
   },
 }
 const edits: unknown[] = []
@@ -217,7 +217,7 @@ describe('task edits', () => {
     edits.length = 0
     const result = await post(daemon, path, blocked, browser(daemon))
     expect(result.status).toBe(200)
-    expect(JSON.parse(result.body).data.reportedBy).toBe('user-reported')
+    expect(JSON.parse(result.body).data.userEdited).toEqual(['status'])
     expect(edits).toEqual([{ projectId: 'acme', taskId: 'auth-1', change: { kind: 'status', status: 'blocked' } }])
   })
 

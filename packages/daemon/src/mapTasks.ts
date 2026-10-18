@@ -31,7 +31,7 @@ export function toTask(snapshot: RepoSnapshot, task: TaskSummary): ProjectTask {
       id: `${task.id}~criterion~${index}`,
       text: criterion.text,
       status: criterion.met ? 'complete' : 'incomplete',
-      evidence: CRITERION_EVIDENCE[task.reportedBy],
+      evidence: CRITERION_EVIDENCE[task.userEdited.includes('criteria') ? 'user-reported' : 'agent-reported'],
     })),
     completedSteps: task.completedSteps,
     remainingSteps: task.remainingSteps,
@@ -39,7 +39,7 @@ export function toTask(snapshot: RepoSnapshot, task: TaskSummary): ProjectTask {
     relatedFileIds: files.map((path) => ids.file(snapshot.projectId, path)),
     verificationIds: checksCovering(snapshot, files),
     updatedAt: task.updatedAt,
-    reportedBy: task.reportedBy,
+    ...(task.userEdited.length > 0 ? { userEdited: task.userEdited } : {}),
   }
 }
 

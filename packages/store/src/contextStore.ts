@@ -375,6 +375,10 @@ export class ContextStore implements Mutations {
     return this.graphIndex.has(key)
   }
 
+  getNode(key: IdentityKey): GraphNode | undefined {
+    return this.graphIndex.get(key)
+  }
+
   upsertNode(key: IdentityKey, input: UpsertInput): void {
     const before = this.graphIndex.get(key)?.history.length ?? 0
     this.graphIndex.upsert(key, input)

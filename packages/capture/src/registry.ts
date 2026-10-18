@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -45,13 +45,28 @@ async function writeRegistry(configDir: string, repositories: RegisteredReposito
   await rename(temporary, path)
 }
 
-export async function registerRepository(configDir: string, root: string, at: Date): Promise<void> {
+/** The same repository reached through a symlink or /private on macOS is one entry, not two. */
+function canonical(root: string): string {
+  try {
+    return realpathSync(root)
+  } catch {
+    return root
+  }
+}
+
+/**
+ * Adds a repository. Two setups at the same moment can race (last writer wins);
+ * the cost is a missing entry that the next setup or doctor run adds back.
+ */
+export async function registerRepository(configDir: string, repository: string, at: Date): Promise<void> {
+  const root = canonical(repository)
   const repositories = await readRegistry(configDir)
   if (repositories.some((entry) => entry.root === root)) return
   await writeRegistry(configDir, [...repositories, { root, addedAt: at.toISOString() }])
 }
 
-export async function unregisterRepository(configDir: string, root: string): Promise<boolean> {
+export async function unregisterRepository(configDir: string, repository: string): Promise<boolean> {
+  const root = canonical(repository)
   const repositories = await readRegistry(configDir)
   const kept = repositories.filter((entry) => entry.root !== root)
   if (kept.length === repositories.length) return false

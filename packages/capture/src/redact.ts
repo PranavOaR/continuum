@@ -16,11 +16,17 @@ const MIN_VALUE_LENGTH = 6
 /** Type names and literals that follow `token:` in code rather than a credential. */
 const CODE_WORDS = 'string|number|boolean|unknown|undefined|null|true|false|never|any|void|object|bigint|symbol|readonly'
 
+/** `SECRETS_TIMEOUT_MS = 10_000`: a number is a setting, not a secret. */
+const NUMBER = String.raw`[\d_.]+`
+
 /** 'GITHUB_TOKEN' in quotes is the name of a variable holding a secret, not the secret. */
 const ENV_NAME = /^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+$/
 
-/** `options.token`, `process.env.API_KEY`: code that refers to a secret, not the secret. */
-const PROPERTY_PATH = String.raw`[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+(?![\w$.-])`
+/**
+ * `options.token`, `process.env.API_KEY`: code that refers to a secret, not the secret. Only
+ * well-known roots qualify, so a dotted secret (`password=hunter.prod.x`) is still masked.
+ */
+const PROPERTY_PATH = String.raw`(?:process\.env|import\.meta\.env|env|options|opts|config|cfg|settings|props|this|args|params|ctx|context|req|request|secrets|vault)(?:\.[A-Za-z_$][\w$]*)+(?![\w$.-])`
 
 /** Random-looking strings at least this long are treated as secrets. */
 const MIN_ENTROPY_LENGTH = 32
@@ -57,11 +63,11 @@ const RULES: readonly Rule[] = [
   // NAME="value" and name: 'value' in configs and shells
   [new RegExp(String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(["'])(?!\[redacted\])[^"'\n]{${MIN_VALUE_LENGTH},}\3`, 'gi'), `$1$2$3${REDACTED}$3`, quotesVariableName],
   // NAME=value and name: value, unquoted. Code is left alone: comparisons (===), type annotations
-  // (token: string), short values (TOKEN_BYTES = 24), calls (apiToken = link.get('token')) and
-  // property paths (password = process.env.DB_PASSWORD).
+  // (token: string, secrets: Secrets = …), numbers (TIMEOUT_MS = 10_000), calls
+  // (apiToken = link.get('token')) and property paths (password = process.env.DB_PASSWORD).
   [
     new RegExp(
-      String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(?!\[redacted\])(?!(?:${CODE_WORDS})\b)(?!${PROPERTY_PATH})[^\s"'()\[\]{},;<>]{${MIN_VALUE_LENGTH},}(?![^\s"'()\[\]{},;<>]*\()`,
+      String.raw`\b(${SECRET_NAME}["']?)(\s*(?:=(?!=)|:)\s*)(?!\[redacted\])(?!(?:${CODE_WORDS})\b)(?!${PROPERTY_PATH})(?!${NUMBER}(?![^\s"'()\[\]{},;<>]))[^\s"'()\[\]{},;<>]{${MIN_VALUE_LENGTH},}(?![^\s"'()\[\]{},;<>]*\s*(?:\(|=(?!=)))`,
       'gi',
     ),
     `$1$2${REDACTED}`,

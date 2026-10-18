@@ -68,7 +68,7 @@ describe('ContextStore projection', () => {
       acceptanceCriteria: [],
       completedSteps: ['tests'],
       remainingSteps: [],
-      reportedBy: 'agent-reported',
+      userEdited: [],
     })
     store.close()
   })

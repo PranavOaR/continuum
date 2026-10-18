@@ -5,7 +5,8 @@ import { useToast } from '../state/toasts'
 import { invalidateQueries } from './useServiceQuery'
 
 export interface TaskEditor {
-  apply: (change: TaskChange) => Promise<void>
+  /** Resolves true once saved; false when the save failed (already reported to the user). */
+  apply: (change: TaskChange) => Promise<boolean>
   isSaving: boolean
 }
 
@@ -18,8 +19,10 @@ export function useTaskEditor(projectId: string, taskId: string): TaskEditor {
     try {
       await continuumService.updateTask(projectId, taskId, change)
       invalidateQueries()
+      return true
     } catch (error) {
       notify(error instanceof Error ? `Could not save: ${error.message}` : 'Could not save the change.', 'error')
+      return false
     } finally {
       setSaving(false)
     }

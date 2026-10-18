@@ -1,6 +1,6 @@
 import { ArrowRightLeft, CircleCheck, CircleDashed, Compass, Pencil } from 'lucide-react'
 import { useState } from 'react'
-import type { ProjectTask, TaskStatus, VerificationRecord, VerificationStatus } from '@continuum/core'
+import type { ProjectTask, TaskField, TaskStatus, VerificationRecord, VerificationStatus } from '@continuum/core'
 import { cn } from '../../utils/cn'
 import { PROJECT_STATUS_LABEL, VERIFICATION_LABEL } from '@continuum/core'
 import { useTaskEditor, type TaskEditor } from '../../hooks/useTaskEditor'
@@ -12,6 +12,7 @@ import { CriterionBadge, EvidenceBadge, TaskStatusBadge } from '../shared/Status
 import { ProgressBar } from './ProjectCard'
 
 const TASK_STATUSES: TaskStatus[] = ['planned', 'in-progress', 'blocked', 'completed']
+const FIELD_LABEL: Record<TaskField, string> = { status: 'status', nextAction: 'next action', steps: 'steps', criteria: 'acceptance criteria' }
 /** Matches the daemon's limit on a next action. */
 const MAX_NEXT_ACTION_CHARS = 500
 
@@ -83,8 +84,8 @@ function NextActionEditor({ task, editor }: { task: ProjectTask; editor: TaskEdi
     )
   }
   const save = async () => {
-    await editor.apply({ kind: 'next-action', nextAction: draft.trim() === '' ? null : draft })
-    setDraft(null)
+    // Keep what was typed if the save failed, so nothing is lost.
+    if (await editor.apply({ kind: 'next-action', nextAction: draft.trim() === '' ? null : draft })) setDraft(null)
   }
   return (
     <form
@@ -163,8 +164,14 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-[22px] font-normal tracking-[-0.02em] text-fg">{task.title}</h3>
             <TaskStatusBadge status={task.status} />
-            {task.reportedBy && <EvidenceBadge type={task.reportedBy} />}
+            <EvidenceBadge type="agent-reported" />
           </div>
+          {task.userEdited && task.userEdited.length > 0 && (
+            <p className="mt-1.5 flex items-center gap-2 text-[12px] text-muted">
+              <EvidenceBadge type="user-reported" />
+              <span>Changed by you: {task.userEdited.map((field) => FIELD_LABEL[field]).join(', ')}</span>
+            </p>
+          )}
           {editor && (
             <div className="mt-3 w-48">
               <SelectField
@@ -212,7 +219,7 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
                         type="checkbox"
                         checked={criterion.status === 'complete'}
                         disabled={editor.isSaving}
-                        onChange={(event) => void editor.apply({ kind: 'criterion', index, met: event.target.checked })}
+                        onChange={(event) => void editor.apply({ kind: 'criterion', index, text: criterion.text, met: event.target.checked })}
                       />
                       Met
                     </label>
@@ -244,7 +251,8 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
             </div>
           </div>
         )}
-        {editor && <NextActionEditor key={`${task.id}:${task.nextAction ?? ''}`} task={task} editor={editor} />}
+        {/* Keyed by task only: a live refresh (an agent changing the next action) must not wipe what you are typing. */}
+        {editor && <NextActionEditor key={task.id} task={task} editor={editor} />}
       </div>
     </Panel>
   )

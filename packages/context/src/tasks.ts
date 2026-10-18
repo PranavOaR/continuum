@@ -1,4 +1,4 @@
-import type { RecordedCriterion, TaskChange, TaskUpsertedEvent } from '@continuum/core'
+import type { RecordedCriterion, TaskChange, TaskField, TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore, GraphNode } from '@continuum/store'
 
 export type TaskStatus = 'planned' | 'in-progress' | 'blocked' | 'completed'
@@ -6,6 +6,13 @@ const ACTIVE: ReadonlySet<string> = new Set(['in-progress', 'blocked'])
 /** A task nobody has touched for this long is no longer "current": new work is not attributed to it. */
 export const STALE_TASK_MS = 14 * 24 * 60 * 60 * 1000
 const STATUSES: ReadonlySet<string> = new Set(['planned', 'in-progress', 'blocked', 'completed'])
+const TASK_FIELDS: ReadonlySet<string> = new Set(['status', 'nextAction', 'steps', 'criteria'])
+
+/** Removes one occurrence, so two steps that happen to share a name stay two steps. */
+function withoutOne(steps: readonly string[], step: string): string[] {
+  const index = steps.indexOf(step)
+  return index === -1 ? [...steps] : [...steps.slice(0, index), ...steps.slice(index + 1)]
+}
 
 export interface TaskSummary {
   id: string
@@ -19,8 +26,8 @@ export interface TaskSummary {
   /** Repository-relative paths edited while this task was current. */
   files: string[]
   updatedAt: string
-  /** Who set the current state: an agent through MCP, or the person in the dashboard. */
-  reportedBy: 'agent-reported' | 'user-reported'
+  /** Fields you changed in the dashboard since the agent last reported the task. */
+  userEdited: TaskField[]
 }
 
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [])
@@ -82,7 +89,7 @@ export function summarizeTask(store: ContextStore, node: GraphNode): TaskSummary
       .map((key) => key.slice('file:'.length))
       .sort(),
     updatedAt: node.updatedAt,
-    reportedBy: node.props.reportedBy === 'user-reported' ? 'user-reported' : 'agent-reported',
+    userEdited: strings(node.props.userEdited).filter((field): field is TaskField => TASK_FIELDS.has(field)),
   }
 }
 
@@ -111,25 +118,34 @@ export function applyTaskChange(task: TaskSummary, change: TaskChange): TaskUpse
   switch (change.kind) {
     case 'status':
       if (!STATUSES.has(change.status)) throw new InvalidTaskChangeError(`Unknown status "${String(change.status)}".`)
-      return { ...base, status: change.status }
+      return { ...base, status: change.status, editedFields: ['status'] }
     case 'next-action': {
       const next = change.nextAction?.trim() ?? ''
       if (next.length > MAX_NEXT_ACTION_CHARS) throw new InvalidTaskChangeError(`The next action is longer than ${MAX_NEXT_ACTION_CHARS} characters.`)
       const { nextAction: _previous, ...rest } = base
-      return next === '' ? rest : { ...rest, nextAction: next }
+      return next === '' ? { ...rest, editedFields: ['nextAction'] } : { ...rest, nextAction: next, editedFields: ['nextAction'] }
     }
     case 'step': {
-      const known = task.completedSteps.includes(change.step) || task.remainingSteps.includes(change.step)
-      if (!known) throw new InvalidTaskChangeError(`"${change.step}" is not a step of this task.`)
-      const completed = task.completedSteps.filter((step) => step !== change.step)
-      const remaining = task.remainingSteps.filter((step) => step !== change.step)
+      // Move one step between the lists; asking for the state it is already in changes nothing.
+      const from = change.done ? task.remainingSteps : task.completedSteps
+      if (!from.includes(change.step)) {
+        const known = task.completedSteps.includes(change.step) || task.remainingSteps.includes(change.step)
+        if (!known) throw new InvalidTaskChangeError(`"${change.step}" is not a step of this task.`)
+        return { ...base, editedFields: ['steps'] }
+      }
       return change.done
-        ? { ...base, completedSteps: [...completed, change.step], remainingSteps: remaining }
-        : { ...base, completedSteps: completed, remainingSteps: [...remaining, change.step] }
+        ? { ...base, completedSteps: [...task.completedSteps, change.step], remainingSteps: withoutOne(task.remainingSteps, change.step), editedFields: ['steps'] }
+        : { ...base, completedSteps: withoutOne(task.completedSteps, change.step), remainingSteps: [...task.remainingSteps, change.step], editedFields: ['steps'] }
     }
     case 'criterion': {
-      if (!Number.isInteger(change.index) || !task.acceptanceCriteria[change.index]) throw new InvalidTaskChangeError('No such acceptance criterion.')
-      return { ...base, acceptanceCriteria: task.acceptanceCriteria.map((criterion, index) => (index === change.index ? { ...criterion, met: change.met } : criterion)) }
+      const target = Number.isInteger(change.index) ? task.acceptanceCriteria[change.index] : undefined
+      if (!target) throw new InvalidTaskChangeError('No such acceptance criterion.')
+      if (target.text !== change.text) throw new InvalidTaskChangeError('The acceptance criteria changed since the page loaded; reload and try again.')
+      return {
+        ...base,
+        acceptanceCriteria: task.acceptanceCriteria.map((criterion, index) => (index === change.index ? { ...criterion, met: change.met } : criterion)),
+        editedFields: ['criteria'],
+      }
     }
   }
 }

@@ -253,7 +253,9 @@ function parseTaskChange(body: unknown): TaskChange | null {
     case 'step':
       return typeof value.step === 'string' && typeof value.done === 'boolean' ? { kind: 'step', step: value.step, done: value.done } : null
     case 'criterion':
-      return Number.isInteger(value.index) && typeof value.met === 'boolean' ? { kind: 'criterion', index: value.index as number, met: value.met } : null
+      return Number.isInteger(value.index) && typeof value.text === 'string' && typeof value.met === 'boolean'
+        ? { kind: 'criterion', index: value.index as number, text: value.text, met: value.met }
+        : null
     default:
       return null
   }

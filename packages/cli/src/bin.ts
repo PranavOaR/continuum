@@ -27,6 +27,8 @@ const controller = new AbortController()
 const FORCE_EXIT_AFTER = 3
 const SIGNAL_EXIT_CODE = 130
 let interrupts = 0
+// A worker whose supervisor is gone (even killed outright) stops instead of holding the port as an orphan.
+if (process.env[WORKER_ENV] === '1') process.once('disconnect', () => controller.abort())
 if (!supervise && handlesInterrupts(argv)) {
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, () => {
@@ -48,3 +50,6 @@ process.exitCode = supervise
       readStdin,
       configDir: defaultConfigDir(),
     })
+
+// The IPC channel to the supervisor would otherwise keep a finished worker alive, and its restart would never come.
+if (process.connected) process.disconnect()

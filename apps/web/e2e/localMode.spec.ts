@@ -167,12 +167,14 @@ test('edits a task from the dashboard and records it as set by you', async ({ pa
   await panel.getByRole('button', { name: 'Mark "Validate" as done' }).click()
   await expect(panel.getByRole('button', { name: 'Mark "Validate" as not done' })).toBeVisible()
   await panel.getByLabel('Status').selectOption('blocked')
-  await expect(panel.getByText('Set by you', { exact: true })).toBeVisible()
+  await expect(panel.getByText('Changed by you: status, steps')).toBeVisible()
 
   // Saved in the repository's store, not just on screen.
   await page.reload()
   await expect(page.locator('#task').getByLabel('Status')).toHaveValue('blocked')
-  expect(continuum(['handoff'])).toContain('[set by you] "Load config from env" (blocked)')
+  const handoff = continuum(['handoff'])
+  expect(handoff).toContain('[agent-reported] "Load config from env" (blocked)')
+  expect(handoff).toContain('[set by you] Changed in the dashboard: status, steps done')
 })
 
 test('a project without tasks offers its briefing, and Prepare Handoff says why it is unavailable', async ({ page }) => {
