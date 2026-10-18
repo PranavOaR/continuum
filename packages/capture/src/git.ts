@@ -29,6 +29,8 @@ export interface WorkingTree {
   root: string
   revision: string | null
   files: ReadonlyMap<string, ContentHash>
+  /** Current hashes of anchored symbols (`symbol:path#name`), when the caller asked for them. */
+  symbols?: ReadonlyMap<string, ContentHash>
 }
 
 /** Runs git without a shell, so paths are never interpreted. */

@@ -14,6 +14,7 @@ import { keys, type ContextStore, type GraphNode } from '@continuum/store'
 import { currentTaskId, taskSummaries, type TaskSummary } from './tasks'
 
 const FILE_PREFIX = 'file:'
+const SYMBOL_PREFIX = 'symbol:'
 
 export interface SessionSummary {
   id: string
@@ -96,13 +97,19 @@ function recentCommits(store: ContextStore): CommitSummary[] {
 }
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null)
-const pathOf = (key: IdentityKey) => (key.startsWith(FILE_PREFIX) ? key.slice(FILE_PREFIX.length) : key)
+/** `file:src/a.ts` → `src/a.ts`; `symbol:src/a.ts#login` → `src/a.ts#login`. */
+const pathOf = (key: IdentityKey) =>
+  key.startsWith(FILE_PREFIX) ? key.slice(FILE_PREFIX.length) : key.startsWith(SYMBOL_PREFIX) ? key.slice(SYMBOL_PREFIX.length) : key
 
 /** Graph hashes with file hashes replaced by the live working tree, so evidence is judged against what is on disk now. */
+/**
+ * Hashes as they are now: files from the working tree, anchored symbols from
+ * their current source (missing means changed), everything else as recorded.
+ */
 export function liveHashes(store: ContextStore, tree: WorkingTree): CurrentHashes {
-  const nonFiles = [...store.graph.currentHashes()].filter(([key]) => !key.startsWith(FILE_PREFIX))
+  const recorded = [...store.graph.currentHashes()].filter(([key]) => !key.startsWith(FILE_PREFIX) && !key.startsWith(SYMBOL_PREFIX))
   const files = [...tree.files].map(([path, hash]) => [keys.file(path), hash] as const)
-  return new Map([...nonFiles, ...files])
+  return new Map([...recorded, ...files, ...(tree.symbols ?? [])])
 }
 
 function nodesOfKind(store: ContextStore, kind: 'session' | 'check' | 'memory'): GraphNode[] {

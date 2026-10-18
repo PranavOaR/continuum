@@ -148,3 +148,17 @@ describe('forget, hardened', () => {
     expect(rawBytes(path)).not.toContain('private hostname')
   })
 })
+
+describe('forgetPath and symbols', () => {
+  it('also removes decisions anchored to symbols inside the forgotten file', () => {
+    const { path, store } = fileStore()
+    store.record(on(1, ev.file(SECRET, 'h-1')))
+    store.record(on(2, ev.memory('plan', { [`symbol:${SECRET}#pricing`]: 'h-sym', 'file:src/app.ts': 'h-app' })))
+    store.rewriteHistory(forgetPath(SECRET))
+    store.vacuum()
+    expect(store.graph.get('memory:plan')?.props.anchors).toEqual({ 'file:src/app.ts': 'h-app' })
+    expect(store.graph.has(`symbol:${SECRET}#pricing`)).toBe(false)
+    store.close()
+    expect(rawBytes(path)).not.toContain(SECRET)
+  })
+})
