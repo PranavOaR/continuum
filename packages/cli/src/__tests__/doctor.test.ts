@@ -110,3 +110,14 @@ describe('continuum doctor', () => {
     expect((await cli(repo.root, ['doctor'])).code).toBe(EXIT_OK)
   })
 })
+
+describe('continuum doctor with Codex', () => {
+  it('passes a repository connected only to Codex', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'codex'])
+    const findings = await doctor(repo.root)
+    expect(findings.filter((finding) => finding.status === 'fail')).toEqual([])
+    expect(find(findings, /Codex hooks registered/)?.status).toBe('ok')
+    expect(find(findings, /Claude Code not connected/)?.status).toBe('ok')
+  })
+})

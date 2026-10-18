@@ -85,7 +85,7 @@ describe('ingestHook', () => {
     const { repo } = await initialized()
     repo.write('dist/out.js', 'built')
     const ignored = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: join(repo.root, 'dist/out.js') } }))
-    expect(ignored).toEqual({ status: 'ignored', reason: 'edited file is outside what Continuum captures' })
+    expect(ignored).toEqual({ status: 'ignored', reason: 'edited files are outside what Continuum captures' })
     const outside = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: '/etc/hosts' } }))
     expect(outside.status).toBe('ignored')
     symlinkSync('/etc/hosts', join(repo.root, 'hosts-link'))
@@ -260,5 +260,41 @@ describe('changes outside agent sessions', () => {
     const section = context.slice(context.indexOf('## Changed outside agent sessions'))
     expect(section).toContain('- modified `about.html`')
     expect(section).not.toContain('src/a.ts')
+  })
+})
+
+describe('ingestHook for Codex', () => {
+  // Shapes captured from a real Codex session (codex-cli 0.149).
+  const patch = (root: string) =>
+    ['*** Begin Patch', `*** Update File: ${join(root, 'src/a.ts')}`, '@@', '-a', '+a2', `*** Add File: ${join(root, 'notes.txt')}`, '+done', `*** Delete File: ${join(root, 'old.ts')}`, '*** End Patch'].join('\n')
+
+  it('records every file an apply_patch touched, as a Codex session', async () => {
+    const { repo, storePath } = await initialized({ 'src/a.ts': 'a', 'old.ts': 'old' })
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'codex-1'), { now: () => NOW, agent: 'codex' })
+    repo.write('src/a.ts', 'a2')
+    repo.write('notes.txt', 'done')
+    repo.remove('old.ts')
+    const outcome = await ingestHook(
+      hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_input: { command: patch(repo.root) }, tool_response: 'Exit code: 0\nSuccess.' }, 'codex-1'),
+      { now: () => NOW, agent: 'codex' },
+    )
+    expect(outcome).toEqual({ status: 'recorded', events: 3 })
+    withStore(storePath, (store) => {
+      expect(store.graph.get('session:codex-1')?.props.agent).toBe('codex')
+      const changes = store.recentEvents(3).map(({ event }) => event).filter((event) => event.type === 'file.changed')
+      expect(changes.map((event) => [event.payload.path, event.payload.changeType, event.source])).toEqual(
+        expect.arrayContaining([
+          ['src/a.ts', 'modified', 'adapter:codex'],
+          ['notes.txt', 'added', 'adapter:codex'],
+          ['old.ts', 'deleted', 'adapter:codex'],
+        ]),
+      )
+    })
+  })
+
+  it('does not treat Codex shell runs as checks, because Codex reports no exit code', async () => {
+    const { repo } = await initialized()
+    const outcome = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'npm test' }, tool_response: '' }), { now: () => NOW, agent: 'codex' })
+    expect(outcome).toEqual({ status: 'ignored', reason: 'codex does not report exit codes' })
   })
 })
