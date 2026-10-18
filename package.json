@@ -16,7 +16,8 @@
     "test:e2e": "npm run test:e2e -w @continuum/web",
     "bundle": "node scripts/bundle.mjs",
     "smoke:release": "node scripts/smoke-release.mjs",
-    "bench:scan": "tsx scripts/bench-scan.ts"
+    "bench:scan": "tsx scripts/bench-scan.ts",
+    "eval": "tsx scripts/eval/run.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

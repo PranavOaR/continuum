@@ -17,6 +17,7 @@ export async function startCommand(io: Io): Promise<number> {
   let initial = true
   try {
     const capture = await startCapture(store, workspace.root, {
+      attributeToActiveSession: true,
       onChanges: (changes) => {
         if (initial) {
           io.out(`Caught up on ${changes.length} change${changes.length === 1 ? '' : 's'} since the last scan:`)
