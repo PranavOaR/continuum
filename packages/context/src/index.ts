@@ -2,4 +2,5 @@ export { liveHashes, projectState, type CheckSummary, type DecisionSummary, type
 export { DEFAULT_HANDOFF_CHARS, renderHandoff, type HandoffOptions } from './handoff'
 export { agoFromIso, formatAgo } from './time'
 export { isQuiet, sinceYouLeft, type SinceYouLeft } from './sinceYouLeft'
+export { CHARS_PER_TOKEN, DEFAULT_CONTEXT_TOKENS, rankContext, renderContext, type ContextItem } from './retrieve'
 export { currentTaskId, currentTaskNode, isTaskNode, STALE_TASK_MS, summarizeTask, taskSummaries, type TaskStatus, type TaskSummary, applyTaskChange, InvalidTaskChangeError, MAX_NEXT_ACTION_CHARS } from './tasks'

@@ -50,7 +50,7 @@ It writes two project-scoped files and nothing in `~/.claude`:
 
 - `.claude/settings.local.json`: hooks that record each session, the files Claude edits, and Claude's last message in each turn. At session start, the hook briefs Claude on where the previous session left off.
 - `.mcp.json`: the `continuum` MCP server.
-  - Reading: `get_handoff` and `get_project_state`.
+  - Reading: `get_handoff`, `get_project_state`, and `get_context`. `get_context` ranks recorded context for a task by its graph links, evidence, recency and whether it needs action (a failing check, a stale decision), then cuts it to a token budget, showing each item's score and why.
   - Tasks: `start_task` and `update_task` record what Claude is working on (objective, acceptance criteria, steps and next action), and edits are attributed to the current task.
   - Decisions: `record_decision` saves decisions, known issues and next steps tied to specific files.
 
