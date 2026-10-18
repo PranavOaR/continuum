@@ -37,6 +37,8 @@ export interface CaptureOptions {
   onError?: (error: unknown) => void
   /** Called once when watching is unavailable and capture falls back to polling. */
   onPolling?: (reason: string) => void
+  /** Credit changes to a session opened with `continuum session start`. */
+  attributeToActiveSession?: boolean
   /** Injected in tests to simulate an OS without watch capacity. */
   openWatcher?: (root: string, onPath: (path: string | null) => void) => FSWatcher
 }
@@ -94,7 +96,7 @@ export async function startCapture(store: ContextStore, root: string, options: C
 
   const scan = (): Promise<void> => {
     if (closed) return Promise.resolve()
-    const work = scanRepository(store, root).then(({ changes }) => {
+    const work = scanRepository(store, root, { attributeToActiveSession: options.attributeToActiveSession ?? false }).then(({ changes }) => {
       if (changes.length > 0 && !closed) options.onChanges?.(changes)
     })
     inFlight.add(work)

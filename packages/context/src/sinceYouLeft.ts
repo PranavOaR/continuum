@@ -8,15 +8,17 @@ const LOOKBACK_EVENTS = 2_000
 export interface SinceYouLeft {
   /** When this agent's previous session was last active. */
   since: string
-  otherSessions: { sessionId: string; agent: string; files: string[]; note: string | null }[]
+  /** Each item says when it last happened, so an agent never has to guess from the section's start. */
+  otherSessions: { sessionId: string; agent: string; files: string[]; note: string | null; at: string }[]
   /** Changes no agent session made: by hand, or a tool Continuum does not see. */
   outsideChanges: string[]
+  outsideChangedAt: string | null
   /** The latest result of each check run since, with how it was recorded. */
-  checks: { name: string; passed: boolean; evidence: EvidenceType }[]
-  commits: { hash: string; message: string }[]
-  decisions: string[]
+  checks: { name: string; passed: boolean; evidence: EvidenceType; at: string }[]
+  commits: { hash: string; message: string; at: string }[]
+  decisions: { title: string; at: string }[]
   /** Tasks you changed in the dashboard, and which parts. */
-  taskEdits: { taskId: string; title: string; fields: TaskField[] }[]
+  taskEdits: { taskId: string; title: string; fields: TaskField[]; at: string }[]
 }
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null)
@@ -44,11 +46,13 @@ function fold(summary: SinceYouLeft, event: ContinuumEvent, sessionAgent: (sessi
     case 'file.changed': {
       const { sessionId, path } = event.payload
       if (sessionId === currentSessionId) return summary
-      if (!sessionId) return event.source === SCAN_SOURCE ? { ...summary, outsideChanges: addUnique(summary.outsideChanges, path) } : summary
+      if (!sessionId) {
+        return event.source === SCAN_SOURCE ? { ...summary, outsideChanges: addUnique(summary.outsideChanges, path), outsideChangedAt: event.occurredAt } : summary
+      }
       const existing = summary.otherSessions.find((session) => session.sessionId === sessionId)
       const others = summary.otherSessions.filter((session) => session.sessionId !== sessionId)
-      const session = existing ?? { sessionId, agent: sessionAgent(sessionId), files: [], note: null }
-      return { ...summary, otherSessions: [...others, { ...session, files: addUnique(session.files, path) }] }
+      const session = existing ?? { sessionId, agent: sessionAgent(sessionId), files: [], note: null, at: event.occurredAt }
+      return { ...summary, otherSessions: [...others, { ...session, files: addUnique(session.files, path), at: event.occurredAt }] }
     }
     case 'session.progress':
     case 'session.ended': {
@@ -57,22 +61,24 @@ function fold(summary: SinceYouLeft, event: ContinuumEvent, sessionAgent: (sessi
       if (sessionId === currentSessionId || !note) return summary
       const existing = summary.otherSessions.find((session) => session.sessionId === sessionId)
       const others = summary.otherSessions.filter((session) => session.sessionId !== sessionId)
-      return { ...summary, otherSessions: [...others, { ...(existing ?? { sessionId, agent: sessionAgent(sessionId), files: [] }), note }] }
+      return { ...summary, otherSessions: [...others, { ...(existing ?? { sessionId, agent: sessionAgent(sessionId), files: [] }), note, at: event.occurredAt }] }
     }
     case 'check.recorded': {
       const checks = summary.checks.filter((check) => check.name !== event.payload.name)
-      return { ...summary, checks: [...checks, { name: event.payload.name, passed: event.payload.exitCode === 0, evidence: event.evidence }] }
+      return { ...summary, checks: [...checks, { name: event.payload.name, passed: event.payload.exitCode === 0, evidence: event.evidence, at: event.occurredAt }] }
     }
     case 'commit.recorded':
-      return event.payload.baseline ? summary : { ...summary, commits: [...summary.commits, { hash: event.payload.hash, message: event.payload.message }] }
-    case 'memory.recorded':
-      return { ...summary, decisions: addUnique(summary.decisions, event.payload.title) }
+      return event.payload.baseline ? summary : { ...summary, commits: [...summary.commits, { hash: event.payload.hash, message: event.payload.message, at: event.occurredAt }] }
+    case 'memory.recorded': {
+      const decisions = summary.decisions.filter((decision) => decision.title !== event.payload.title)
+      return { ...summary, decisions: [...decisions, { title: event.payload.title, at: event.occurredAt }] }
+    }
     case 'task.upserted': {
       if (event.evidence !== 'user-reported') return summary
       const existing = summary.taskEdits.find((edit) => edit.taskId === event.payload.id)
       const fields = [...new Set([...(existing?.fields ?? []), ...(event.payload.editedFields ?? [])])]
       const others = summary.taskEdits.filter((edit) => edit.taskId !== event.payload.id)
-      return { ...summary, taskEdits: [...others, { taskId: event.payload.id, title: event.payload.title, fields }] }
+      return { ...summary, taskEdits: [...others, { taskId: event.payload.id, title: event.payload.title, fields, at: event.occurredAt }] }
     }
     default:
       return summary
@@ -94,7 +100,7 @@ export function sinceYouLeft(store: ContextStore, agent: string, currentSessionI
     .map((entry) => entry.event)
     .filter((event) => event.occurredAt > since)
     .reverse()
-  const empty: SinceYouLeft = { since, otherSessions: [], outsideChanges: [], checks: [], commits: [], decisions: [], taskEdits: [] }
+  const empty: SinceYouLeft = { since, otherSessions: [], outsideChanges: [], outsideChangedAt: null, checks: [], commits: [], decisions: [], taskEdits: [] }
   return events.reduce((summary, event) => fold(summary, event, sessionAgent, currentSessionId), empty)
 }
 

@@ -122,17 +122,22 @@ function sinceSection(since: SinceYouLeft | null | undefined, now: Date): string
   const lines = [heading]
   for (const session of since.otherSessions) {
     const files = session.files.length > 0 ? `changed ${listPaths(session.files)}` : 'changed no files'
-    lines.push(`- [observed] A ${code(session.agent)} session ${files}.${session.note ? ` Its last note [agent-reported]: ${quote(session.note, 200)}` : ''}`)
+    const note = session.note ? ` Its last note [agent-reported]: ${quote(session.note, 200)}` : ''
+    lines.push(`- [observed] A ${code(session.agent)} session ${files} (${agoFromIso(session.at, now)}).${note}`)
   }
-  if (since.outsideChanges.length > 0) lines.push(`- [observed] Changed outside agent sessions: ${listPaths(since.outsideChanges)}`)
+  if (since.outsideChanges.length > 0) {
+    lines.push(`- [observed] Changed outside agent sessions (latest ${agoFromIso(since.outsideChangedAt, now)}): ${listPaths(since.outsideChanges)}`)
+  }
   for (const edit of since.taskEdits) {
-    lines.push(`- [set by you] You changed ${edit.fields.map((field) => FIELD_LABEL[field]).join(', ') || 'the task'} of ${quote(edit.title, 120)} in the dashboard.`)
+    const fields = edit.fields.map((field) => FIELD_LABEL[field]).join(', ') || 'the task'
+    lines.push(`- [set by you] You changed ${fields} of ${quote(edit.title, 120)} in the dashboard (${agoFromIso(edit.at, now)}).`)
   }
   for (const check of since.checks) {
-    lines.push(`- ${check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'} ${code(check.name)} ${check.passed ? 'passed' : 'FAILED'}.`)
+    const tag = check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'
+    lines.push(`- ${tag} ${code(check.name)} ${check.passed ? 'passed' : 'FAILED'} (${agoFromIso(check.at, now)}).`)
   }
-  for (const commit of since.commits.slice(-MAX_LISTED)) lines.push(`- [observed] Committed ${code(commit.hash.slice(0, 7))} ${quote(commit.message, 120)}`)
-  for (const title of since.decisions) lines.push(`- [agent-reported] Decision recorded: ${quote(title, 160)}`)
+  for (const commit of since.commits.slice(-MAX_LISTED)) lines.push(`- [observed] Committed ${code(commit.hash.slice(0, 7))} ${quote(commit.message, 120)} (${agoFromIso(commit.at, now)})`)
+  for (const decision of since.decisions) lines.push(`- [agent-reported] Decision recorded: ${quote(decision.title, 160)} (${agoFromIso(decision.at, now)})`)
   return lines
 }
 

@@ -13,6 +13,7 @@ import { initCommand } from './commands/init'
 import { mcpCommand } from './commands/mcp'
 import { RUN_USAGE, runCommand } from './commands/run'
 import { scanCommand } from './commands/scan'
+import { sessionCommand } from './commands/session'
 import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
@@ -39,6 +40,7 @@ Commands
                        ${RUN_USAGE.replace('Usage: ', '')}
   handoff              Print where the project left off, for any agent or chat
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
+  session start|note|end  Record a session for an agent without hooks (Codex, Cursor, a chat)
   setup claude-code    Connect Claude Code to this repository (--remove to undo)
   config [name on|off] Show or change settings: agent-checks, prompts
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
@@ -70,6 +72,7 @@ const COMMANDS: Record<string, Command> = {
   run: (io, args) => runCommand(io, args),
   handoff: (io, args) => handoffCommand(io, args),
   serve: async (io, args) => serveCommand(io, args, VERSION, await serveWorkerOptions()),
+  session: (io, args) => sessionCommand(io, args),
   setup: (io, args) => setupCommand(io, args, selfInvocation()),
   mcp: (io) => mcpCommand(io, VERSION),
   ingest: (io, args) => ingestCommand(io, args),
