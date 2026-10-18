@@ -292,6 +292,18 @@ describe('ingestHook for Codex', () => {
     })
   })
 
+  it('records a moved file as the old path deleted and the new one added', async () => {
+    const { repo, storePath } = await initialized({ 'src/old.ts': 'x' })
+    repo.write('src/new.ts', 'x')
+    repo.remove('src/old.ts')
+    const move = ['*** Begin Patch', `*** Update File: ${join(repo.root, 'src/old.ts')}`, `*** Move to: ${join(repo.root, 'src/new.ts')}`, '*** End Patch'].join('\n')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_input: { command: move } }, 'codex-m'), { now: () => NOW, agent: 'codex' })
+    withStore(storePath, (store) => {
+      expect(store.graph.get('file:src/old.ts')?.props.changeType).toBe('deleted')
+      expect(store.graph.get('file:src/new.ts')?.props.changeType).toBe('added')
+    })
+  })
+
   it('does not treat Codex shell runs as checks, because Codex reports no exit code', async () => {
     const { repo } = await initialized()
     const outcome = await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'npm test' }, tool_response: '' }), { now: () => NOW, agent: 'codex' })
@@ -314,6 +326,15 @@ describe('ingestHook path resolution', () => {
     )
     expect(outcome).toEqual({ status: 'recorded', events: 1 })
     withStore(storePath, (store) => expect(store.graph.get('file:src/a.ts')?.props.changedBy).toBe('s-link'))
+
+    // A deleted file whose directory went too still resolves through the symlink.
+    repo.write('gone/deep/x.ts', 'x')
+    rmSync(join(repo.root, 'gone'), { recursive: true, force: true })
+    const deleted = await ingestHook(
+      JSON.stringify({ session_id: 's-link', cwd: link, hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_input: { command: `*** Begin Patch\n*** Delete File: ${join(link, 'gone/deep/x.ts')}\n*** End Patch` } }),
+      { now: () => NOW, agent: 'codex' },
+    )
+    expect(deleted).toEqual({ status: 'recorded', events: 1 })
     rmSync(linkDir, { recursive: true, force: true })
   })
 })

@@ -106,8 +106,11 @@ export async function removeCursorSetup(root: string): Promise<SetupResult> {
   const files: SetupResult['files'] = []
   const mcpPath = join(root, CURSOR_MCP_FILE)
   const mcpText = await readText(mcpPath)
-  if (mcpText !== null) {
-    const after = withServer(parseMcp(mcpText), null)
+  const current = mcpText === null ? null : parseMcp(mcpText)
+  const servers = (current?.mcpServers ?? {}) as Json
+  // Removal never fails over a server someone else wrote: it is simply not ours to remove.
+  if (current !== null && isContinuumServer(servers[MCP_SERVER_NAME])) {
+    const after = withServer(current, null)
     if (json(after) !== mcpText) {
       const empty = Object.keys(after).every((key) => isObject(after[key]) && Object.keys(after[key] as Json).length === 0)
       if (empty && !(await isTracked(root, CURSOR_MCP_FILE))) {
