@@ -14,7 +14,7 @@ export function listChanges(io: Io, changes: readonly Parameters<typeof formatCh
 export async function scanCommand(io: Io): Promise<number> {
   const { workspace, store } = await openWorkspace(io.cwd)
   try {
-    const { changes } = await scanRepository(store, workspace.root, { now: io.now })
+    const { changes } = await scanRepository(store, workspace.root, { now: io.now, attributeToActiveSession: true })
     if (changes.length === 0) {
       io.out('No changes since the last scan.')
       return EXIT_OK
