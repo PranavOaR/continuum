@@ -3,7 +3,7 @@
 //   npx tsx scripts/plugin.ts
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { setupClaudeCode } from '../packages/claude-code/src/index'
+import { guardedPluginHooks, setupClaudeCode } from '../packages/claude-code/src/index'
 import { createSandbox } from '../packages/capture/src/testing'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -17,7 +17,7 @@ export async function pluginFiles(): Promise<{ hooks: unknown; mcp: unknown; ver
     await setupClaudeCode(sandbox.root, invocation)
     const settings = JSON.parse(readFileSync(join(sandbox.root, '.claude/settings.local.json'), 'utf8'))
     const mcp = JSON.parse(readFileSync(join(sandbox.root, '.mcp.json'), 'utf8'))
-    return { hooks: { hooks: settings.hooks }, mcp, version }
+    return { hooks: { hooks: guardedPluginHooks(settings.hooks) }, mcp, version }
   } finally {
     sandbox.cleanup()
   }

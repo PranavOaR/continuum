@@ -18,7 +18,8 @@
     "smoke:release": "node scripts/smoke-release.mjs",
     "bench:scan": "tsx scripts/bench-scan.ts",
     "test:cross-agent": "node scripts/cross-agent.mjs",
-    "plugin": "tsx scripts/plugin.ts"
+    "plugin": "tsx scripts/plugin.ts",
+    "eval": "tsx scripts/eval/run.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

@@ -2,6 +2,8 @@
 
 ## [0.1.0] - unreleased
 
+<!-- Replace "unreleased" with the release date (YYYY-MM-DD) before tagging; the release workflow checks it. -->
+
 The first public release.
 
 ### Continuity

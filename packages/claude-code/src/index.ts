@@ -18,3 +18,4 @@ export {
 } from './setup'
 export { CODEX_CONFIG_FILE, CODEX_HOOKS_FILE, removeCodexSetup, setupCodex } from './codexSetup'
 export { CURSOR_MCP_FILE, CURSOR_RULE_FILE, removeCursorSetup, setupCursor } from './cursorSetup'
+export { guardedPluginHooks } from './plugin'

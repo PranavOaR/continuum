@@ -84,6 +84,15 @@ If something does not work, `continuum doctor` checks Node.js, git, the store, t
 
 To remove Continuum, `setup claude-code --remove` takes out exactly what setup added. `continuum uninstall` does the same; `continuum uninstall --purge` also deletes `.continuum/` and leaves the repository as it was before setup.
 
+## Briefing quality
+
+```bash
+npm run eval                     # does each briefing contain what a fresh agent needs? (free; runs in CI)
+npm run eval -- --agent claude   # ask Claude Code the standard questions from the briefing alone (uses your account)
+```
+
+`scripts/eval/scenarios.ts` holds recorded histories (resuming after another agent and a hand edit, a project with no task, a task changed in the dashboard) and the questions a new session must answer: the current task, the next step, which checks can be trusted, what changed by hand, who set what. Briefing mode checks that each answer appears in its section in the expected words, and that no section makes a misleading claim (such as calling an out-of-date check passed); it must score 100%, and CI runs it. Claude mode scores real answers, including that misleading claims are absent. With Claude Code it scored 100% on all three scenarios after the first run surfaced a missing timestamp.
+
 ## Release package
 
 ```bash

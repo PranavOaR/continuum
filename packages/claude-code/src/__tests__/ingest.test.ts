@@ -338,3 +338,48 @@ describe('ingestHook path resolution', () => {
     rmSync(linkDir, { recursive: true, force: true })
   })
 })
+
+describe('since your last session', () => {
+  const at = (start: number, ms: number) => () => new Date(start + ms)
+  const briefingFor = async (repo: Sandbox, sessionId: string, now: () => Date) => {
+    const outcome = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, sessionId), { now })
+    return outcome.status === 'recorded' ? (outcome.additionalContext ?? '') : ''
+  }
+
+  it('opens the briefing with everything recorded while Claude was away, each with its time', async () => {
+    const { repo, storePath } = await initialized({ 'src/a.ts': 'a', 'src/b.ts': 'b', 'notes.md': 'n' })
+    const start = Date.now()
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'claude-1'), { now: at(start, 1_000) })
+    await ingestHook(hook(repo, { hook_event_name: 'SessionEnd', reason: 'exit' }, 'claude-1'), { now: at(start, 2_000) })
+
+    // Meanwhile: another agent, a hand edit, a decision.
+    withStore(storePath, (store) => {
+      const t = (ms: number) => new Date(start + ms).toISOString()
+      store.record({ type: 'session.started', payload: { sessionId: 'codex-1', agent: 'codex' }, evidence: 'observed', source: 'test', occurredAt: t(3_000) })
+      store.record({ type: 'file.changed', payload: { path: 'src/b.ts', contentHash: 'h-b2', changeType: 'modified', sessionId: 'codex-1' }, evidence: 'observed', source: 'test', occurredAt: t(3_100) })
+      store.record({ type: 'session.progress', payload: { sessionId: 'codex-1', note: 'Refactored the b module' }, evidence: 'agent-reported', source: 'test', occurredAt: t(3_200) })
+      store.record({ type: 'memory.recorded', payload: { id: 'm1', kind: 'decision', title: 'Keep b pure', body: '', anchors: {} }, evidence: 'agent-reported', source: 'mcp', occurredAt: t(3_300) })
+    })
+    repo.write('notes.md', 'edited by hand')
+    const store = ContextStore.open(storePath)
+    await scanRepository(store, repo.root, { now: at(start, 4_000) })
+    store.close()
+
+    const briefing = await briefingFor(repo, 'claude-2', at(start, 5_000))
+    const begins = briefing.indexOf('## Since your last session')
+    const section = briefing.slice(begins, briefing.indexOf('\n## ', begins + 5))
+    expect(begins).toBeGreaterThan(-1)
+    expect(begins).toBeLessThan(briefing.indexOf('## Where we left off'))
+    expect(section).toMatch(/A `codex` session changed `src\/b\.ts` \([^)]+\)\. Its last note \[agent-reported\]: "Refactored the b module"/)
+    expect(section).toMatch(/Changed outside agent sessions \(latest [^)]+\): `notes\.md`/)
+    expect(section).toMatch(/Decision recorded: "Keep b pure" \([^)]+\)/)
+  })
+
+  it('says when nothing happened, and says nothing on an agent’s first session', async () => {
+    const { repo } = await initialized()
+    const start = Date.now()
+    expect(await briefingFor(repo, 'first', at(start, 1_000))).not.toContain('Since your last session')
+    await ingestHook(hook(repo, { hook_event_name: 'SessionEnd', reason: 'exit' }, 'first'), { now: at(start, 2_000) })
+    expect(await briefingFor(repo, 'second', at(start, 3_000))).toContain('Nothing was recorded since then.')
+  })
+})

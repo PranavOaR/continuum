@@ -5,13 +5,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx",
+            "timeout": 20,
+            "command": "sh",
             "args": [
-              "-y",
-              "@pranavoar/continuum@0.1.0",
-              "ingest"
-            ],
-            "timeout": 20
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
           }
         ]
       }
@@ -21,13 +20,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx",
+            "timeout": 10,
+            "command": "sh",
             "args": [
-              "-y",
-              "@pranavoar/continuum@0.1.0",
-              "ingest"
-            ],
-            "timeout": 10
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
           }
         ]
       }
@@ -37,13 +35,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx",
+            "timeout": 10,
+            "command": "sh",
             "args": [
-              "-y",
-              "@pranavoar/continuum@0.1.0",
-              "ingest"
-            ],
-            "timeout": 10
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
           }
         ]
       }
@@ -54,14 +51,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx",
-            "args": [
-              "-y",
-              "@pranavoar/continuum@0.1.0",
-              "ingest"
-            ],
             "async": true,
-            "timeout": 30
+            "timeout": 30,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
           }
         ]
       }
@@ -72,14 +68,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx",
-            "args": [
-              "-y",
-              "@pranavoar/continuum@0.1.0",
-              "ingest"
-            ],
             "async": true,
-            "timeout": 30
+            "timeout": 30,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
           }
         ]
       }
@@ -89,14 +84,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "npx",
-            "args": [
-              "-y",
-              "@pranavoar/continuum@0.1.0",
-              "ingest"
-            ],
             "async": true,
-            "timeout": 30
+            "timeout": 30,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
           }
         ]
       }

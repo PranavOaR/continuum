@@ -30,6 +30,16 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match packages/cli version $version"
             exit 1
           fi
+      - name: The changelog has a dated section for this version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          heading="$(grep -E "^## \\[${version//./\\.}\\]" CHANGELOG.md || true)"
+          if [ -z "$heading" ] || echo "$heading" | grep -qi unreleased; then
+            echo "CHANGELOG.md needs '## [$version] - YYYY-MM-DD' before releasing (found: '${heading:-nothing}')"
+            exit 1
+          fi
+          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {found=1; next} /^## \[/ {if (found) exit} found' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
@@ -43,6 +53,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: GitHub release
-        run: gh release create "$GITHUB_REF_NAME" --title "Continuum $GITHUB_REF_NAME" --notes-file <(awk "/^## \\[${GITHUB_REF_NAME#v}\\]/{found=1;next} /^## \\[/{if(found)exit} found" CHANGELOG.md)
+        run: gh release create "$GITHUB_REF_NAME" --title "Continuum $GITHUB_REF_NAME" --notes-file release-notes.md
         env:
           GH_TOKEN: ${{ github.token }}
