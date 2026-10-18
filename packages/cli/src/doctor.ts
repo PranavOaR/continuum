@@ -5,7 +5,7 @@ import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError, readRegistry } from '@continuum/capture'
-import { CODEX_HOOKS_FILE, HOOK_EVENTS, HOOKS_FILE, isContinuumHandler, isContinuumServer, MCP_FILE, MCP_SERVER_NAME, type Invocation } from '@continuum/claude-code'
+import { CODEX_HOOKS_FILE, CURSOR_MCP_FILE, HOOK_EVENTS, HOOKS_FILE, isContinuumHandler, isContinuumServer, MCP_FILE, MCP_SERVER_NAME, type Invocation } from '@continuum/claude-code'
 import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@continuum/store'
 
 /** node:sqlite works without a flag from this version on. */
@@ -146,6 +146,16 @@ async function checkCodex(root: string): Promise<Finding | null> {
   }
 }
 
+/** Cursor is connected when its project MCP config runs Continuum's server; null when it is not set up here. */
+async function checkCursor(root: string): Promise<Finding | null> {
+  const config = await readJson(join(root, CURSOR_MCP_FILE))
+  if (config === null) return null
+  if (config === 'invalid') return { status: 'fail', label: `${CURSOR_MCP_FILE} is not a valid JSON object`, fix: 'Fix or remove it, then run `continuum setup cursor`.' }
+  const server = isObject(config.mcpServers) ? config.mcpServers[MCP_SERVER_NAME] : undefined
+  if (!isContinuumServer(server)) return null
+  return { status: 'ok', label: 'Cursor MCP server registered', detail: 'enable it in Cursor Settings → MCP; capture edits with `continuum session start --agent cursor` and `continuum start`' }
+}
+
 function checkDashboard(webDist: string): Finding {
   return existsSync(join(webDist, 'index.html'))
     ? { status: 'ok', label: 'Dashboard available', detail: 'continuum serve' }
@@ -167,14 +177,14 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   if (!isInitialized(workspace)) return [...findings, { status: 'fail', label: 'Continuum is not set up here', fix: SETUP_FIX }]
   findings.push(checkStore(workspace.storePath))
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
-  const codex = await checkCodex(workspace.root)
+  const others = [await checkCodex(workspace.root), await checkCursor(workspace.root)].filter((finding): finding is Finding => finding !== null)
   const claudeHooks = checkHooks(settings, env.invocation)
   const claudeMissing = settings === null && claudeHooks.status === 'fail'
-  if (claudeMissing && codex) {
-    // Connected through Codex only: Claude Code's absence is not a problem.
-    findings.push({ status: 'ok', label: 'Claude Code not connected', detail: 'Codex is; run `continuum setup claude-code` to add it' }, codex)
+  if (claudeMissing && others.length > 0) {
+    // Connected through another agent only: Claude Code's absence is not a problem.
+    findings.push({ status: 'ok', label: 'Claude Code not connected', detail: 'another agent is; run `continuum setup claude-code` to add it' }, ...others)
   } else {
-    findings.push(claudeHooks, ...(await checkMcp(workspace.root, mcpConfig, settings)), ...(codex ? [codex] : []))
+    findings.push(claudeHooks, ...(await checkMcp(workspace.root, mcpConfig, settings)), ...others)
   }
   findings.push(checkDashboard(env.webDist))
   const listed = (await readRegistry(env.configDir)).some((entry) => entry.root === workspace.root)

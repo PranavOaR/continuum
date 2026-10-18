@@ -2,7 +2,7 @@ import { existsSync, readdirSync, rmdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { CONTINUUM_DIR, includeInGit, locateWorkspace, unregisterRepository } from '@continuum/capture'
-import { CODEX_HOOKS_FILE, HOOKS_FILE, removeClaudeCodeSetup, removeCodexSetup } from '@continuum/claude-code'
+import { CODEX_HOOKS_FILE, CURSOR_RULE_FILE, HOOKS_FILE, removeClaudeCodeSetup, removeCodexSetup, removeCursorSetup } from '@continuum/claude-code'
 import { isStoreBusy } from '@continuum/store'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -31,10 +31,13 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
   }
   const claude = await removeClaudeCodeSetup(root)
   const codex = await removeCodexSetup(root)
-  const result = { files: [...claude.files, ...codex.files] }
+  const cursor = await removeCursorSetup(root)
+  const result = { files: [...claude.files, ...codex.files, ...cursor.files] }
   await unregisterRepository(io.configDir, root)
   removeIfEmpty(join(root, dirname(HOOKS_FILE)))
   removeIfEmpty(join(root, dirname(CODEX_HOOKS_FILE)))
+  removeIfEmpty(join(root, dirname(CURSOR_RULE_FILE)))
+  removeIfEmpty(join(root, dirname(dirname(CURSOR_RULE_FILE))))
   for (const file of result.files) io.out(`  ${file.action.padEnd(9)} ${file.path}`)
 
   const storeDir = join(root, CONTINUUM_DIR)

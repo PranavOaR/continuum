@@ -311,6 +311,34 @@ describe('ingestHook for Codex', () => {
   })
 })
 
+describe('ingestHook path resolution', () => {
+  it('attributes an edit reported through a symlinked path to the real repository file', async () => {
+    const { repo, storePath } = await initialized({ 'src/a.ts': 'a' })
+    const { symlinkSync, mkdtempSync, realpathSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const linkDir = mkdtempSync(join(tmpdir(), 'continuum-link-'))
+    const link = join(linkDir, 'repo')
+    symlinkSync(realpathSync(repo.root), link)
+    repo.write('src/a.ts', 'a2')
+    const outcome = await ingestHook(
+      JSON.stringify({ session_id: 's-link', cwd: link, hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_input: { command: `*** Begin Patch\n*** Update File: ${join(link, 'src/a.ts')}\n*** End Patch` } }),
+      { now: () => NOW, agent: 'codex' },
+    )
+    expect(outcome).toEqual({ status: 'recorded', events: 1 })
+    withStore(storePath, (store) => expect(store.graph.get('file:src/a.ts')?.props.changedBy).toBe('s-link'))
+
+    // A deleted file whose directory went too still resolves through the symlink.
+    repo.write('gone/deep/x.ts', 'x')
+    rmSync(join(repo.root, 'gone'), { recursive: true, force: true })
+    const deleted = await ingestHook(
+      JSON.stringify({ session_id: 's-link', cwd: link, hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_input: { command: `*** Begin Patch\n*** Delete File: ${join(link, 'gone/deep/x.ts')}\n*** End Patch` } }),
+      { now: () => NOW, agent: 'codex' },
+    )
+    expect(deleted).toEqual({ status: 'recorded', events: 1 })
+    rmSync(linkDir, { recursive: true, force: true })
+  })
+})
+
 describe('since your last session', () => {
   const at = (start: number, ms: number) => () => new Date(start + ms)
   const briefingFor = async (repo: Sandbox, sessionId: string, now: () => Date) => {
