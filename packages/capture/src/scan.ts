@@ -1,5 +1,6 @@
 import type { ChangeType, ContentHash, ContinuumEvent, FileChangedEvent } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
+import { readActiveSession, type ActiveSession } from './activeSession'
 import { commitsSince, recordedHead, type CommitInfo } from './commits'
 import { readWorkingTree, type WorkingTree } from './git'
 import { redactSecrets } from './redact'
@@ -21,6 +22,11 @@ export interface ScanResult {
 
 export interface ScanOptions {
   now?: () => Date
+  /**
+   * Attribute changes to the session opened with `continuum session start`, if any.
+   * Off for scans made by another agent's hooks, which must not credit that session with their work.
+   */
+  attributeToActiveSession?: boolean
 }
 
 /** Pure diff of two path → hash snapshots, sorted by path. */
@@ -45,10 +51,10 @@ export function recordedFiles(store: ContextStore): Map<string, ContentHash> {
   return files
 }
 
-function toEvent(change: FileChange, occurredAt: string, revision: string | null): FileChangedEvent {
+function toEvent(change: FileChange, occurredAt: string, revision: string | null, session: ActiveSession | null): FileChangedEvent {
   return {
     type: 'file.changed',
-    payload: change,
+    payload: { ...change, ...(session ? { sessionId: session.sessionId, ...(session.taskId ? { taskId: session.taskId } : {}) } : {}) },
     evidence: 'observed',
     source: SCAN_SOURCE,
     occurredAt,
@@ -73,6 +79,7 @@ function commitEvent(commit: CommitInfo, occurredAt: string, isBaseline: boolean
  */
 export async function scanRepository(store: ContextStore, root: string, options: ScanOptions = {}): Promise<ScanResult> {
   const tree = await readWorkingTree(root)
+  const session = (options.attributeToActiveSession ?? true) ? await readActiveSession(root) : null
   const occurredAt = (options.now ?? (() => new Date()))().toISOString()
   const previousHead = recordedHead(store)
   // tree.revision is abbreviated; the recorded head is the full hash.
@@ -87,7 +94,7 @@ export async function scanRepository(store: ContextStore, root: string, options:
     changes = diffSnapshots(recordedFiles(store), tree.files)
     // Only the process that still sees the old HEAD records the new commits.
     const commitEvents = recordedHead(store) === previousHead ? [...commits].reverse().map((commit) => commitEvent(commit, occurredAt, previousHead === null || found.length === 0)) : []
-    return [...commitEvents, ...changes.map((change) => toEvent(change, occurredAt, tree.revision))]
+    return [...commitEvents, ...changes.map((change) => toEvent(change, occurredAt, tree.revision, session))]
   })
   return { changes, tree }
 }
