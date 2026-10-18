@@ -3,7 +3,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { applyRepositoryRedactions, hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, readWorkingTree, redactSecrets } from '@continuum/capture'
-import { currentTaskId, DEFAULT_HANDOFF_CHARS, projectState, renderHandoff, type ProjectState } from '@continuum/context'
+import { currentTaskId, DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, projectState, rankContext, renderContext, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
 import { registerTaskTools, TaskToolError } from './taskTools'
@@ -12,6 +12,8 @@ export const SERVER_NAME = 'continuum'
 export const MCP_SOURCE = 'mcp'
 const MIN_HANDOFF_CHARS = 1_000
 const MAX_HANDOFF_CHARS = 20_000
+const MIN_CONTEXT_TOKENS = 200
+const MAX_CONTEXT_TOKENS = 8_000
 const MAX_LISTED_UNRECORDED = 50
 const MAX_ANCHORED_FILES = 50
 
@@ -98,6 +100,29 @@ const recordDecisionInput = {
 export function createContinuumServer(options: ServerOptions): McpServer {
   const now = options.now ?? (() => new Date())
   const server = new McpServer({ name: SERVER_NAME, version: options.version })
+
+  server.registerTool(
+    'get_context',
+    {
+      title: 'Get ranked context',
+      description:
+        'The recorded context most useful for a task, ranked and cut to a token budget: the task, failing or out-of-date checks, decisions anchored to the files it touches, recent session notes, hand edits and commits. Each line shows its score and why. Use it to focus before working on a task; get_handoff gives the full overview.',
+      inputSchema: {
+        task_id: z.string().trim().min(1).max(100).optional().describe('Defaults to the current task'),
+        budget_tokens: z.number().int().min(MIN_CONTEXT_TOKENS).max(MAX_CONTEXT_TOKENS).optional().describe(`Defaults to ${DEFAULT_CONTEXT_TOKENS}`),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ task_id, budget_tokens }) =>
+      guarded(() =>
+        withStore(options.cwd, async (store, root) => {
+          const at = now()
+          const state = await currentState(store, root, at)
+          if (task_id && !state.tasks.some((task) => task.id === task_id)) throw new ToolInputError(`No task "${task_id}".`)
+          return ok(renderContext(rankContext(store, state, { now: at, ...(task_id ? { taskId: task_id } : {}) }), budget_tokens ?? DEFAULT_CONTEXT_TOKENS))
+        }),
+      ),
+  )
 
   server.registerTool(
     'get_handoff',

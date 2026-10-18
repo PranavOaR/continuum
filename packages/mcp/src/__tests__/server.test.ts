@@ -50,9 +50,18 @@ describe('Continuum MCP server', () => {
   it('lists its tools with read-only hints on the read tools', async () => {
     const client = await connect((await initializedRepo()).root)
     const { tools } = await client.listTools()
-    expect(tools.map((tool) => tool.name).sort()).toEqual(['get_handoff', 'get_project_state', 'record_decision', 'start_task', 'update_task'])
+    expect(tools.map((tool) => tool.name).sort()).toEqual(['get_context', 'get_handoff', 'get_project_state', 'record_decision', 'start_task', 'update_task'])
     expect(tools.find((tool) => tool.name === 'get_handoff')?.annotations?.readOnlyHint).toBe(true)
     expect(tools.find((tool) => tool.name === 'record_decision')?.annotations?.readOnlyHint).toBe(false)
+  })
+
+  it('returns ranked context within a token budget', async () => {
+    const client = await connect((await initializedRepo()).root)
+    const ranked = text(await client.callTool({ name: 'get_context', arguments: { budget_tokens: 400 } }))
+    expect(ranked).toContain('Context ranked for this task (score; why).')
+    expect(ranked).toMatch(/- \(\d\.\d\d; [^)]+\) \[verified\] unit: PASSED/)
+    const unknown = await client.callTool({ name: 'get_context', arguments: { task_id: 'nope' } })
+    expect(unknown.isError).toBe(true)
   })
 
   it('returns a handoff judged against the current code', async () => {
