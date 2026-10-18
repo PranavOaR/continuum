@@ -1,6 +1,7 @@
 import type { ContinuumEvent, IdentityKey } from '@continuum/core'
 import type { HistoryRewrite } from './checkpoint'
 import type { GraphNode } from './graphIndex'
+import { anchoredPath } from './keys'
 
 /** Replaces forgotten text inside notes, prompts, output and messages. */
 export const FORGOTTEN = '[forgotten]'
@@ -60,7 +61,11 @@ export function forgetPath(path: string, options: { scrubText?: boolean } = {}):
   const needle = forgettablePath(path, scrubText ? MIN_FORGET_PATH_CHARS : 1)
   const scrub = scrubText ? scrubValue : <T>(value: T) => value
   const matches = pathMatcher(needle)
-  const isFileKey = (key: IdentityKey) => key.startsWith('file:') && matches(key.slice('file:'.length))
+  // Files and the symbols inside them: both name the path.
+  const isFileKey = (key: IdentityKey) => {
+    const path = anchoredPath(key)
+    return path !== null && matches(path)
+  }
   return {
     event(event) {
       switch (event.type) {

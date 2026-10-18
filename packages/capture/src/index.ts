@@ -9,3 +9,5 @@ export { applyRepositoryRedactions, CONFIG_FILE, DEFAULT_CONFIG, readConfig, upd
 export { commitsSince, MAX_COMMITS_PER_SCAN, recordedHead, type CommitInfo } from './commits'
 export { IGNORE_FILE, loadContinuumIgnore, type IgnorePredicate } from './continuumIgnore'
 export { defaultConfigDir, readRegistry, registerRepository, REGISTRY_FILE, unregisterRepository, type RegisteredRepository } from './registry'
+export { extractSymbols, parseSymbolRef, type SourceSymbol, type SymbolKind } from './symbols'
+export { readSymbolHashes, readWorkingTreeWithSymbols } from './symbolHashes'

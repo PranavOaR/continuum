@@ -20,6 +20,13 @@ export const keys = {
   memory: (id: string): IdentityKey => `memory:${id}`,
 }
 
+/** The file an anchor points into: `file:src/a.ts` and `symbol:src/a.ts#login` are both `src/a.ts`; other keys have none. */
+export function anchoredPath(key: IdentityKey): string | null {
+  if (key.startsWith('file:')) return key.slice('file:'.length)
+  if (key.startsWith('symbol:')) return key.slice('symbol:'.length, key.lastIndexOf('#'))
+  return null
+}
+
 /** The repository itself: holds repository-wide facts such as the last recorded HEAD. */
 export const REPOSITORY_NODE: IdentityKey = keys.project('repository')
 
