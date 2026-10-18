@@ -1,0 +1,99 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 20,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash|mcp__continuum__start_task|mcp__continuum__update_task",
+        "hooks": [
+          {
+            "type": "command",
+            "async": true,
+            "timeout": 30,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "async": true,
+            "timeout": 30,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "async": true,
+            "timeout": 30,
+            "command": "sh",
+            "args": [
+              "-c",
+              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -d \"$root/.continuum\" ] || exit 0; exec 'npx' '-y' '@pranavoar/continuum@0.1.0' 'ingest'"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

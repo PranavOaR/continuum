@@ -1,0 +1,18 @@
+{
+  "name": "continuum",
+  "version": "0.1.0",
+  "description": "Keeps AI coding work continuous across sessions and agents: each session starts briefed on where the last one left off, with every claim labelled verified, observed or agent-reported. Local-first; nothing leaves your machine.",
+  "author": {
+    "name": "Pranav Rao"
+  },
+  "homepage": "https://github.com/PranavOaR/continuum",
+  "repository": "https://github.com/PranavOaR/continuum",
+  "license": "MIT",
+  "keywords": [
+    "handoff",
+    "context",
+    "memory",
+    "tasks",
+    "local-first"
+  ]
+}

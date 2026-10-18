@@ -98,6 +98,7 @@ try {
   if (!existsSync(join(RELEASE, 'continuum.js'))) throw new Error('dist/release is missing: run `npm run build && npm run bundle` first.')
   const bin = packAndInstall()
   const name = JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8')).name
+  check('the package ships its MIT license', existsSync(join(dirname(dirname(bin)), name, 'LICENSE')) && readFileSync(join(dirname(dirname(bin)), name, 'LICENSE'), 'utf8').startsWith('MIT License'))
   check('--version prints the package version', run(bin, ['--version'], scratch).trim() === JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8')).version)
 
   const repo = makeRepo()

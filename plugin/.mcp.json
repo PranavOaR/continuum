@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "continuum": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pranavoar/continuum@0.1.0",
+        "mcp"
+      ]
+    }
+  }
+}

@@ -1,0 +1,58 @@
+name: Release
+
+# Publishes @pranavoar/continuum when a version tag is pushed:
+#   git tag v0.1.0 && git push origin v0.1.0
+# Needs the NPM_TOKEN repository secret (an npm automation token with publish rights to @pranavoar).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  # npm provenance: the published package links back to this workflow run.
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - name: The tag matches the package version
+        run: |
+          version="$(node -p "require('./packages/cli/package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match packages/cli version $version"
+            exit 1
+          fi
+      - name: The changelog has a dated section for this version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          heading="$(grep -E "^## \\[${version//./\\.}\\]" CHANGELOG.md || true)"
+          if [ -z "$heading" ] || echo "$heading" | grep -qi unreleased; then
+            echo "CHANGELOG.md needs '## [$version] - YYYY-MM-DD' before releasing (found: '${heading:-nothing}')"
+            exit 1
+          fi
+          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {found=1; next} /^## \[/ {if (found) exit} found' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run eval
+      - run: npm run build
+      - run: npm run bundle
+      - run: npm run smoke:release
+      - name: Publish to npm
+        working-directory: dist/release
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: GitHub release
+        run: gh release create "$GITHUB_REF_NAME" --title "Continuum $GITHUB_REF_NAME" --notes-file release-notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}

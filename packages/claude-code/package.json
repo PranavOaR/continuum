@@ -17,5 +17,6 @@
     "@continuum/core": "*",
     "@continuum/store": "*",
     "zod": "4.6.7"
-  }
+  },
+  "license": "MIT"
 }
