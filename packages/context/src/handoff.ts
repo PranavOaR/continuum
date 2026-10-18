@@ -68,6 +68,7 @@ function recent(label: string, steps: readonly string[]): string[] {
 
 function describeTask(task: TaskSummary): string[] {
   const lines = [`[agent-reported] ${quote(task.title, 200)} (${task.status})`]
+  if (task.userEdited.length > 0) lines.push(`[set by you] Changed in the dashboard: ${task.userEdited.map((field) => FIELD_LABEL[field]).join(', ')}`)
   if (task.objective) lines.push(`Objective: ${quote(task.objective)}`)
   if (task.nextAction) lines.push(`Next action: ${quote(task.nextAction)}`)
   if (task.acceptanceCriteria.length > 0) {
@@ -101,6 +102,13 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
     lines.push(`Files it changed: ${files.length > MAX_LISTED ? `${shown} and ${files.length - MAX_LISTED} more` : shown}`)
   }
   return [...lines, ...commitLines(state, now)]
+}
+
+const FIELD_LABEL: Record<TaskSummary['userEdited'][number], string> = {
+  status: 'status',
+  nextAction: 'next action',
+  steps: 'steps done',
+  criteria: 'acceptance criteria met',
 }
 
 function describeCheck(check: CheckSummary, now: Date): string {
@@ -190,7 +198,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
   const header = [
     `# Continuum handoff: ${basename(state.root)}`,
     `Generated ${state.generatedAt}, revision ${state.revision ?? 'none (no commits yet)'}, ${state.files.tracked} tracked files.`,
-    'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof.',
+    'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.',
   ]
   return fit(
     [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],

@@ -22,7 +22,9 @@ function check(name, condition, detail = '') {
   if (!condition) failures.push(name)
 }
 
-const run = (command, args, cwd, input) => execFileSync(command, args, { cwd, input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
+// The binary's per-user registry goes in the scratch directory, never the real ~/.config.
+const ENV = { ...process.env, CONTINUUM_CONFIG_DIR: join(scratch, 'config') }
+const run = (command, args, cwd, input) => execFileSync(command, args, { cwd, input, env: ENV, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
 
 function packAndInstall() {
   const tarball = join(scratch, run('npm', ['pack', '--silent', '--pack-destination', scratch], RELEASE).trim().split('\n').at(-1))
@@ -45,7 +47,7 @@ function makeRepo(name = 'repo') {
 /** Starts `mcp`, lists its tools over stdio and returns their names. */
 function mcpTools(bin, repo) {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, ['mcp'], { cwd: repo, stdio: ['pipe', 'pipe', 'inherit'] })
+    const child = spawn(bin, ['mcp'], { cwd: repo, env: ENV, stdio: ['pipe', 'pipe', 'inherit'] })
     let buffer = ''
     child.stdout.on('data', (chunk) => {
       buffer += chunk
@@ -69,7 +71,7 @@ function mcpTools(bin, repo) {
 /** Starts `serve`, follows the launch link and returns the dashboard HTML. */
 function serveDashboard(bin, repo) {
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, ['serve', '--port', '0'], { cwd: repo, stdio: ['ignore', 'pipe', 'inherit'] })
+    const child = spawn(bin, ['serve', '--port', '0'], { cwd: repo, env: ENV, stdio: ['ignore', 'pipe', 'inherit'] })
     const timer = setTimeout(() => {
       child.kill()
       reject(new Error('serve did not print a link'))

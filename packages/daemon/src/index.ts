@@ -1,5 +1,5 @@
 export { projectIds } from './ids'
-export { LocalContinuumService, ProjectUnavailableError, SNAPSHOT_TTL_MS, type LocalServiceOptions, type Repository } from './localService'
+export { DASHBOARD_SOURCE, LocalContinuumService, ProjectUnavailableError, SNAPSHOT_TTL_MS, type LocalServiceOptions, type Repository } from './localService'
 export { detectStack } from './mapProject'
-export { createAccessToken, createDaemonServer, DEFAULT_PORT, LOOPBACK, PortInUseError, startDaemon, type DaemonOptions, type RunningDaemon } from './server'
+export { createAccessToken, createDaemonServer, CSRF_HEADER, DEFAULT_PORT, LOOPBACK, PortInUseError, startDaemon, type DaemonOptions, type RunningDaemon } from './server'
 export { CHANGE_POLL_MS, createChangeFeed, type ChangeFeed, type ChangeListener, type WatchedStore } from './changeFeed'

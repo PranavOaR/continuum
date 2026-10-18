@@ -190,8 +190,8 @@ export function SettingsPage() {
               {isLive ? (
                 <p>
                   <span className="font-medium text-fg">Connected to your local repositories.</span> This dashboard reads Continuum's records from
-                  disk through <span className="font-mono">continuum serve</span> on 127.0.0.1; it never writes to them and nothing is sent to any
-                  server. Preferences and handoff history are kept in this browser's local storage.
+                  disk through <span className="font-mono">continuum serve</span> on 127.0.0.1. The only thing it writes is a task edit you make,
+                  recorded as set by you. Nothing is sent to any server. Preferences and handoff history are kept in this browser's local storage.
                 </p>
               ) : (
                 <p>

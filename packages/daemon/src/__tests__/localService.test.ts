@@ -258,3 +258,82 @@ describe('LocalContinuumService tasks', () => {
     expect(await local.listTasks()).toHaveLength(1)
   })
 })
+
+describe('LocalContinuumService task edits', () => {
+  async function withTask() {
+    const { repo, storePath } = await seededRepo()
+    sandboxes.push(repo)
+    const store = openStore(storePath)
+    store.record({
+      type: 'task.upserted',
+      payload: { id: 'auth-1', title: 'Auth', status: 'in-progress', nextAction: 'Write tests', acceptanceCriteria: [{ text: 'Logs in', met: false }], completedSteps: ['Plan'], remainingSteps: ['Build', 'Test'] },
+      evidence: 'agent-reported',
+      source: 'mcp',
+      occurredAt: NOW.toISOString(),
+    })
+    store.close()
+    return { storePath, local: new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 60_000 }) }
+  }
+
+  it('records each edit as yours and shows it straight away', async () => {
+    const { storePath, local } = await withTask()
+    await local.getWorkspace('acme') // warm the cache: the edit must not be hidden behind it
+    expect(await local.updateTask('acme', 'auth-1', { kind: 'step', step: 'Build', done: true })).toMatchObject({ completedSteps: ['Plan', 'Build'], remainingSteps: ['Test'], userEdited: ['steps'] })
+    await local.updateTask('acme', 'auth-1', { kind: 'criterion', index: 0, text: 'Logs in', met: true })
+    await local.updateTask('acme', 'auth-1', { kind: 'next-action', nextAction: 'Ship it' })
+    const task = await local.updateTask('acme', 'auth-1', { kind: 'status', status: 'blocked' })
+    expect(task).toMatchObject({
+      status: 'blocked',
+      nextAction: 'Ship it',
+      acceptanceCriteria: [{ status: 'complete', evidence: 'Set by you in the dashboard; not verified.' }],
+      userEdited: ['criteria', 'nextAction', 'status', 'steps'],
+    })
+
+    const store = openStore(storePath)
+    const last = store.recentEvents(1)[0].event
+    store.close()
+    expect(last).toMatchObject({ type: 'task.upserted', evidence: 'user-reported', source: 'dashboard' })
+    // The agent's own text keeps the agent's label; only what you changed is labelled yours.
+    const briefing = await local.getBriefing('acme')
+    expect(briefing).toContain('[agent-reported] "Auth" (blocked)')
+    expect(briefing).toContain('[set by you] Changed in the dashboard: acceptance criteria met, next action, status, steps done')
+  })
+
+  it("forgets your edits' label once the agent reports the task again", async () => {
+    const { storePath, local } = await withTask()
+    await local.updateTask('acme', 'auth-1', { kind: 'status', status: 'blocked' })
+    const store = openStore(storePath)
+    store.record({ type: 'task.upserted', payload: { id: 'auth-1', title: 'Auth', status: 'in-progress' }, evidence: 'agent-reported', source: 'mcp', occurredAt: NOW.toISOString() })
+    store.close()
+    local.invalidate()
+    const task = (await local.getWorkspace('acme')).tasks.find((candidate) => candidate.id === 'auth-1')
+    expect(task?.userEdited).toBeUndefined()
+  })
+
+  it('refuses to tick a criterion that moved, and keeps duplicate step names apart', async () => {
+    const { storePath, local } = await withTask()
+    await expect(local.updateTask('acme', 'auth-1', { kind: 'criterion', index: 0, text: 'Something else', met: true })).rejects.toThrow(/changed since the page loaded/)
+    const store = openStore(storePath)
+    store.record({ type: 'task.upserted', payload: { id: 'auth-1', title: 'Auth', status: 'in-progress', remainingSteps: ['Test', 'Test'] }, evidence: 'agent-reported', source: 'mcp', occurredAt: NOW.toISOString() })
+    store.close()
+    local.invalidate()
+    expect(await local.updateTask('acme', 'auth-1', { kind: 'step', step: 'Test', done: true })).toMatchObject({ completedSteps: ['Test'], remainingSteps: ['Test'] })
+  })
+
+  it('rejects edits to steps or tasks that do not exist', async () => {
+    const { local } = await withTask()
+    await expect(local.updateTask('acme', 'auth-1', { kind: 'step', step: 'Invented', done: true })).rejects.toThrow(/not a step/)
+    await expect(local.updateTask('acme', 'nope', { kind: 'status', status: 'completed' })).rejects.toBeInstanceOf(NotFoundError)
+    await expect(local.updateTask('elsewhere', 'auth-1', { kind: 'status', status: 'completed' })).rejects.toBeInstanceOf(NotFoundError)
+  })
+})
+
+describe('LocalContinuumService setup state', () => {
+  it('reports whether Claude Code is connected to the repository', async () => {
+    const { repo, service: local } = await service()
+    expect((await local.getWorkspace('acme')).setup).toEqual({ agentConnected: false })
+    const { setupClaudeCode } = await import('@continuum/claude-code')
+    await setupClaudeCode(repo.root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
+    expect((await local.getWorkspace('acme')).setup).toEqual({ agentConnected: true })
+  })
+})

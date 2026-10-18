@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { isInitialized, locateWorkspace, NotInitializedError } from '@continuum/capture'
+import { isInitialized, locateWorkspace, NotAGitRepositoryError, NotInitializedError, readRegistry, type Workspace } from '@continuum/capture'
 import { createAccessToken, createChangeFeed, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
 import { basename, resolve } from 'node:path'
 import { BUILD_INFO } from '../build'
@@ -35,6 +35,36 @@ function parseServeArgs(args: readonly string[]): ServeArgs | { error: string } 
   return { port, repositories }
 }
 
+/** Repositories named on the command line must all be set up: a typo should not silently serve less. */
+async function namedWorkspaces(io: Io, paths: readonly string[]): Promise<Workspace[]> {
+  const workspaces = await Promise.all(paths.map((path) => locateWorkspace(resolve(io.cwd, path))))
+  const missing = workspaces.find((workspace) => !isInitialized(workspace))
+  if (missing) throw new NotInitializedError(missing.root)
+  return workspaces
+}
+
+/**
+ * With no arguments: every repository connected with `continuum setup`, plus
+ * the one you are in. Registered repositories that were moved, deleted or
+ * uninstalled are skipped with a note.
+ */
+async function everyConnectedWorkspace(io: Io): Promise<Workspace[]> {
+  const here = await locateWorkspace(io.cwd).catch((error: unknown) => {
+    if (error instanceof NotAGitRepositoryError) return null
+    throw error
+  })
+  const registered = await Promise.all(
+    (await readRegistry(io.configDir)).map(async ({ root }) => {
+      const workspace = await locateWorkspace(root).catch(() => null)
+      if (!workspace || !isInitialized(workspace)) io.err(`continuum: skipping ${root}: no longer set up (run \`continuum setup claude-code\` there to add it back)`)
+      return workspace && isInitialized(workspace) ? workspace : null
+    }),
+  )
+  const workspaces = [...(here && isInitialized(here) ? [here] : []), ...registered.filter((workspace): workspace is Workspace => workspace !== null)]
+  if (workspaces.length === 0) throw new NotInitializedError(here?.root ?? io.cwd)
+  return workspaces
+}
+
 function untilAborted(signal: AbortSignal): Promise<void> {
   return new Promise((done) => {
     if (signal.aborted) done()
@@ -42,17 +72,54 @@ function untilAborted(signal: AbortSignal): Promise<void> {
   })
 }
 
+/** Exit code a serve worker uses to ask its supervisor for a fresh start with the new code. */
+export const RESTART_EXIT = 75
+/** How often a worker checks whether Continuum's code changed. */
+export const UPDATE_POLL_MS = 2_000
+
+export interface ServeOptions {
+  webDist?: string
+  /** Reuse an access token, so a restarted server keeps open dashboards signed in. */
+  token?: string
+  /** Reuse the CSRF token too, so pages opened before a restart can still save edits. */
+  csrfToken?: string
+  /** When given, the server exits with RESTART_EXIT as soon as this value changes. */
+  codeFingerprint?: () => string
+  updatePollMs?: number
+}
+
+/**
+ * Resolves once the code the server runs from has changed and then stayed the
+ * same for a poll: a `git pull` writes many files, and restarting halfway
+ * through would load a half-updated tree.
+ */
+function untilCodeChanges(fingerprint: () => string, pollMs: number, signal: AbortSignal): Promise<void> {
+  const initial = fingerprint()
+  let previous = initial
+  return new Promise((done) => {
+    const timer = setInterval(() => {
+      const current = fingerprint()
+      const settled = current !== initial && current === previous
+      previous = current
+      if (!settled) return
+      clearInterval(timer)
+      done()
+    }, pollMs)
+    timer.unref()
+    signal.addEventListener('abort', () => clearInterval(timer), { once: true })
+  })
+}
+
 /** Serves the dashboard for one or more initialized repositories on 127.0.0.1 until Ctrl-C. */
-export async function serveCommand(io: Io, args: readonly string[], version: string, webDist = WEB_DIST): Promise<number> {
+export async function serveCommand(io: Io, args: readonly string[], version: string, options: ServeOptions = {}): Promise<number> {
+  const webDist = options.webDist ?? WEB_DIST
   const parsed = parseServeArgs(args)
   if ('error' in parsed) {
     io.err(`continuum: ${parsed.error}`)
     io.err(SERVE_USAGE)
     return EXIT_USAGE
   }
-  const workspaces = await Promise.all((parsed.repositories.length > 0 ? parsed.repositories : ['.']).map((path) => locateWorkspace(resolve(io.cwd, path))))
-  const missing = workspaces.find((workspace) => !isInitialized(workspace))
-  if (missing) throw new NotInitializedError(missing.root)
+  const workspaces = parsed.repositories.length > 0 ? await namedWorkspaces(io, parsed.repositories) : await everyConnectedWorkspace(io)
   const unique = [...new Map(workspaces.map((workspace) => [workspace.root, workspace])).values()]
   const ids = projectIds(unique.map((workspace) => basename(workspace.root)))
   const describeError = (error: unknown) => (error instanceof Error ? (error.stack ?? error.message) : String(error))
@@ -70,7 +137,8 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   const daemon = await startDaemon({
     service,
     version,
-    token: createAccessToken(),
+    token: options.token ?? createAccessToken(),
+    ...(options.csrfToken ? { csrfToken: options.csrfToken } : {}),
     port: parsed.port,
     changes,
     ...(hasDashboard ? { staticDir: webDist } : {}),
@@ -81,8 +149,17 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   for (const workspace of unique) io.out(`  serving ${workspace.root}`)
   if (!hasDashboard) io.out(`  (the dashboard was not found at ${webDist}, so only the API is available; in a checkout, run \`npm run build\`)`)
   io.out('Open that exact link: it carries a one-time access token. Only this machine can reach the dashboard. Press Ctrl-C to stop.')
-  await untilAborted(io.signal)
+  const stopUpdateWatch = new AbortController()
+  const updated = options.codeFingerprint
+    ? untilCodeChanges(options.codeFingerprint, options.updatePollMs ?? UPDATE_POLL_MS, stopUpdateWatch.signal).then(() => 'updated' as const)
+    : new Promise<never>(() => {})
+  const reason = await Promise.race([untilAborted(io.signal).then(() => 'stopped' as const), updated])
+  stopUpdateWatch.abort()
   await daemon.close()
+  if (reason === 'updated') {
+    io.out("Continuum's code changed; restarting the dashboard with it…")
+    return RESTART_EXIT
+  }
   io.out('Stopped.')
   return EXIT_OK
 }

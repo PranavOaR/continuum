@@ -11,7 +11,7 @@ export async function doctorCommand(io: Io, args: readonly string[], invocation:
     io.err(`continuum: doctor takes no arguments: ${args.join(' ')}`)
     return EXIT_USAGE
   }
-  const findings = await runDoctor({ cwd: io.cwd, nodeVersion: process.versions.node, invocation, webDist })
+  const findings = await runDoctor({ cwd: io.cwd, nodeVersion: process.versions.node, invocation, webDist, configDir: io.configDir })
   io.out('Continuum doctor')
   for (const finding of findings) {
     io.out(`  ${MARKS[finding.status]} ${finding.label}${finding.detail ? ` (${finding.detail})` : ''}`)

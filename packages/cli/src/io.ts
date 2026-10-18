@@ -10,6 +10,8 @@ export interface Io {
   signal: AbortSignal
   /** Reads all of stdin (hook payloads arrive there). */
   readStdin: () => Promise<string>
+  /** Where Continuum keeps per-user state: the registry of connected repositories. */
+  configDir: string
   /** Raw streams for child-process output (`run`); default to the process's own. */
   stdout?: Writable
   stderr?: Writable

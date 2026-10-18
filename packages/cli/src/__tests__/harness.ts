@@ -1,8 +1,15 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Writable } from 'node:stream'
 import type { Io } from '../io'
 import { main } from '../main'
 
 export const NOW = new Date('2026-10-16T12:00:00.000Z')
+
+/** Tests never touch the real ~/.config/continuum. */
+export const TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'continuum-config-'))
+process.once('exit', () => rmSync(TEST_CONFIG_DIR, { recursive: true, force: true }))
 
 function sink(lines: string[]) {
   return new Writable({
@@ -27,6 +34,7 @@ export async function cli(cwd: string, argv: string[], extra: Partial<Io> = {}) 
     stderr: sink(raw),
     signal: new AbortController().signal,
     readStdin: async () => '',
+    configDir: TEST_CONFIG_DIR,
     ...extra,
   })
   return { code, out: out.join('\n'), err: err.join('\n'), raw: raw.join('') }

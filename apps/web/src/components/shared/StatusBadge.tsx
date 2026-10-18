@@ -1,24 +1,4 @@
-import {
-  Bot,
-  CircleCheck,
-  CircleDashed,
-  CircleDot,
-  CircleHelp,
-  CirclePause,
-  CircleX,
-  Clock,
-  Copy,
-  Eye,
-  FileMinus2,
-  FilePen,
-  FilePlus2,
-  FlaskConical,
-  Lightbulb,
-  OctagonPause,
-  PenLine,
-  ShieldCheck,
-  TriangleAlert,
-} from 'lucide-react'
+import { Bot, CircleCheck, CircleDashed, CircleDot, CircleHelp, CirclePause, CircleX, Clock, Copy, Eye, FileMinus2, FilePen, FilePlus2, FlaskConical, Lightbulb, OctagonPause, PenLine, ShieldCheck, TriangleAlert, UserRound } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { ChangeType, CriterionStatus, EvidenceType, FileStatus, HandoffStatus, ProjectStatus, VerificationStatus } from '@continuum/core'
 import {
@@ -59,6 +39,7 @@ const EVIDENCE_VISUAL: Record<EvidenceType, Visual> = {
   observed: { tone: 'neutral', icon: <Eye /> },
   verified: { tone: 'success', icon: <ShieldCheck /> },
   'agent-reported': { tone: 'muted', icon: <Bot /> },
+  'user-reported': { tone: 'accent', icon: <UserRound /> },
   inferred: { tone: 'muted', icon: <Lightbulb />, dashed: true },
   simulated: { tone: 'muted', icon: <FlaskConical />, dashed: true },
 }

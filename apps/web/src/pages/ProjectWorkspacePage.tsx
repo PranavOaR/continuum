@@ -5,6 +5,7 @@ import { ActivityTimeline } from '../components/activity/ActivityTimeline'
 import { EventDetailDrawer } from '../components/activity/EventDetailDrawer'
 import { FileDetailDrawer } from '../components/projects/FileDetailDrawer'
 import { FileExplorer } from '../components/projects/FileExplorer'
+import { GettingStarted } from '../components/projects/GettingStarted'
 import { LeftOffPanel } from '../components/projects/LeftOffPanel'
 import { MemoryPanel } from '../components/projects/MemoryPanel'
 import { ProjectHeader } from '../components/projects/ProjectHeader'
@@ -99,6 +100,7 @@ export function ProjectWorkspacePage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
+          <GettingStarted workspace={workspace} />
           {task ? (
             <TaskPanel
               tasks={tasks}

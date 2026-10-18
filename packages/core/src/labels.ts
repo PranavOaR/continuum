@@ -32,6 +32,7 @@ export const EVIDENCE_LABEL: Record<EvidenceType, string> = {
   observed: 'Observed',
   verified: 'Verified',
   'agent-reported': 'Agent-reported',
+  'user-reported': 'Set by you',
   inferred: 'Inferred',
   simulated: 'Simulated',
 }
@@ -40,6 +41,7 @@ export const EVIDENCE_DESCRIPTION: Record<EvidenceType, string> = {
   observed: 'Recorded directly from a project change or session event.',
   verified: 'Backed by a recorded check result, such as a test run.',
   'agent-reported': 'Stated by an agent and not independently confirmed.',
+  'user-reported': 'You set this in the dashboard. A statement, not a verified result.',
   inferred: 'Derived by Continuum from other records.',
   simulated: 'Created by this demo; no real action took place.',
 }

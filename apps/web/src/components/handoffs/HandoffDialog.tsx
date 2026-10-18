@@ -1,5 +1,5 @@
 import { ArrowRight, Info } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AGENTS, getAgent } from '@continuum/core'
 import { usePreferredProjectId, useProjects, useWorkspace } from '../../hooks/useWorkspace'
@@ -43,7 +43,10 @@ function tryBuildContext(...args: Parameters<typeof buildHandoffContext>): Hando
   }
 }
 
-function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone: () => void }) {
+/** Why the dialog cannot prepare a handoff right now, or null when it can. */
+export type SubmitBlocker = 'loading' | 'no-task' | 'no-context' | 'invalid' | null
+
+function HandoffForm({ initial, onDone, onBlockerChange }: { initial: HandoffDialogTarget; onDone: () => void; onBlockerChange: (blocker: SubmitBlocker) => void }) {
   const { preferences } = usePreferences()
   const { createHandoff } = useHandoffs()
   const notify = useToast()
@@ -78,6 +81,8 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
     setIncluded((current) => (checked ? [...current, category] : current.filter((item) => item !== category)))
 
   const canSubmit = task !== undefined && included.length > 0 && context !== undefined && !(context instanceof Error)
+  const blocker: SubmitBlocker = !workspace.data ? 'loading' : !task ? 'no-task' : included.length === 0 ? 'no-context' : canSubmit ? null : 'invalid'
+  useEffect(() => onBlockerChange(blocker), [blocker, onBlockerChange])
 
   const submit = () => {
     if (!task || !canSubmit) return
@@ -184,9 +189,16 @@ function HandoffForm({ initial, onDone }: { initial: HandoffDialogTarget; onDone
   )
 }
 
+const BLOCKER_HINT: Record<Exclude<SubmitBlocker, null | 'loading'>, string> = {
+  'no-task': 'This project has no recorded task to hand off. Copy the briefing instead.',
+  'no-context': 'Select at least one category to prepare a handoff.',
+  invalid: 'This handoff could not be prepared.',
+}
+
 export function HandoffDialog() {
   const { handoffDialog, closeHandoffDialog } = useUI()
   const formKey = handoffDialog ? `${handoffDialog.projectId ?? ''}:${handoffDialog.taskId ?? ''}` : 'closed'
+  const [blocker, setBlocker] = useState<SubmitBlocker>('loading')
 
   return (
     <Dialog
@@ -197,14 +209,19 @@ export function HandoffDialog() {
       size="xl"
       footer={
         <>
+          {blocker && blocker !== 'loading' && (
+            <p id="handoff-blocker" className="mr-auto text-[12px] text-muted">
+              {BLOCKER_HINT[blocker]}
+            </p>
+          )}
           <Button onClick={closeHandoffDialog}>Cancel</Button>
-          <Button variant="primary" type="submit" form="handoff-form">
+          <Button variant="primary" type="submit" form="handoff-form" disabled={blocker !== null} aria-describedby={blocker && blocker !== 'loading' ? 'handoff-blocker' : undefined}>
             Prepare Handoff
           </Button>
         </>
       }
     >
-      {handoffDialog && <HandoffForm key={formKey} initial={handoffDialog} onDone={closeHandoffDialog} />}
+      {handoffDialog && <HandoffForm key={formKey} initial={handoffDialog} onDone={closeHandoffDialog} onBlockerChange={setBlocker} />}
     </Dialog>
   )
 }

@@ -97,9 +97,10 @@ Handoffs separately list **changes no agent session made**, so the next agent as
 ```bash
 npm run build                                          # once, and after pulling changes
 npm run continuum -- serve ~/code/my-app ~/code/api    # prints http://127.0.0.1:4747/app?token=…
+npm run continuum -- serve                             # every repository connected with `setup`
 ```
 
-`serve` opens a read-only dashboard for one or more initialized repositories:
+`serve` opens a dashboard for one or more initialized repositories:
 - what changed and which agent changed it;
 - where the last session left off;
 - checks, with whether they still cover the current code;

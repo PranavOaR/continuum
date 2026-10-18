@@ -1,11 +1,12 @@
 import type { ContentHash, ContinuumEvent, IdentityKey } from '@continuum/core'
-import type { EdgeType, UpsertInput } from './graphIndex'
+import type { EdgeType, GraphNode, UpsertInput } from './graphIndex'
 import { hashRecord } from './hash'
 import { keys, REPOSITORY_NODE } from './keys'
 
 /** The write operations a projection may perform. ContextStore implements them with write-through persistence. */
 export interface Mutations {
   hasNode(key: IdentityKey): boolean
+  getNode(key: IdentityKey): GraphNode | undefined
   upsertNode(key: IdentityKey, input: UpsertInput): void
   link(from: IdentityKey, type: EdgeType, to: IdentityKey): void
   putObject(kind: string, value: unknown): ContentHash
@@ -39,7 +40,11 @@ export function project(store: Mutations, event: ContinuumEvent): void {
   const at = event.occurredAt
   switch (event.type) {
     case 'task.upserted': {
-      const { id, title, status, objective, nextAction, acceptanceCriteria, completedSteps, remainingSteps } = event.payload
+      const { id, title, status, objective, nextAction, acceptanceCriteria, completedSteps, remainingSteps, editedFields } = event.payload
+      const previous = store.getNode(keys.task(id))?.props.userEdited
+      // A dashboard edit adds the fields you changed; an agent's next snapshot is its own account again.
+      const userEdited =
+        event.evidence === 'user-reported' ? [...new Set([...(Array.isArray(previous) ? (previous as string[]) : []), ...(editedFields ?? [])])].sort() : []
       // Every field is written so each snapshot fully replaces the last (node props otherwise merge).
       const props = {
         title,
@@ -49,6 +54,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
         acceptanceCriteria: acceptanceCriteria ?? [],
         completedSteps: completedSteps ?? [],
         remainingSteps: remainingSteps ?? [],
+        userEdited,
       }
       store.upsertNode(keys.task(id), { hash: hashRecord('task', event.payload), props, at })
       return

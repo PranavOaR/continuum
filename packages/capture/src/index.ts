@@ -8,3 +8,4 @@ export { MAX_EXCERPT_LINES, MAX_PATCH_LINES, uncommittedChanges, type Uncommitte
 export { applyRepositoryRedactions, CONFIG_FILE, DEFAULT_CONFIG, readConfig, updateConfig, type ContinuumConfig } from './config'
 export { commitsSince, MAX_COMMITS_PER_SCAN, recordedHead, type CommitInfo } from './commits'
 export { IGNORE_FILE, loadContinuumIgnore, type IgnorePredicate } from './continuumIgnore'
+export { defaultConfigDir, readRegistry, registerRepository, REGISTRY_FILE, unregisterRepository, type RegisteredRepository } from './registry'

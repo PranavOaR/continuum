@@ -164,3 +164,11 @@ test('unknown routes and records show coherent states', async ({ page }) => {
   await page.goto('/app/nope')
   await expect(page.getByText('Page not found')).toBeVisible()
 })
+
+test('the demo shows tasks read-only: editing needs your own dashboard', async ({ page }) => {
+  await page.goto('/app/projects/startup-app')
+  const panel = page.locator('#task')
+  await expect(panel).toBeVisible()
+  await expect(panel.getByLabel('Status')).toHaveCount(0)
+  await expect(panel.getByRole('button', { name: /Mark ".*" as done/ })).toHaveCount(0)
+})

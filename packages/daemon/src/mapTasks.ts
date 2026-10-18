@@ -4,7 +4,10 @@ import { ids } from './ids'
 import { toFiles } from './mapProject'
 import type { RepoSnapshot } from './snapshot'
 
-const AGENT_REPORTED = 'Reported by the agent through update_task; not verified.'
+const CRITERION_EVIDENCE = {
+  'agent-reported': 'Reported by the agent through update_task; not verified.',
+  'user-reported': 'Set by you in the dashboard; not verified.',
+} as const
 
 function checksCovering(snapshot: RepoSnapshot, files: readonly string[]): string[] {
   const keys = files.map((path) => `file:${path}`)
@@ -28,7 +31,7 @@ export function toTask(snapshot: RepoSnapshot, task: TaskSummary): ProjectTask {
       id: `${task.id}~criterion~${index}`,
       text: criterion.text,
       status: criterion.met ? 'complete' : 'incomplete',
-      evidence: AGENT_REPORTED,
+      evidence: CRITERION_EVIDENCE[task.userEdited.includes('criteria') ? 'user-reported' : 'agent-reported'],
     })),
     completedSteps: task.completedSteps,
     remainingSteps: task.remainingSteps,
@@ -36,6 +39,7 @@ export function toTask(snapshot: RepoSnapshot, task: TaskSummary): ProjectTask {
     relatedFileIds: files.map((path) => ids.file(snapshot.projectId, path)),
     verificationIds: checksCovering(snapshot, files),
     updatedAt: task.updatedAt,
+    ...(task.userEdited.length > 0 ? { userEdited: task.userEdited } : {}),
   }
 }
 

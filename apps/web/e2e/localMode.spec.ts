@@ -16,6 +16,8 @@ const CLI = ['--import', 'tsx', join(ROOT, 'packages/cli/src/bin.ts')]
 const GIT_IDENTITY = ['-c', 'user.name=Continuum Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false']
 
 let repo = ''
+/** A second repository with Continuum set up but no task recorded yet. */
+let emptyRepo = ''
 let server: ChildProcess | undefined
 let url = ''
 let launchUrl = ''
@@ -61,7 +63,12 @@ test.beforeAll(async () => {
   hook({ hook_event_name: 'Stop', last_assistant_message: 'Bumped app to 2. Next: wire the config loader.' })
   continuum(['run', '--name', 'unit', '--', process.execPath, '-e', '0'])
 
-  server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] })
+  emptyRepo = realpathSync(mkdtempSync(join(tmpdir(), 'continuum-e2e-empty-')))
+  execFileSync('git', [...GIT_IDENTITY, 'init', '--quiet', '--initial-branch=main'], { cwd: emptyRepo })
+  writeFileSync(join(emptyRepo, 'notes.md'), 'nothing yet\n')
+  execFileSync(process.execPath, [...CLI, '-C', emptyRepo, 'init'], { cwd: ROOT })
+
+  server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0', '.', emptyRepo], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] })
   launchUrl = await new Promise<string>((resolve, reject) => {
     let output = ''
     server?.stdout?.on('data', (chunk: Buffer) => {
@@ -94,6 +101,7 @@ test.afterAll(async () => {
     await exited
   }
   if (repo) rmSync(repo, { recursive: true, force: true })
+  if (emptyRepo) rmSync(emptyRepo, { recursive: true, force: true })
 })
 
 test('the printed link opens the dashboard, labelled as live local data', async ({ page }) => {
@@ -150,4 +158,86 @@ test('updates without a reload when something new is recorded', async ({ page })
   continuum(['run', '--name', 'typecheck', '--', process.execPath, '-e', '0'])
   // Pushed by the daemon's change stream: nothing in the page reloads or navigates.
   await expect(page.locator('#verification').getByText('typecheck')).toBeVisible({ timeout: 4_000 })
+})
+
+test('edits a task from the dashboard and records it as set by you', async ({ page }) => {
+  const name = repo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  const panel = page.locator('#task')
+  await panel.getByRole('button', { name: 'Mark "Validate" as done' }).click()
+  await expect(panel.getByRole('button', { name: 'Mark "Validate" as not done' })).toBeVisible()
+  await panel.getByLabel('Status').selectOption('blocked')
+  await expect(panel.getByText('Changed by you: status, steps')).toBeVisible()
+
+  // Saved in the repository's store, not just on screen.
+  await page.reload()
+  await expect(page.locator('#task').getByLabel('Status')).toHaveValue('blocked')
+  const handoff = continuum(['handoff'])
+  expect(handoff).toContain('[agent-reported] "Load config from env" (blocked)')
+  expect(handoff).toContain('[set by you] Changed in the dashboard: status, steps done')
+})
+
+test('a project without tasks offers its briefing, and Prepare Handoff says why it is unavailable', async ({ page }) => {
+  const name = emptyRepo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).first().click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: 'Copy briefing' })).toBeVisible()
+  const prepare = dialog.getByRole('button', { name: 'Prepare Handoff', exact: true })
+  await expect(prepare).toBeDisabled()
+  await expect(dialog.getByText('This project has no recorded task to hand off. Copy the briefing instead.')).toBeVisible()
+})
+
+test('a new project shows a getting-started checklist that ticks itself off live', async ({ page }) => {
+  const name = emptyRepo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  const guide = page.locator('#getting-started')
+  await expect(guide.getByText('0 of 4 done', { exact: false })).toBeVisible()
+  await expect(guide.getByText('continuum setup claude-code')).toBeVisible()
+
+  execFileSync(process.execPath, [...CLI, '-C', emptyRepo, 'run', '--name', 'smoke', '--', process.execPath, '-e', '0'], { cwd: ROOT })
+  await expect(guide.getByText('1 of 4 done', { exact: false })).toBeVisible({ timeout: 4_000 })
+  await expect(guide.getByText('Record a check (done)')).toBeAttached()
+
+  await guide.getByRole('button', { name: 'Hide getting started' }).click()
+  await expect(page.locator('#getting-started')).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Where we left off' })).toBeVisible()
+  await expect(page.locator('#getting-started')).toHaveCount(0)
+})
+
+test.describe('accessibility of live screens', () => {
+  const pages = () => {
+    const slug = (path: string) => (path.split('/').at(-1) as string).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    return [
+      ['overview', '/app'],
+      ['project with a task', `/app/projects/${slug(repo)}`],
+      ['project without tasks', `/app/projects/${slug(emptyRepo)}`],
+      ['activity', '/app/activity'],
+      ['memory', '/app/memory'],
+      ['settings', '/app/settings'],
+    ] as const
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`has no serious or critical axe violations in the ${theme} theme`, async ({ page }) => {
+      const { default: AxeBuilder } = await import('@axe-core/playwright')
+      const failures: string[] = []
+      // Measure settled colours, not elements caught halfway through a fade-in.
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      for (const [name, path] of pages()) {
+        await page.goto(`${url}${path}`)
+        await expect(page.getByRole('main')).toBeVisible()
+        // Switch instantly: a colour transition would be measured halfway between themes.
+        await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; }' })
+        await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme)
+        const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+        for (const violation of violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')) {
+          const where = violation.nodes.map((node) => `${node.html.slice(0, 100)} [${node.any.map((check) => check.message).join('; ')}]`)
+          failures.push(`${name}: ${violation.id} (${violation.impact}) on ${where.slice(0, 3).join(' | ')}`)
+        }
+      }
+      expect(failures).toEqual([])
+    })
+  }
 })

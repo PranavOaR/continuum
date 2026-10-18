@@ -16,10 +16,27 @@ interface Envelope<T> {
   error?: { code?: string; message?: string }
 }
 
+/** `continuum serve` puts a per-run CSRF token in the page; writes must send it back. */
+export const CSRF_META = 'continuum-csrf'
+
+function pageCsrfToken(doc: Pick<Document, 'querySelector'> | undefined = globalThis.document): string {
+  return doc?.querySelector<HTMLMetaElement>(`meta[name="${CSRF_META}"]`)?.content ?? ''
+}
+
 /** Reads the local daemon's API. Same contract as the mock service, so screens do not change. */
-export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = ''): ContinuumService {
+export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = '', csrfToken: () => string = pageCsrfToken): ContinuumService {
   async function get<T>(path: string): Promise<T> {
-    const response = await fetchImpl(`${base}${path}`, { headers: { Accept: 'application/json' } })
+    return parse<T>(path, await fetchImpl(`${base}${path}`, { headers: { Accept: 'application/json' } }))
+  }
+  async function post<T>(path: string, body: unknown): Promise<T> {
+    const response = await fetchImpl(`${base}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Continuum-CSRF': csrfToken() },
+      body: JSON.stringify(body),
+    })
+    return parse<T>(path, response)
+  }
+  async function parse<T>(path: string, response: Response): Promise<T> {
     let body: Envelope<T>
     try {
       body = (await response.json()) as Envelope<T>
@@ -40,5 +57,6 @@ export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = ''):
     getMemoryGraph: (projectId) => get(`${project(projectId)}/graph`),
     search: (query) => get(`/api/search?q=${encodeURIComponent(query)}`),
     getBriefing: (projectId) => get(`${project(projectId)}/briefing`),
+    updateTask: (projectId, taskId, change) => post(`${project(projectId)}/tasks/${encodeURIComponent(taskId)}`, change),
   }
 }
