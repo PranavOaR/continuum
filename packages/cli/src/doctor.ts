@@ -5,7 +5,7 @@ import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError, readRegistry } from '@continuum/capture'
-import { HOOK_EVENTS, HOOKS_FILE, isContinuumHandler, isContinuumServer, MCP_FILE, MCP_SERVER_NAME, type Invocation } from '@continuum/claude-code'
+import { CODEX_HOOKS_FILE, HOOK_EVENTS, HOOKS_FILE, isContinuumHandler, isContinuumServer, MCP_FILE, MCP_SERVER_NAME, type Invocation } from '@continuum/claude-code'
 import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@continuum/store'
 
 /** node:sqlite works without a flag from this version on. */
@@ -132,6 +132,20 @@ function approval(settings: Json): Finding {
   return { status: 'warn', label: 'MCP server not approved yet', detail: 'Claude Code asks the first time it starts in this repository', fix: 'Start Claude Code here and approve "continuum" (or run /mcp).' }
 }
 
+/** Codex is connected when its project hooks run Continuum; null when it is not set up here. */
+async function checkCodex(root: string): Promise<Finding | null> {
+  const hooks = await readJson(join(root, CODEX_HOOKS_FILE))
+  if (hooks === null) return null
+  if (hooks === 'invalid') return { status: 'fail', label: `${CODEX_HOOKS_FILE} is not a valid JSON object`, fix: 'Fix or remove it, then run `continuum setup codex`.' }
+  const connected = JSON.stringify(hooks).includes('ingest --agent codex')
+  if (!connected) return null
+  return {
+    status: 'ok',
+    label: 'Codex hooks registered',
+    detail: 'Codex runs them once the project is trusted and you have reviewed them with /hooks',
+  }
+}
+
 function checkDashboard(webDist: string): Finding {
   return existsSync(join(webDist, 'index.html'))
     ? { status: 'ok', label: 'Dashboard available', detail: 'continuum serve' }
@@ -153,7 +167,16 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   if (!isInitialized(workspace)) return [...findings, { status: 'fail', label: 'Continuum is not set up here', fix: SETUP_FIX }]
   findings.push(checkStore(workspace.storePath))
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
-  findings.push(checkHooks(settings, env.invocation), ...(await checkMcp(workspace.root, mcpConfig, settings)), checkDashboard(env.webDist))
+  const codex = await checkCodex(workspace.root)
+  const claudeHooks = checkHooks(settings, env.invocation)
+  const claudeMissing = settings === null && claudeHooks.status === 'fail'
+  if (claudeMissing && codex) {
+    // Connected through Codex only: Claude Code's absence is not a problem.
+    findings.push({ status: 'ok', label: 'Claude Code not connected', detail: 'Codex is; run `continuum setup claude-code` to add it' }, codex)
+  } else {
+    findings.push(claudeHooks, ...(await checkMcp(workspace.root, mcpConfig, settings)), ...(codex ? [codex] : []))
+  }
+  findings.push(checkDashboard(env.webDist))
   const listed = (await readRegistry(env.configDir)).some((entry) => entry.root === workspace.root)
   findings.push(
     listed

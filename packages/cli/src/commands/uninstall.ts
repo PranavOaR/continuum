@@ -2,7 +2,7 @@ import { existsSync, readdirSync, rmdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { CONTINUUM_DIR, includeInGit, locateWorkspace, unregisterRepository } from '@continuum/capture'
-import { HOOKS_FILE, removeClaudeCodeSetup } from '@continuum/claude-code'
+import { CODEX_HOOKS_FILE, HOOKS_FILE, removeClaudeCodeSetup, removeCodexSetup } from '@continuum/claude-code'
 import { isStoreBusy } from '@continuum/store'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -29,9 +29,12 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
     io.err('continuum: another Continuum process is writing to this repository. Stop `continuum start` and `continuum serve` here, then run uninstall again. Nothing was changed.')
     return EXIT_FAILURE
   }
-  const result = await removeClaudeCodeSetup(root)
+  const claude = await removeClaudeCodeSetup(root)
+  const codex = await removeCodexSetup(root)
+  const result = { files: [...claude.files, ...codex.files] }
   await unregisterRepository(io.configDir, root)
   removeIfEmpty(join(root, dirname(HOOKS_FILE)))
+  removeIfEmpty(join(root, dirname(CODEX_HOOKS_FILE)))
   for (const file of result.files) io.out(`  ${file.action.padEnd(9)} ${file.path}`)
 
   const storeDir = join(root, CONTINUUM_DIR)

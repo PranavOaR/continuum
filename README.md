@@ -101,12 +101,25 @@ Handoffs separately list **changes no agent session made**, so the next agent as
 | `continuum compact` | Folds events older than 30 days into a checkpoint. |
 | `continuum uninstall [--purge]` | Disconnects Claude Code; `--purge` also deletes `.continuum/`. |
 
-## Use with an agent that has no hooks
-
-Codex, Cursor or a chat can still leave a trail:
+## Use with Codex
 
 ```bash
-continuum session start --agent codex   # prints a briefing to paste in, including what changed since its last session
+continuum setup codex
+```
+
+This writes project-scoped `.codex/hooks.json` and a marked block in `.codex/config.toml`, never `~/.codex`. Codex loads them once you **trust the project** when it asks; then run **`/hooks`** in Codex and trust Continuum's hooks.
+- Each Codex session starts briefed on where the work left off (including what Claude or another agent did since).
+- Its patches are recorded as changes, and its last message as an agent-reported note.
+- It can use the same MCP tools (`start_task`, `update_task`, `get_context`, `record_decision`).
+
+Codex does not report a shell command's exit code to hooks, so its test runs are not recorded as checks. Use `continuum run -- <command>` for verified results. `continuum setup codex --remove` and `continuum uninstall` take it out again.
+
+## Use with an agent that has no hooks
+
+Cursor, a chat or any other agent can still leave a trail:
+
+```bash
+continuum session start --agent cursor  # prints a briefing to paste in, including what changed since its last session
 continuum start                         # in another terminal: file changes are attributed to the open session
 continuum session note "Parser done; tests next"
 continuum session end --summary "Parser rewritten, tests pass"

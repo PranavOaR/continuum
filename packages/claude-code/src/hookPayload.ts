@@ -81,6 +81,55 @@ export function reportedTaskId(payload: HookPayload): string | null {
   return match ? match[1] : null
 }
 
+/** Agents whose hooks Continuum understands. Codex's hooks use the same events and fields as Claude Code's. */
+export type HookAgent = 'claude-code' | 'codex'
+
+/** Codex edits files through one tool whose input is a patch naming every file it touches. */
+export const PATCH_TOOL = 'apply_patch'
+
+/** A file a tool call changed, and how, when the tool says so. */
+export interface EditedFile {
+  path: string
+  changeType?: 'added' | 'modified' | 'deleted'
+}
+
+const PATCH_HEADER = /^\*\*\* (Add|Update|Delete) File: (.+)$/
+const PATCH_MOVE = /^\*\*\* Move to: (.+)$/
+
+/**
+ * Every file an apply_patch call names: added, updated and deleted files, and
+ * for a move (`*** Update File: old` then `*** Move to: new`) the old path as
+ * deleted and the new one as added.
+ */
+export function patchedFiles(patch: string): EditedFile[] {
+  const files: EditedFile[] = []
+  for (const line of patch.split('\n')) {
+    const header = PATCH_HEADER.exec(line)
+    if (header) {
+      const kind = header[1] === 'Add' ? 'added' : header[1] === 'Delete' ? 'deleted' : 'modified'
+      files.push({ path: header[2].trim(), changeType: kind })
+      continue
+    }
+    const moved = PATCH_MOVE.exec(line)
+    if (!moved) continue
+    const source = files.at(-1)
+    if (source?.changeType === 'modified') files[files.length - 1] = { ...source, changeType: 'deleted' }
+    files.push({ path: moved[1].trim(), changeType: 'added' })
+  }
+  return files
+}
+
+/** Every file a successful tool call wrote: one for Claude Code's edit tools, any number for a patch. */
+export function editedFiles(payload: HookPayload): EditedFile[] {
+  if (payload.hook_event_name !== 'PostToolUse') return []
+  if (payload.tool_name === PATCH_TOOL) {
+    const patch = typeof payload.tool_input.command === 'string' ? payload.tool_input.command : typeof payload.tool_input.patch === 'string' ? payload.tool_input.patch : ''
+    return patchedFiles(patch)
+  }
+  const path = editedPath(payload)
+  return path ? [{ path }] : []
+}
+
 /** The absolute path a file-editing tool call wrote, if this payload is one. */
 export function editedPath(payload: HookPayload): string | null {
   if (payload.hook_event_name !== 'PostToolUse') return null

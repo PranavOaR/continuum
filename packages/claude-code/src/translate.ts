@@ -1,9 +1,11 @@
 import { redactSecrets } from '@continuum/capture'
 import type { ChangeType, ContentHash, ContinuumEvent } from '@continuum/core'
 import type { AgentCheck } from './agentCheck'
-import type { HookPayload } from './hookPayload'
+import type { HookAgent, HookPayload } from './hookPayload'
 
 export const ADAPTER_SOURCE = 'adapter:claude-code'
+/** Where an agent's hook events come from in the event log. */
+export const adapterSource = (agent: HookAgent) => `adapter:${agent}`
 /** Longest agent note kept per turn; the handoff quotes far less. */
 export const MAX_NOTE_CHARS = 2_000
 /** Longest prompt kept; the handoff quotes far less. */
@@ -15,6 +17,8 @@ export interface FileEdit {
   path: string
   /** Blob hash after the edit, or null if the file no longer exists. */
   contentHash: ContentHash | null
+  /** How the tool said it changed the file, when it did (a patch names added and deleted files). */
+  changeType?: ChangeType
 }
 
 export interface TranslateContext {
@@ -22,8 +26,10 @@ export interface TranslateContext {
   revision: string | null
   /** Whether the store already knows this session (resume and compact reuse the id). */
   knownSession: boolean
-  /** Set when the payload is a file edit inside the repository that scans capture. */
-  edit?: FileEdit
+  /** Which agent's hooks sent this payload. Defaults to Claude Code. */
+  agent?: HookAgent
+  /** Files the payload's tool call changed, inside what scans capture. */
+  edits?: FileEdit[]
   /** The task currently being worked on, if one is recorded. */
   taskId?: string
   /** Set when a task tool call linked this session to a task. */
@@ -36,6 +42,7 @@ export interface TranslateContext {
 
 function changeTypeOf(payload: Extract<HookPayload, { hook_event_name: 'PostToolUse' }>, edit: FileEdit): ChangeType {
   if (edit.contentHash === null) return 'deleted'
+  if (edit.changeType) return edit.changeType
   const response = payload.tool_response as { type?: unknown } | undefined
   return payload.tool_name === 'Write' && response?.type === 'create' ? 'added' : 'modified'
 }
@@ -48,8 +55,9 @@ function checkEvent(base: { source: string; occurredAt: string; revision?: strin
 
 /** Pure mapping from one Claude Code hook payload to the events it implies. */
 export function translateHook(payload: HookPayload, context: TranslateContext): ContinuumEvent[] {
+  const agent = context.agent ?? 'claude-code'
   const base = {
-    source: ADAPTER_SOURCE,
+    source: adapterSource(agent),
     occurredAt: context.now.toISOString(),
     ...(context.revision ? { revision: context.revision } : {}),
   }
@@ -59,7 +67,7 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
       const isFresh = payload.source === undefined || FRESH_SESSION_SOURCES.has(payload.source)
       if (!isFresh && context.knownSession) return []
       const task = context.taskId ? { taskId: context.taskId } : {}
-      return [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent: 'claude-code', ...task } }]
+      return [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent, ...task } }]
     }
     case 'SessionEnd':
       return [{ ...base, type: 'session.ended', evidence: 'observed', payload: { sessionId } }]
@@ -75,16 +83,12 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
     case 'PostToolUse': {
       if (context.check) return [checkEvent(base, context.check)]
       if (context.sessionTaskId) return [{ ...base, type: 'session.task', evidence: 'observed', payload: { sessionId, taskId: context.sessionTaskId } }]
-      const { edit } = context
-      if (!edit) return []
-      return [
-        {
-          ...base,
-          type: 'file.changed',
-          evidence: 'observed',
-          payload: { path: edit.path, contentHash: edit.contentHash, changeType: changeTypeOf(payload, edit), sessionId, ...(context.taskId ? { taskId: context.taskId } : {}) },
-        },
-      ]
+      return (context.edits ?? []).map((edit) => ({
+        ...base,
+        type: 'file.changed' as const,
+        evidence: 'observed' as const,
+        payload: { path: edit.path, contentHash: edit.contentHash, changeType: changeTypeOf(payload, edit), sessionId, ...(context.taskId ? { taskId: context.taskId } : {}) },
+      }))
     }
   }
 }
