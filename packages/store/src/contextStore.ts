@@ -434,6 +434,11 @@ export class ContextStore implements Mutations {
     return checkStatus(this.checkRun(name), this.graphIndex.currentHashes())
   }
 
+  /**
+   * Staleness against recorded hashes only. Symbol anchors need their current
+   * hashes from source (see readWorkingTreeWithSymbols and liveHashes), so
+   * callers that care about symbols use projectState instead.
+   */
   memoryStatus(id: string): { status: AnchorStatus; changed: IdentityKey[] } {
     const anchors = (this.graphIndex.get(keys.memory(id))?.props.anchors ?? {}) as Record<IdentityKey, ContentHash>
     return anchorStatus(anchors, this.graphIndex.currentHashes())

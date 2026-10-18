@@ -9,7 +9,7 @@ import {
   NotAGitRepositoryError,
   applyRepositoryRedactions,
   readConfig,
-  readWorkingTree,
+  readWorkingTreeWithSymbols,
   scanRepository,
   coverage,
   type Workspace,
@@ -69,7 +69,7 @@ function taskFor(store: ContextStore, sessionId: string, now: Date): string | un
 }
 
 async function sessionStartContext(store: ContextStore, root: string, sessionId: string, now: Date): Promise<string | undefined> {
-  const previous = projectState(store, await readWorkingTree(root), now, { excludeSessionId: sessionId })
+  const previous = projectState(store, await readWorkingTreeWithSymbols(store, root), now, { excludeSessionId: sessionId })
   if (previous.sessions.length === 0 && previous.checks.length === 0 && previous.decisions.length === 0 && previous.tasks.length === 0) return undefined
   const handoff = renderHandoff(previous, { now, maxChars: SESSION_START_CONTEXT_CHARS, since: sinceYouLeft(store, AGENT, sessionId) })
   return [

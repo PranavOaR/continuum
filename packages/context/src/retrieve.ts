@@ -1,5 +1,5 @@
 import type { EvidenceType } from '@continuum/core'
-import type { ContextStore } from '@continuum/store'
+import { anchoredPath, type ContextStore } from '@continuum/store'
 import type { ProjectState } from './projectState'
 import type { TaskSummary } from './tasks'
 import { agoFromIso } from './time'
@@ -60,7 +60,7 @@ function decisionAnchors(store: ContextStore): Map<string, string[]> {
   return new Map(
     store.graph.keysOfKind('memory').map((key) => {
       const anchors = (store.graph.get(key)?.props.anchors ?? {}) as Record<string, string>
-      return [key.slice('memory:'.length), Object.keys(anchors).map((anchor) => anchor.slice('file:'.length))]
+      return [key.slice('memory:'.length), Object.keys(anchors).flatMap((anchor) => anchoredPath(anchor) ?? [])]
     }),
   )
 }

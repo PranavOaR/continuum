@@ -3,7 +3,7 @@ import {
   clearActiveSession,
   openWorkspace,
   readActiveSession,
-  readWorkingTree,
+  readWorkingTreeWithSymbols,
   redactSecrets,
   scanRepository,
   claimActiveSession,
@@ -64,7 +64,7 @@ async function start(io: Io, args: readonly string[]): Promise<number> {
       await clearActiveSession(workspace.root)
       throw error
     }
-    const state = projectState(store, await readWorkingTree(workspace.root), io.now(), { excludeSessionId: session.sessionId })
+    const state = projectState(store, await readWorkingTreeWithSymbols(store, workspace.root), io.now(), { excludeSessionId: session.sessionId })
     io.out(`Started a ${agent} session (${session.sessionId}). Changes captured by \`continuum start\` or \`scan\` are now attributed to it.`)
     io.out('Paste this briefing into the agent, and end with `continuum session end --summary "..."`:')
     io.out('')

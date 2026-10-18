@@ -10,3 +10,5 @@ export { commitsSince, MAX_COMMITS_PER_SCAN, recordedHead, type CommitInfo } fro
 export { IGNORE_FILE, loadContinuumIgnore, type IgnorePredicate } from './continuumIgnore'
 export { defaultConfigDir, readRegistry, registerRepository, REGISTRY_FILE, unregisterRepository, type RegisteredRepository } from './registry'
 export { ACTIVE_SESSION_FILE, claimActiveSession, clearActiveSession, readActiveSession, type ActiveSession } from './activeSession'
+export { extractSymbols, parseSymbolRef, type SourceSymbol, type SymbolKind } from './symbols'
+export { readSymbolHashes, readWorkingTreeWithSymbols } from './symbolHashes'
