@@ -151,6 +151,19 @@ This adds the `continuum` MCP server to `.cursor/mcp.json` and an always-applied
 
 Cursor has no hooks Continuum uses, so to capture its edits, run `continuum session start --agent cursor` and `continuum start` (see below).
 
+## Use with an agent that has no hooks
+
+Cursor, a chat or any other agent can still leave a trail:
+
+```bash
+continuum session start --agent cursor  # prints a briefing to paste in, including what changed since its last session
+continuum start                         # in another terminal: file changes are attributed to the open session
+continuum session note "Parser done; tests next"
+continuum session end --summary "Parser rewritten, tests pass"
+```
+
+While a session is open, `continuum start`, `scan` and `run` attribute file changes to it. Changes made before it started are not credited to it. Notes and summaries are labelled agent-reported, like an agent's own messages.
+
 ## Dashboard
 
 ```bash

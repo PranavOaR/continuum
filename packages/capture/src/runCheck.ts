@@ -39,6 +39,8 @@ export interface RunCheckOptions {
   stdout?: Writable
   stderr?: Writable
   now?: () => Date
+  /** Credit file changes to a session opened with `continuum session start`. */
+  attributeToActiveSession?: boolean
   /** Aborting stops the command (SIGTERM) and records nothing. */
   signal?: AbortSignal
 }
@@ -149,7 +151,8 @@ export async function runCheck(store: ContextStore, options: RunCheckOptions): P
   const now = options.now ?? (() => new Date())
   const { text: commandLine, count: commandRedactions } = redactWithCount([options.command, ...options.args].join(' '))
   const name = redactSecrets(options.name ?? commandLine)
-  const { tree } = await scanRepository(store, options.root, { now })
+  const attribution = { attributeToActiveSession: options.attributeToActiveSession ?? false }
+  const { tree } = await scanRepository(store, options.root, { now, ...attribution })
   const startedAt = now()
   const outcome = await execute(options)
   if (outcome.interrupted) throw new CheckInterruptedError(outcome.exitCode)
@@ -172,7 +175,7 @@ export async function runCheck(store: ContextStore, options: RunCheckOptions): P
   store.transact(() => [{ ...event, payload: { ...event.payload, coverage: store.putCoverage(coverage(tree.files)) } }])
   const result: RunCheckResult = { name, exitCode: outcome.exitCode, durationMs, status: 'unknown', redactions: commandRedactions + outcome.redactions }
   try {
-    await scanRepository(store, options.root, { now })
+    await scanRepository(store, options.root, { now, ...attribution })
   } catch (error) {
     // The run is recorded; losing its exit code over a follow-up scan would be worse.
     const reason = error instanceof Error ? error.message : String(error)
