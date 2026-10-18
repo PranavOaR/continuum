@@ -6,7 +6,7 @@ import {
   readWorkingTree,
   redactSecrets,
   scanRepository,
-  writeActiveSession,
+  claimActiveSession,
   type ActiveSession,
 } from '@continuum/capture'
 import { projectState, renderHandoff, sinceYouLeft } from '@continuum/context'
@@ -41,11 +41,6 @@ async function start(io: Io, args: readonly string[]): Promise<number> {
   }
   const { workspace, store } = await openWorkspace(io.cwd)
   try {
-    const open = await readActiveSession(workspace.root)
-    if (open) {
-      io.err(`continuum: a ${open.agent} session (${open.sessionId}) is already open. End it first: continuum session end`)
-      return EXIT_FAILURE
-    }
     if (taskId && !store.graph.has(keys.task(taskId))) {
       io.err(`continuum: no task "${taskId}"`)
       return EXIT_FAILURE
@@ -54,11 +49,21 @@ async function start(io: Io, args: readonly string[]): Promise<number> {
     await scanRepository(store, workspace.root, { now: io.now })
     const now = io.now().toISOString()
     const session: ActiveSession = { sessionId: `${agent}-${randomUUID().slice(0, 8)}`, agent: agent as AgentType, startedAt: now, ...(taskId ? { taskId } : {}) }
-    store.recordAll([
-      { type: 'session.started', payload: { sessionId: session.sessionId, agent: session.agent, ...(taskId ? { taskId } : {}) }, evidence: 'observed', source: SOURCE, occurredAt: now },
-      ...(taskId ? [{ type: 'session.task' as const, payload: { sessionId: session.sessionId, taskId }, evidence: 'observed' as const, source: SOURCE, occurredAt: now }] : []),
-    ])
-    await writeActiveSession(workspace.root, session)
+    if (!(await claimActiveSession(workspace.root, session))) {
+      const open = await readActiveSession(workspace.root)
+      io.err(`continuum: a ${open?.agent ?? ''} session (${open?.sessionId ?? 'unknown'}) is already open. End it first: continuum session end`)
+      return EXIT_FAILURE
+    }
+    try {
+      store.recordAll([
+        { type: 'session.started', payload: { sessionId: session.sessionId, agent: session.agent, ...(taskId ? { taskId } : {}) }, evidence: 'observed', source: SOURCE, occurredAt: now },
+        ...(taskId ? [{ type: 'session.task' as const, payload: { sessionId: session.sessionId, taskId }, evidence: 'observed' as const, source: SOURCE, occurredAt: now }] : []),
+      ])
+    } catch (error) {
+      // Nothing was recorded, so the session must not stay open.
+      await clearActiveSession(workspace.root)
+      throw error
+    }
     const state = projectState(store, await readWorkingTree(workspace.root), io.now(), { excludeSessionId: session.sessionId })
     io.out(`Started a ${agent} session (${session.sessionId}). Changes captured by \`continuum start\` or \`scan\` are now attributed to it.`)
     io.out('Paste this briefing into the agent, and end with `continuum session end --summary "..."`:')
@@ -100,7 +105,9 @@ async function end(io: Io, args: readonly string[]): Promise<number> {
       return EXIT_OK
     }
     // Whatever changed until now was this session's work.
-    const { changes } = await scanRepository(store, workspace.root, { now: io.now })
+    const { changes } = await scanRepository(store, workspace.root, { now: io.now, attributeToActiveSession: true })
+    // Close the file first: a crash after this point leaves an unended session, never one that keeps collecting changes.
+    await clearActiveSession(workspace.root)
     store.record({
       type: 'session.ended',
       payload: { sessionId: open.sessionId, ...(summary?.trim() ? { summary: note(summary) } : {}) },
@@ -108,7 +115,6 @@ async function end(io: Io, args: readonly string[]): Promise<number> {
       source: SOURCE,
       occurredAt: io.now().toISOString(),
     })
-    await clearActiveSession(workspace.root)
     io.out(`Ended ${open.sessionId}${changes.length > 0 ? `; recorded ${changes.length} last change${changes.length === 1 ? '' : 's'}` : ''}.`)
     return EXIT_OK
   } finally {

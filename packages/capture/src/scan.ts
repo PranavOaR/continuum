@@ -24,7 +24,8 @@ export interface ScanOptions {
   now?: () => Date
   /**
    * Attribute changes to the session opened with `continuum session start`, if any.
-   * Off for scans made by another agent's hooks, which must not credit that session with their work.
+   * Off unless asked for: only commands a person runs alongside that agent (the
+   * watcher, scan, run, session end) opt in, never another agent's hooks.
    */
   attributeToActiveSession?: boolean
 }
@@ -79,7 +80,9 @@ function commitEvent(commit: CommitInfo, occurredAt: string, isBaseline: boolean
  */
 export async function scanRepository(store: ContextStore, root: string, options: ScanOptions = {}): Promise<ScanResult> {
   const tree = await readWorkingTree(root)
-  const session = (options.attributeToActiveSession ?? true) ? await readActiveSession(root) : null
+  const open = options.attributeToActiveSession ? await readActiveSession(root) : null
+  // A session file left behind by a crash after the session ended credits nothing.
+  const session = open && !store.graph.get(`session:${open.sessionId}`)?.props.endedAt ? open : null
   const occurredAt = (options.now ?? (() => new Date()))().toISOString()
   const previousHead = recordedHead(store)
   // tree.revision is abbreviated; the recorded head is the full hash.

@@ -55,7 +55,7 @@ export async function runCommand(io: Io, argv: readonly string[]): Promise<numbe
   const { workspace, store } = await openWorkspace(io.cwd)
   try {
     await applyRepositoryRedactions(workspace.root)
-    const result = await runCheck(store, { root: workspace.root, ...parsed, stdout: io.stdout, stderr: io.stderr, now: io.now, signal: io.signal })
+    const result = await runCheck(store, { root: workspace.root, ...parsed, stdout: io.stdout, stderr: io.stderr, now: io.now, signal: io.signal, attributeToActiveSession: true })
     io.err(`continuum: recorded "${result.name}" · ${CHECK_LABELS[result.status]} · exit ${result.exitCode} · ${formatDuration(result.durationMs)}`)
     if (result.redactions > 0) io.err(`continuum: masked ${result.redactions} secret${result.redactions === 1 ? '' : 's'} in the command and output before storing them`)
     if (result.warning) io.err(`continuum: warning: ${result.warning}`)

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentType } from '@continuum/core'
 import { CONTINUUM_DIR } from './git'
@@ -33,11 +33,18 @@ export async function readActiveSession(root: string): Promise<ActiveSession | n
   }
 }
 
-export async function writeActiveSession(root: string, session: ActiveSession): Promise<void> {
-  const path = pathOf(root)
-  const temporary = `${path}.${process.pid}.tmp`
-  await writeFile(temporary, `${JSON.stringify(session, null, 2)}\n`, { mode: 0o600 })
-  await rename(temporary, path)
+/**
+ * Opens the session file only if none exists, in one step ('wx'), so two
+ * `session start`s at once cannot both succeed. Returns false when one is open.
+ */
+export async function claimActiveSession(root: string, session: ActiveSession): Promise<boolean> {
+  try {
+    await writeFile(pathOf(root), `${JSON.stringify(session, null, 2)}\n`, { mode: 0o600, flag: 'wx' })
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false
+    throw error
+  }
 }
 
 export async function clearActiveSession(root: string): Promise<void> {

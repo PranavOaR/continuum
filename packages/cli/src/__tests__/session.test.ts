@@ -47,3 +47,36 @@ describe('continuum session', () => {
     expect((await cli(created.root, ['session'])).out).toMatch(/Open: cursor session cursor-\w+/)
   })
 })
+
+describe('continuum session attribution', () => {
+  it('credits only scans a person runs alongside the agent, never other paths', async () => {
+    const created = await repo()
+    await cli(created.root, ['session', 'start', '--agent', 'codex'])
+    created.write('README.md', 'changed while the session is open')
+    // `handoff` reads the tree but must not credit anything; `scan` does.
+    await cli(created.root, ['handoff'])
+    await cli(created.root, ['scan'])
+    await cli(created.root, ['session', 'end'])
+    expect((await cli(created.root, ['handoff'])).out).toContain('Files it changed: `README.md`')
+  })
+
+  it('lets only one of two simultaneous starts open a session', async () => {
+    const created = await repo()
+    const results = await Promise.all([cli(created.root, ['session', 'start', '--agent', 'codex']), cli(created.root, ['session', 'start', '--agent', 'cursor'])])
+    expect(results.map((result) => result.code).sort()).toEqual([EXIT_OK, EXIT_FAILURE])
+  })
+
+  it('ignores a session file left behind after its session ended', async () => {
+    const created = await repo()
+    await cli(created.root, ['session', 'start', '--agent', 'codex'])
+    const { readFileSync, writeFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const file = join(created.root, '.continuum/active-session.json')
+    const saved = readFileSync(file, 'utf8')
+    await cli(created.root, ['session', 'end'])
+    writeFileSync(file, saved) // as if a crash had left it
+    created.write('src/app.ts', 'edited after the session ended')
+    await cli(created.root, ['scan'])
+    expect((await cli(created.root, ['handoff'])).out).not.toMatch(/Files it changed:[^\n]*src\/app\.ts/)
+  })
+})

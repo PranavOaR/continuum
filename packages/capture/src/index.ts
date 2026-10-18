@@ -9,4 +9,4 @@ export { applyRepositoryRedactions, CONFIG_FILE, DEFAULT_CONFIG, readConfig, upd
 export { commitsSince, MAX_COMMITS_PER_SCAN, recordedHead, type CommitInfo } from './commits'
 export { IGNORE_FILE, loadContinuumIgnore, type IgnorePredicate } from './continuumIgnore'
 export { defaultConfigDir, readRegistry, registerRepository, REGISTRY_FILE, unregisterRepository, type RegisteredRepository } from './registry'
-export { ACTIVE_SESSION_FILE, clearActiveSession, readActiveSession, writeActiveSession, type ActiveSession } from './activeSession'
+export { ACTIVE_SESSION_FILE, claimActiveSession, clearActiveSession, readActiveSession, type ActiveSession } from './activeSession'

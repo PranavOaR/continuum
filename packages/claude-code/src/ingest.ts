@@ -139,7 +139,7 @@ async function recordAgentCheck(payload: HookPayload, workspace: Workspace, now:
   const store = ContextStore.open(workspace.storePath)
   try {
     // Record what changed first, so the check's coverage matches the recorded file state.
-    const { tree } = await scanRepository(store, workspace.root, { now: () => now, attributeToActiveSession: false })
+    const { tree } = await scanRepository(store, workspace.root, { now: () => now })
     const recorded = store.transact(() =>
       translateHook(payload, {
         now,
