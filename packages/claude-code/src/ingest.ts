@@ -1,4 +1,5 @@
-import { isAbsolute, relative, resolve } from 'node:path'
+import { realpathSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
   hashFiles,
   headRevision,
@@ -47,13 +48,26 @@ async function findWorkspace(cwd: string): Promise<Workspace | null> {
 }
 
 /**
+ * The path through real directories: agents may report /var/… where git says
+ * /private/var/… (macOS), or a path through a symlinked checkout. The file
+ * itself may be gone (a deleted file), so only its directory is resolved.
+ */
+function canonical(absolute: string): string {
+  try {
+    return join(realpathSync(dirname(absolute)), basename(absolute))
+  } catch {
+    return absolute
+  }
+}
+
+/**
  * The edits as Continuum captures them: files inside the repository that git
  * does not ignore. A file a patch deleted is recorded as deleted.
  */
 async function resolveEdits(root: string, payload: HookPayload): Promise<FileEdit[]> {
   const edits = await Promise.all(
     editedFiles(payload).map(async (file): Promise<FileEdit | null> => {
-      const path = normalizePath(relative(root, resolve(payload.cwd, file.path)))
+      const path = normalizePath(relative(root, canonical(resolve(payload.cwd, file.path))))
       if (path === '' || path.startsWith('../') || isAbsolute(path) || (await isIgnored(root, path))) return null
       if (file.changeType === 'deleted') return { path, contentHash: null, changeType: 'deleted' }
       if (!(await isRegularFileInRepo(root, path))) return null

@@ -298,3 +298,22 @@ describe('ingestHook for Codex', () => {
     expect(outcome).toEqual({ status: 'ignored', reason: 'codex does not report exit codes' })
   })
 })
+
+describe('ingestHook path resolution', () => {
+  it('attributes an edit reported through a symlinked path to the real repository file', async () => {
+    const { repo, storePath } = await initialized({ 'src/a.ts': 'a' })
+    const { symlinkSync, mkdtempSync, realpathSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const linkDir = mkdtempSync(join(tmpdir(), 'continuum-link-'))
+    const link = join(linkDir, 'repo')
+    symlinkSync(realpathSync(repo.root), link)
+    repo.write('src/a.ts', 'a2')
+    const outcome = await ingestHook(
+      JSON.stringify({ session_id: 's-link', cwd: link, hook_event_name: 'PostToolUse', tool_name: 'apply_patch', tool_input: { command: `*** Begin Patch\n*** Update File: ${join(link, 'src/a.ts')}\n*** End Patch` } }),
+      { now: () => NOW, agent: 'codex' },
+    )
+    expect(outcome).toEqual({ status: 'recorded', events: 1 })
+    withStore(storePath, (store) => expect(store.graph.get('file:src/a.ts')?.props.changedBy).toBe('s-link'))
+    rmSync(linkDir, { recursive: true, force: true })
+  })
+})
