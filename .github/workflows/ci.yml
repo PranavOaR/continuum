@@ -22,6 +22,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # Briefings may not lose information a fresh agent needs (scripts/eval/baseline.json).
+      - run: npm run eval
       - run: npm run build
 
   test:
