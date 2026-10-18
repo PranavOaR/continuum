@@ -105,6 +105,19 @@ This writes project-scoped `.codex/hooks.json` and a marked block in `.codex/con
 
 Codex does not report a shell command's exit code to hooks, so its test runs are not recorded as checks. Use `continuum run -- <command>` for verified results. `continuum setup codex --remove` and `continuum uninstall` take it out again.
 
+## Use with Cursor
+
+```bash
+continuum setup cursor
+```
+
+This adds the `continuum` MCP server to `.cursor/mcp.json` and an always-applied rule, `.cursor/rules/continuum.mdc`. Enable the server in Cursor's Settings → MCP. The rule asks Cursor's agent to:
+- read `get_handoff` at the start;
+- keep the task current with `start_task` and `update_task`;
+- record decisions with `record_decision`.
+
+Cursor has no hooks Continuum uses, so to capture its edits, run `continuum session start --agent cursor` and `continuum start` (see below).
+
 ## Dashboard
 
 ```bash

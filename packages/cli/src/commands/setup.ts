@@ -3,8 +3,10 @@ import {
   MCP_FILE,
   removeClaudeCodeSetup,
   removeCodexSetup,
+  removeCursorSetup,
   setupClaudeCode,
   setupCodex,
+  setupCursor,
   type Invocation,
   type SetupResult,
 } from '@continuum/claude-code'
@@ -37,6 +39,16 @@ const TARGETS: Record<string, Target> = {
       'Then run /hooks in Codex and trust the Continuum hooks; Codex runs new hooks only after you review them.',
       'New sessions are briefed on where the last one left off; edits (apply_patch) and progress are recorded as you work.',
       'Codex does not report exit codes, so record tests with `continuum run -- <command>` for verified results.',
+    ],
+  },
+  cursor: {
+    name: 'Cursor',
+    setup: setupCursor,
+    remove: removeCursorSetup,
+    next: () => [
+      'Next: open this repository in Cursor and enable the "continuum" MCP server in Settings → MCP.',
+      'The always-applied rule asks Cursor to read the handoff first and keep the task current through the MCP tools.',
+      'Cursor has no hooks Continuum uses: run `continuum session start --agent cursor` and `continuum start` to capture its edits.',
     ],
   },
 }
@@ -79,7 +91,7 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
   for (const line of target.next(invocation)) io.out(line)
   io.out(
     invocation.portable
-      ? `The configuration runs Continuum through npx, so you can commit ${targetName === 'codex' ? '.codex/' : MCP_FILE} to share it with your team.`
+      ? `The configuration runs Continuum through npx, so you can commit ${targetName === 'codex' ? '.codex/' : targetName === 'cursor' ? '.cursor/' : MCP_FILE} to share it with your team.`
       : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
   )
   return EXIT_OK

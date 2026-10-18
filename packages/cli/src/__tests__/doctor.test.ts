@@ -121,3 +121,13 @@ describe('continuum doctor with Codex', () => {
     expect(find(findings, /Claude Code not connected/)?.status).toBe('ok')
   })
 })
+
+describe('continuum doctor with Cursor', () => {
+  it('passes a repository connected only to Cursor', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'cursor'])
+    const findings = await doctor(repo.root)
+    expect(findings.filter((finding) => finding.status === 'fail')).toEqual([])
+    expect(find(findings, /Cursor MCP server registered/)?.status).toBe('ok')
+  })
+})

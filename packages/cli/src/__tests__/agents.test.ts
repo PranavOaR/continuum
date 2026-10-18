@@ -62,7 +62,7 @@ describe('continuum setup claude-code', () => {
   it('validates its arguments', async () => {
     const repo = sandbox()
     expect(await cli(repo.root, ['setup'])).toMatchObject({ code: EXIT_USAGE, err: expect.stringContaining('missing setup target') })
-    expect((await cli(repo.root, ['setup', 'cursor'])).err).toContain('unsupported setup target')
+    expect((await cli(repo.root, ['setup', 'windsurf'])).err).toContain('unsupported setup target')
     expect((await cli(repo.root, ['setup', 'claude-code', '--force'])).code).toBe(EXIT_USAGE)
   })
 })
