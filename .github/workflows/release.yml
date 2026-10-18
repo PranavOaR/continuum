@@ -23,6 +23,16 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
       - run: npm ci
+      # Fails in seconds, before the checks, when NPM_TOKEN is missing, expired or for another account.
+      - name: NPM_TOKEN signs in as pranavoar
+        run: |
+          user="$(npm whoami 2>/dev/null || true)"
+          if [ "$user" != "pranavoar" ]; then
+            echo "::error::NPM_TOKEN does not sign in to npm as pranavoar (got '${user:-nothing}'). Set the repository secret NPM_TOKEN to a granular token with read and write access, then re-run."
+            exit 1
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: The tag matches the package version
         run: |
           version="$(node -p "require('./packages/cli/package.json').version")"
