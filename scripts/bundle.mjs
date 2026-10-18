@@ -56,7 +56,8 @@ const manifest = {
   version,
   description: 'Keep AI coding work continuous across sessions and agents. Local-first: nothing leaves your machine.',
   type: 'module',
-  bin: { continuum: './continuum.js' },
+  // npm rewrites './continuum.js' at publish (and warns that it removed it), so write its normal form.
+  bin: { continuum: 'continuum.js' },
   files: ['continuum.js', 'web', 'README.md', 'LICENSE'],
   engines: { node: MIN_NODE },
   license: 'MIT',
