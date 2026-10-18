@@ -18,6 +18,7 @@ export const ev = {
     event('file.changed', { path, contentHash, changeType: contentHash ? 'modified' : 'deleted', ...extra }),
   check: (name: string, exitCode: number, ranAgainst: Record<string, string>) =>
     event('check.recorded', { name, command: name, exitCode, durationMs: 1200, ranAgainst }, 'verified'),
+  checkCovered: (name: string, coverage: string) => event('check.recorded', { name, command: name, exitCode: 0, durationMs: 1200, coverage }, 'verified'),
   memory: (id: string, anchors: Record<string, string>, taskId?: string) =>
     event('memory.recorded', { id, kind: 'decision', title: 'Callbacks use the session service', body: 'Reuse createSession.', taskId, anchors }),
 }

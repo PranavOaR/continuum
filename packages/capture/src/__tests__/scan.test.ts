@@ -53,7 +53,7 @@ describe('scanRepository', () => {
     const { repo, store } = setup({ 'a.ts': 'a' })
     repo.commit()
     await scanRepository(store, repo.root, { now: fixedNow })
-    const [event] = [...store.events()]
+    const event = [...store.events()].find((recorded) => recorded.type === 'file.changed')
     expect(event).toMatchObject({
       type: 'file.changed',
       evidence: 'observed',
@@ -61,6 +61,61 @@ describe('scanRepository', () => {
       occurredAt: '2026-10-16T10:00:00.000Z',
       revision: repo.git('rev-parse', '--short', 'HEAD'),
     })
+  })
+
+  it('records the existing HEAD once as a baseline, then each new commit with its files', async () => {
+    const { repo, store } = setup({ 'a.ts': 'a' })
+    repo.commit('initial')
+    await scanRepository(store, repo.root)
+    repo.write('b.ts', 'b')
+    repo.commit('add b')
+    repo.write('a.ts', 'a2')
+    repo.commit('change a')
+    await scanRepository(store, repo.root)
+    await scanRepository(store, repo.root)
+    const commits = [...store.events()].filter((event) => event.type === 'commit.recorded').map((event) => event.payload)
+    expect(commits).toEqual([
+      { hash: expect.any(String), message: 'initial', files: ['a.ts'], baseline: true },
+      { hash: expect.any(String), message: 'add b', files: ['b.ts'] },
+      { hash: expect.any(String), message: 'change a', files: ['a.ts'] },
+    ])
+  })
+
+  it('lists the files a merge brought in', async () => {
+    const { repo, store } = setup({ 'a.ts': 'a' })
+    repo.commit('initial')
+    await scanRepository(store, repo.root)
+    repo.git('checkout', '-q', '-b', 'feature')
+    repo.write('feature.ts', 'f')
+    repo.commit('feature work')
+    repo.git('checkout', '-q', 'main')
+    repo.write('main.ts', 'm')
+    repo.commit('main work')
+    repo.git('merge', '-q', '--no-ff', '-m', 'Merge feature', 'feature')
+    await scanRepository(store, repo.root)
+    const merge = [...store.events()].find((event) => event.type === 'commit.recorded' && event.payload.message === 'Merge feature')
+    expect(merge?.type === 'commit.recorded' && merge.payload.files).toEqual(['feature.ts'])
+  })
+
+  it('records where HEAD went after a reset, once, without calling it new work', async () => {
+    const { repo, store } = setup({ 'a.ts': 'a' })
+    repo.commit('first')
+    repo.write('a.ts', 'a2')
+    repo.commit('second')
+    await scanRepository(store, repo.root)
+    repo.git('reset', '-q', '--hard', 'HEAD~1')
+    await scanRepository(store, repo.root)
+    const before = store.eventCount()
+    await scanRepository(store, repo.root)
+    expect(store.eventCount()).toBe(before)
+    const last = [...store.events()].filter((event) => event.type === 'commit.recorded').at(-1)
+    expect(last?.type === 'commit.recorded' && last.payload).toMatchObject({ message: 'first', baseline: true })
+  })
+
+  it('records nothing about commits in a repository without any', async () => {
+    const { repo, store } = setup({ 'a.ts': 'a' })
+    await scanRepository(store, repo.root)
+    expect([...store.events()].some((event) => event.type === 'commit.recorded')).toBe(false)
   })
 
   it('is idempotent when nothing changed', async () => {

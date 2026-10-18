@@ -37,9 +37,9 @@ describe('renderHandoff', () => {
     const { 'src/auth/session.ts': _gone, 'src/auth/callback.ts': _alsoGone, ...rest } = CURRENT_FILES
     const text = handoff({ ...rest, 'src/new.ts': 'h-new' })
     expect(text).toContain('(anchored code changed since: `src/auth/session.ts`)')
-    expect(text).toContain('## Changes not yet recorded')
-    expect(text).toContain('- deleted `src/auth/session.ts`')
-    expect(text).toContain('- added `src/new.ts`')
+    expect(text).toContain('## Changed outside agent sessions')
+    expect(text).toContain('- deleted `src/auth/session.ts` (not yet recorded)')
+    expect(text).toContain('- added `src/new.ts` (not yet recorded)')
     expect(text).toContain('Files it changed: `src/auth/callback.ts` (since deleted), `src/auth/login.ts`')
   })
 

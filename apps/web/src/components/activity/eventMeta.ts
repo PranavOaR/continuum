@@ -1,4 +1,4 @@
-import { ArrowRightLeft, FileCode2, FlaskConical, Landmark, ListChecks, Terminal, type LucideIcon } from 'lucide-react'
+import { ArrowRightLeft, FileCode2, FlaskConical, GitCommitHorizontal, Landmark, ListChecks, Terminal, type LucideIcon } from 'lucide-react'
 import type { ActivityType } from '@continuum/core'
 
 export const EVENT_ICON: Record<ActivityType, LucideIcon> = {
@@ -8,4 +8,5 @@ export const EVENT_ICON: Record<ActivityType, LucideIcon> = {
   'test-result': FlaskConical,
   handoff: ArrowRightLeft,
   session: Terminal,
+  commit: GitCommitHorizontal,
 }

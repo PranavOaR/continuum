@@ -85,29 +85,35 @@ function taskSection(state: ProjectState): string[] {
   return ['## Current task', ...describeTask(current)]
 }
 
+function commitLines(state: ProjectState, now: Date): string[] {
+  return state.commits.map((commit) => `Committed [observed]: ${code(commit.hash.slice(0, 7))} ${quote(commit.message)} (${agoFromIso(commit.recordedAt, now)})`)
+}
+
 function leftOffSection(state: ProjectState, now: Date): string[] {
   const [latest] = state.sessions
-  if (!latest) return ['## Where we left off', 'No agent sessions recorded yet.']
+  if (!latest) return ['## Where we left off', 'No agent sessions recorded yet.', ...commitLines(state, now)]
   const lines = ['## Where we left off', `Latest: ${describeSession(latest, now)}.`]
+  if (latest.prompt) lines.push(`Last request [said by you]: ${quote(latest.prompt)}`)
   if (latest.note) lines.push(`Last note [agent-reported]: ${quote(latest.note)}`)
   if (latest.filesChanged.length > 0) {
     const files = latest.filesChanged.map((file) => (file.exists ? code(file.path) : `${code(file.path)} (since deleted)`))
     const shown = files.slice(0, MAX_LISTED).join(', ')
     lines.push(`Files it changed: ${files.length > MAX_LISTED ? `${shown} and ${files.length - MAX_LISTED} more` : shown}`)
   }
-  return lines
+  return [...lines, ...commitLines(state, now)]
 }
 
 function describeCheck(check: CheckSummary, now: Date): string {
+  const tag = check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'
   const ran = `Ran ${agoFromIso(check.ranAt, now)}`
-  const label = `${code(check.name)} (${code(check.command)})`
+  const label = check.name === check.command ? code(check.name) : `${code(check.name)} (${code(check.command)})`
   switch (check.status) {
     case 'out-of-date':
-      return `- [verified] OUT OF DATE: ${label}. ${ran}; changed since: ${listPaths(check.changed)}`
+      return `- ${tag} OUT OF DATE: ${label}. ${ran}; changed since: ${listPaths(check.changed)}`
     case 'failed':
-      return `- [verified] FAILED: ${label}, exit ${check.exitCode ?? '?'}. ${ran}`
+      return `- ${tag} FAILED: ${label}, exit ${check.exitCode ?? '?'}. ${ran}`
     case 'passed':
-      return `- [verified] passed: ${label}. ${ran}`
+      return `- ${tag} passed: ${label}. ${ran}`
     default:
       return `- ${check.status}: ${label}`
   }
@@ -130,12 +136,22 @@ function decisionsSection(state: ProjectState): string[] {
   ]
 }
 
-function unrecordedSection(state: ProjectState): string[] {
-  const { unrecorded } = state.files
-  if (unrecorded.length === 0) return []
-  const shown = unrecorded.slice(0, MAX_LISTED).map((change) => `- ${change.changeType} ${code(change.path)}`)
-  const more = unrecorded.length > MAX_LISTED ? [`- …and ${unrecorded.length - MAX_LISTED} more`] : []
-  return ['## Changes not yet recorded', ...shown, ...more]
+/** Changes no agent session made or explained: ask about them rather than assume they are part of the task. */
+function outsideSessionsSection(state: ProjectState): string[] {
+  const { unrecorded, outsideSessions } = state.files
+  const pending = new Set(unrecorded.map((change) => change.path))
+  const changes = [
+    ...unrecorded.map((change) => `- ${change.changeType} ${code(change.path)} (not yet recorded)`),
+    ...outsideSessions.filter((change) => !pending.has(change.path)).map((change) => `- ${change.changeType} ${code(change.path)}`),
+  ]
+  if (changes.length === 0) return []
+  const more = changes.length > MAX_LISTED ? [`- …and ${changes.length - MAX_LISTED} more`] : []
+  return [
+    '## Changed outside agent sessions',
+    '[observed] No agent session made or explained these: edits by hand, or by a tool Continuum does not see.',
+    ...changes.slice(0, MAX_LISTED),
+    ...more,
+  ]
 }
 
 function earlierSection(state: ProjectState, now: Date): string[] {
@@ -174,10 +190,10 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
   const header = [
     `# Continuum handoff: ${basename(state.root)}`,
     `Generated ${state.generatedAt}, revision ${state.revision ?? 'none (no commits yet)'}, ${state.files.tracked} tracked files.`,
-    'Evidence labels: [verified] = recorded check run, [agent-reported] = an agent said so, not proof.',
+    'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof.',
   ]
   return fit(
-    [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), unrecordedSection(state), earlierSection(state, now)],
+    [header, taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }

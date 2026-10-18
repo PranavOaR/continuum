@@ -8,6 +8,14 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8')
 }
 
+// Output piped into something that stops reading (`continuum status | head`) is not an error.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EPIPE') process.exit(process.exitCode ?? 0)
+    throw error
+  })
+}
+
 const argv = process.argv.slice(2)
 const controller = new AbortController()
 // Only long-running commands trap signals; hooks and the MCP server must die when Claude Code stops them.

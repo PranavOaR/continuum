@@ -21,7 +21,20 @@ const postToolUse = z.looseObject({
   tool_response: z.unknown().optional(),
 })
 
-export const hookPayloadSchema = z.discriminatedUnion('hook_event_name', [sessionStart, sessionEnd, stop, postToolUse])
+const userPromptSubmit = z.looseObject({ ...common, hook_event_name: z.literal('UserPromptSubmit'), prompt: z.string() })
+
+/** A tool call that failed; for Bash, `error` starts with "Exit code N" when the command ran. */
+const postToolUseFailure = z.looseObject({
+  ...common,
+  hook_event_name: z.literal('PostToolUseFailure'),
+  tool_name: z.string(),
+  tool_input: z.record(z.string(), z.unknown()),
+  error: z.string().optional(),
+  is_interrupt: z.boolean().optional(),
+  duration_ms: z.number().optional(),
+})
+
+export const hookPayloadSchema = z.discriminatedUnion('hook_event_name', [sessionStart, sessionEnd, stop, postToolUse, postToolUseFailure, userPromptSubmit])
 export type HookPayload = z.infer<typeof hookPayloadSchema>
 
 export class InvalidHookPayloadError extends Error {
@@ -52,6 +65,20 @@ export const FILE_EDIT_TOOLS: Readonly<Record<string, string>> = {
   Edit: 'file_path',
   MultiEdit: 'file_path',
   NotebookEdit: 'notebook_path',
+}
+
+/** The shell tool whose test, lint and build runs are recorded as agent checks. */
+export const SHELL_TOOL = 'Bash'
+
+/** Continuum's own MCP task tools, as Claude Code names them in hooks. */
+export const TASK_TOOLS = ['mcp__continuum__start_task', 'mcp__continuum__update_task'] as const
+
+/** The task a successful start_task/update_task call reported ("Task <id>: …"), so the calling session can be linked to it. */
+export function reportedTaskId(payload: HookPayload): string | null {
+  if (payload.hook_event_name !== 'PostToolUse' || !(TASK_TOOLS as readonly string[]).includes(payload.tool_name)) return null
+  // The response is searched as JSON text, where the quote after the id is escaped.
+  const match = /Task ([a-z0-9][a-z0-9-]{0,99}): \\?"/.exec(JSON.stringify(payload.tool_response ?? ''))
+  return match ? match[1] : null
 }
 
 /** The absolute path a file-editing tool call wrote, if this payload is one. */

@@ -117,7 +117,8 @@ test('shows the repository, its session, changed file and verified check', async
   await page.getByText('src/app.ts').first().click()
   const drawer = page.getByRole('dialog')
   await expect(drawer.getByText('Modified by Claude Code.')).toBeVisible()
-  await expect(drawer.getByText('Line-level diffs are not captured yet', { exact: false })).toBeVisible()
+  await expect(drawer.getByText('Uncommitted changes (against the last commit)')).toBeVisible()
+  await expect(drawer.getByText('export const app = 2')).toBeVisible()
   await expect(drawer.getByText('Mock excerpt')).toHaveCount(0)
 })
 
@@ -139,4 +140,14 @@ test('memory graph comes from the local context graph', async ({ page }) => {
   // No ?project=: the page must pick a project that exists locally, not the demo default.
   await page.goto(`${url}/app/memory`)
   await expect(page.getByText('straight from the local context graph')).toBeVisible()
+})
+
+test('updates without a reload when something new is recorded', async ({ page }) => {
+  const name = repo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  await expect(page.locator('#verification').getByText('unit')).toBeVisible()
+  await expect(page.locator('#verification').getByText('typecheck')).toHaveCount(0)
+  continuum(['run', '--name', 'typecheck', '--', process.execPath, '-e', '0'])
+  // Pushed by the daemon's change stream: nothing in the page reloads or navigates.
+  await expect(page.locator('#verification').getByText('typecheck')).toBeVisible({ timeout: 4_000 })
 })

@@ -39,7 +39,7 @@ describe('projectState', () => {
 
   it('lists changes not yet recorded', () => {
     const state = projectState(seededStore(), tree({ ...CURRENT_FILES, 'src/new.ts': 'h-new' }), NOW)
-    expect(state.files).toEqual({ tracked: 5, unrecorded: [{ path: 'src/new.ts', changeType: 'added', contentHash: 'h-new' }] })
+    expect(state.files).toMatchObject({ tracked: 5, unrecorded: [{ path: 'src/new.ts', changeType: 'added', contentHash: 'h-new' }] })
   })
 
   it('works on an empty store', () => {

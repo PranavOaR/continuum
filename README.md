@@ -67,7 +67,30 @@ npm run build && npm run bundle    # dist/release: one ESM file plus the dashboa
 npm run smoke:release              # packs, installs and drives the real binary in a scratch repo
 ```
 
+`continuum compact` folds events older than 30 days (`--keep-days <n>`) into a gzipped checkpoint of the graph and removes them from the log. Tasks, checks and decisions are unchanged; older activity leaves the feed. On a simulated 100-session history of a 2,000-file repository, the store went from 3.5 MB to 1.4 MB.
+
 `CONTINUUM_PACKAGE_NAME` sets the npm name stamped into the bundle. The store records its schema version; migrations apply forward on open, and a store written by a newer Continuum is refused rather than changed.
+
+## What gets recorded, and how to control it
+
+With Claude Code connected, Continuum records:
+- sessions and the files Claude edits;
+- its last message in each turn, labelled agent-reported;
+- tasks, through the MCP tools;
+- commits;
+- test, lint, typecheck and build commands Claude runs through Bash. These are labelled **observed (run by an agent)**, weaker than `continuum run`'s **verified**. Commands whose exit code is hidden by a pipe, `;` or `||` are skipped.
+
+Handoffs separately list **changes no agent session made**, so the next agent asks about them instead of assuming.
+
+| Control | What it does |
+|---|---|
+| `continuum config` | Shows settings. `continuum config agent-checks off` stops recording agent-run checks. `continuum config prompts on` records what you type to agents, redacted, with pasted blocks dropped. It is off by default. |
+| `.continuumignore` | Gitignore-syntax paths, tracked or not, that are never hashed, recorded, diffed or put in a handoff. |
+| `redactPatterns` in `.continuum/config.json` | Extra regular expressions to mask, on top of built-in rules for common token formats and long random-looking strings. |
+| `continuum forget --path <p> \| --session <id> \| --before <date>` | Permanently removes recorded data. The database is rewritten and vacuumed, so the text is gone from the file itself. |
+| `continuum export <file>` / `continuum import <file>` | Moves the whole history between clones or machines as JSON, readable only by you. |
+| `continuum compact` | Folds events older than 30 days into a checkpoint. |
+| `continuum uninstall [--purge]` | Disconnects Claude Code; `--purge` also deletes `.continuum/`. |
 
 ## Dashboard
 

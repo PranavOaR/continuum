@@ -48,8 +48,16 @@ export interface ProjectFile {
   decisionIds: string[]
   additions: number
   deletions: number
-  /** Illustrative excerpt only; never presented as live repository content. */
+  /**
+   * Where the line counts and excerpt come from:
+   * - illustrative: demo data, never presented as live repository content
+   * - uncommitted: the file's current change against the last commit, read live from git
+   * - none: nothing to show (no uncommitted change, or not readable)
+   */
+  diffSource: 'illustrative' | 'uncommitted' | 'none'
   diff: DiffLine[]
+  /** The excerpt was cut short. */
+  diffTruncated?: boolean
   updatedAt: string
 }
 

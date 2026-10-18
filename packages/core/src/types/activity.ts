@@ -1,7 +1,7 @@
 import type { AgentType } from './agent'
 import type { EvidenceType } from './evidence'
 
-export type ActivityType = 'file-change' | 'task-update' | 'decision' | 'test-result' | 'handoff' | 'session'
+export type ActivityType = 'file-change' | 'task-update' | 'decision' | 'test-result' | 'handoff' | 'session' | 'commit'
 
 export interface ActivityEvent {
   id: string
