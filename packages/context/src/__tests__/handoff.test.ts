@@ -19,6 +19,28 @@ describe('renderHandoff', () => {
     expect(leftOff).toContain('Files it changed: `src/auth/callback.ts`, `src/auth/login.ts`')
   })
 
+  it('lists under the latest session only the commits made after it started, by their git time', () => {
+    const store = seededStore()
+    const at = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000).toISOString()
+    // Both noticed by a scan five minutes ago; only the second was made during the latest session (started 1h ago).
+    store.recordAll(
+      [
+        { hash: 'c-before', message: 'Set up the project', committedAt: at(90) },
+        { hash: 'c-during', message: 'Wire the callback', committedAt: at(20) },
+      ].map(({ hash, message, committedAt }) => ({
+        type: 'commit.recorded' as const,
+        payload: { hash: `${hash}0000000`, message, files: ['src/auth/callback.ts'], committedAt },
+        evidence: 'observed' as const,
+        source: 'watcher:git',
+        occurredAt: at(5),
+      })),
+    )
+    const text = renderHandoff(projectState(store, tree(CURRENT_FILES), NOW), { now: NOW })
+    const leftOff = text.slice(text.indexOf('## Where we left off'), text.indexOf('## Checks'))
+    expect(leftOff).toContain('"Wire the callback" (20m ago)')
+    expect(leftOff).not.toContain('Set up the project')
+  })
+
   it('labels evidence and explains stale checks', () => {
     const text = handoff({ ...CURRENT_FILES, 'src/auth/login.ts': 'h-login-2' })
     expect(text).toContain('- [verified] OUT OF DATE: `unit` (`npm test`). Ran 40m ago; changed since: `src/auth/login.ts`')

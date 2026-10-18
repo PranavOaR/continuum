@@ -375,6 +375,25 @@ describe('since your last session', () => {
     expect(section).toMatch(/Decision recorded: "Keep b pure" \([^)]+\)/)
   })
 
+  it('lists only commits made while Claude was away, by their git time, however late a scan noticed them', async () => {
+    const { repo, storePath } = await initialized()
+    const start = Date.now()
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'claude-1'), { now: at(start, 1_000) })
+    await ingestHook(hook(repo, { hook_event_name: 'SessionEnd', reason: 'exit' }, 'claude-1'), { now: at(start, 2_000) })
+    withStore(storePath, (store) => {
+      const t = (ms: number) => new Date(start + ms).toISOString()
+      // Both noticed by one scan after the session; only the second was made after it.
+      for (const [hash, message, committedAt] of [['aaaaaaa1', 'Made before the session', t(0)], ['bbbbbbb2', 'Made while away', t(3_000)]]) {
+        store.record({ type: 'commit.recorded', payload: { hash, message, files: ['a.ts'], committedAt }, evidence: 'observed', source: 'watcher:git', occurredAt: t(4_000) })
+      }
+    })
+    const briefing = await briefingFor(repo, 'claude-2', at(start, 5_000))
+    const begins = briefing.indexOf('## Since your last session')
+    const section = briefing.slice(begins, briefing.indexOf('\n## ', begins + 5))
+    expect(section).toContain('"Made while away"')
+    expect(section).not.toContain('Made before the session')
+  })
+
   it('says when nothing happened, and says nothing on an agent’s first session', async () => {
     const { repo } = await initialized()
     const start = Date.now()

@@ -78,12 +78,14 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
     return EXIT_OK
   }
   const { workspace, store, created } = await initWorkspace(io.cwd)
+  let result: SetupResult
   try {
+    // Write first, then scan: the files setup writes are recorded now, not reported later as changes no session explains.
+    result = await target.setup(workspace.root, invocation)
     await scanRepository(store, workspace.root, { now: io.now })
   } finally {
     store.close()
   }
-  const result = await target.setup(workspace.root, invocation)
   await registerRepository(io.configDir, workspace.root, io.now())
   io.out(`Connected ${target.name} to Continuum in ${workspace.root}${created ? ' (and initialized Continuum)' : ''}:`)
   report(io, result)

@@ -66,7 +66,7 @@ function toEvent(change: FileChange, occurredAt: string, revision: string | null
 function commitEvent(commit: CommitInfo, occurredAt: string, isBaseline: boolean): ContinuumEvent {
   return {
     type: 'commit.recorded',
-    payload: { hash: commit.hash, message: redactSecrets(commit.message), files: commit.files, ...(isBaseline ? { baseline: true } : {}) },
+    payload: { hash: commit.hash, message: redactSecrets(commit.message), files: commit.files, committedAt: commit.committedAt, ...(isBaseline ? { baseline: true } : {}) },
     evidence: 'observed',
     source: SCAN_SOURCE,
     occurredAt,

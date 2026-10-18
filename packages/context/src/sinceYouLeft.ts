@@ -67,8 +67,12 @@ function fold(summary: SinceYouLeft, event: ContinuumEvent, sessionAgent: (sessi
       const checks = summary.checks.filter((check) => check.name !== event.payload.name)
       return { ...summary, checks: [...checks, { name: event.payload.name, passed: event.payload.exitCode === 0, evidence: event.evidence, at: event.occurredAt }] }
     }
-    case 'commit.recorded':
-      return event.payload.baseline ? summary : { ...summary, commits: [...summary.commits, { hash: event.payload.hash, message: event.payload.message, at: event.occurredAt }] }
+    case 'commit.recorded': {
+      // A commit made before the agent left, noticed only later, is not news to it.
+      const at = event.payload.committedAt ?? event.occurredAt
+      if (event.payload.baseline || at < summary.since) return summary
+      return { ...summary, commits: [...summary.commits, { hash: event.payload.hash, message: event.payload.message, at }] }
+    }
     case 'memory.recorded': {
       const decisions = summary.decisions.filter((decision) => decision.title !== event.payload.title)
       return { ...summary, decisions: [...decisions, { title: event.payload.title, at: event.occurredAt }] }
