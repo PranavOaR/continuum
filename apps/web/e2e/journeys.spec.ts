@@ -1,13 +1,23 @@
 import { expect, test } from './fixtures'
 
-test('landing page explains the product and opens the demo', async ({ page }) => {
+test('landing page explains the product, with the install command and the demo video', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Your work continues.')
-  await expect(page.getByRole('heading', { name: 'Your code stays. Your context disappears.' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Stop rebuilding context. Start where the work left off.' })).toBeVisible()
-  await page.getByRole('link', { name: 'Explore Continuum' }).click()
-  await expect(page).toHaveURL(/\/app$/)
-  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+  await expect(page.getByText('npx @pranavoar/continuum setup claude-code')).toBeVisible()
+  await expect(page.locator('video')).toHaveAttribute('src', '/demo/continuum-demo.mp4')
+  await expect(page.getByRole('heading', { name: 'What the next agent is told' })).toBeVisible()
+  await expect(page.locator('pre')).toContainText('## Current task')
+  for (const agent of ['Claude Code', 'Codex', 'Cursor']) await expect(page.getByRole('list').getByText(agent, { exact: true })).toBeVisible()
+  // The prototype's wording is gone for good.
+  await expect(page.getByText(/mock data|prototype|explore the demo|ChatGPT/i)).toHaveCount(0)
+})
+
+test('landing page copies the install command', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Copy' }).click()
+  await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npx @pranavoar/continuum setup claude-code')
 })
 
 test('overview shows coherent summary values and opens a project', async ({ page }) => {

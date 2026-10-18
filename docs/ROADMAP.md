@@ -120,7 +120,7 @@ The handoff today is a fixed set of sections cut down to fit a character budget.
 
 | # | Item | Done when |
 |---|---|---|
-| 8.1 | **Public demo.** The landing page and mock dashboard are deployed to a static host. *Needs from you: the host account and domain.* | The demo is reachable, with every screen labelled as demo data. |
+| 8.1 | **Public demo.** The landing page and mock dashboard are deployed to a static host. *Needs from you: the host account and domain.* | The demo is reachable, with every screen labelled as demo data. **Done differently:** continuumgroup.dev shows a landing page and a video recorded from real sessions, with no mock dashboard. |
 | 8.2 | **Landing page copy matches the real product.** It shows real install steps, real screenshots and the evidence model. | The copy is reviewed against the shipped features, with no claims beyond them. |
 | 8.3 | **Docs.** Covers getting started (the walkthrough we just did), a concepts page (evidence, tasks, checks), troubleshooting (from `doctor`) and privacy. | A newcomer can follow them without help. |
 | 8.4 | **`v0.1.0` release.** Includes a changelog, a security policy and an issue template. | Tagged and published. |

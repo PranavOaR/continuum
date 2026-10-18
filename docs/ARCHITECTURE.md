@@ -137,6 +137,6 @@ The goal is that any developer can try Continuum in minutes, without an account.
 | **Web dashboard** | Served locally by the daemon at `http://127.0.0.1:<port>` | The `apps/web` build ships inside the npm package; no separate install. |
 | **Claude Code integration** | One plugin install that bundles the MCP server, hooks and `/handoff` | Project-scoped by default; nothing written to global settings without consent. |
 | **Other agents** | `continuum mcp` registered in Codex or Cursor settings | Same MCP server. |
-| **Public demo** | Landing page plus mock-data demo hosted on a static host | No backend; shows the product before install. |
+| **Website** | A landing page with a demo video recorded from real sessions, hosted on Vercel (continuumgroup.dev) | No backend and no sample data; shows the real product before install. |
 
 Release checklist (M6): npm scope and name reserved, `npx` path tested on clean macOS and Linux machines, plugin install tested in a fresh repo, public demo deployed, and an "Uninstall / forget my data" section in the README.

@@ -28,7 +28,11 @@ With Claude Code, you can install the plugin instead (hooks, MCP server and a `/
 
 New here? [docs/getting-started.md](docs/getting-started.md) walks through a first handoff in about ten minutes. `continuum doctor` diagnoses any setup problem. [CHANGELOG.md](CHANGELOG.md) lists what is in each release.
 
-> **Two modes, always labelled.** Served by `continuum serve`, the web app shows live data from your repositories ("Local workspace · Live"). Anywhere else, such as `npm run dev` or a static host, it shows a mock demo dataset ("Demo workspace · Mock data"). Nothing is sent anywhere in either mode.
+[![Demo: Claude Code starts a task, Codex finishes it from Continuum's briefing, and the dashboard shows who did what. Recorded from real sessions.](https://continuumgroup.dev/demo/continuum-demo.jpg)](https://continuumgroup.dev/demo/continuum-demo.mp4)
+
+*Watch the demo (50 s): Claude Code fixes one of two bugs and stops; Codex is briefed by Continuum, finishes the same task, and the dashboard shows who did what. Recorded from real sessions with the published package; [scripts/demo-video](scripts/demo-video) re-records it.*
+
+> **The dashboard shows live data only.** `continuum serve` shows your repositories ("Local workspace · Live"). The website, [continuumgroup.dev](https://continuumgroup.dev), is a landing page with no dashboard. `npm run dev` shows a labelled sample dataset, for developing the UI. Nothing is sent anywhere.
 
 ## Run
 
@@ -204,7 +208,7 @@ npm workspaces:
 | `packages/mcp` | `@continuum/mcp` | The local stdio MCP server (`get_handoff`, `get_project_state`, `record_decision`, `start_task`, `update_task`) |
 | `packages/daemon` | `@continuum/daemon` | The local daemon: maps context stores onto the dashboard's service contract and serves it on 127.0.0.1 |
 | `packages/cli` | `@continuum/cli` | The `continuum` command |
-| `apps/web` | `@continuum/web` | The web app: landing page and dashboard, reading live data from the daemon or the mock demo dataset |
+| `apps/web` | `@continuum/web` | The dashboard (live data from the daemon, or a sample dataset in development) and the website, built with `VITE_CONTINUUM_SITE=website` |
 
 Upcoming pieces (symbol-level retrieval, a one-step plugin install once Continuum is on npm) are described in [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md).
 

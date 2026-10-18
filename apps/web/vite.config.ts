@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 // During development, CONTINUUM_API=<the link printed by `continuum serve`> points the app at that daemon.
@@ -8,9 +9,13 @@ const apiLink = process.env.CONTINUUM_API ? new URL(process.env.CONTINUUM_API) :
 const api = apiLink?.origin
 const apiToken = apiLink?.searchParams.get('token') ?? ''
 
+// VITE_CONTINUUM_SITE=website builds continuumgroup.dev: the landing page alone, with no dashboard or demo data.
+const entry = process.env.VITE_CONTINUUM_SITE === 'website' ? './src/site/mountSite.tsx' : './src/app/mountApp.tsx'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: { alias: { '@entry': fileURLToPath(new URL(entry, import.meta.url)) } },
   server: api
     ? {
         proxy: {

@@ -47,7 +47,8 @@ await build({
   logLevel: 'warning',
 })
 
-cpSync(WEB_DIST, join(OUT, 'web'), { recursive: true })
+// The website's demo video stays out of the package: the dashboard does not use it.
+cpSync(WEB_DIST, join(OUT, 'web'), { recursive: true, filter: (source) => !source.startsWith(join(WEB_DIST, 'demo')) })
 cpSync(join(ROOT, 'README.md'), join(OUT, 'README.md'))
 if (existsSync(join(ROOT, 'LICENSE'))) cpSync(join(ROOT, 'LICENSE'), join(OUT, 'LICENSE'))
 
