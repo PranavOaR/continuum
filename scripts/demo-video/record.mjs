@@ -3,7 +3,7 @@
 // real run: terminal scenes replay the captured output, and the dashboard
 // scene is the real `continuum serve` for that repository.
 //
-//   node scripts/demo-video/record.mjs --work <dir> [--out apps/web/public/demo]
+//   node scripts/demo-video/record.mjs --work <dir> [--out apps/web/public/demo]   (the poster goes to --out)
 //
 // Needs ffmpeg and Playwright's Chromium.
 import { spawn } from 'node:child_process'
@@ -238,7 +238,8 @@ async function recordDashboard(page, video, url, posterPath) {
 }
 
 mkdirSync(out, { recursive: true })
-const videoPath = join(out, 'continuum-demo.mp4')
+// The silent master; narrate.mjs adds the voice and writes the website's video.
+const videoPath = join(import.meta.dirname, 'continuum-demo.silent.mp4')
 const posterPath = join(out, 'continuum-demo.jpg')
 // Rendered beside the final files and moved into place only when complete, so a failed run leaves the committed video intact.
 const partial = (path) => path.replace(/(\.\w+)$/, '.partial$1')

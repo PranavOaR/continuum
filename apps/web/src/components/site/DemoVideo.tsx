@@ -10,7 +10,6 @@ export function DemoVideo() {
           poster={DEMO_VIDEO.poster}
           aria-describedby="demo-video-caption"
           controls
-          muted
           playsInline
           preload="metadata"
         >

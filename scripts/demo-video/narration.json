@@ -1,0 +1,17 @@
+{
+  "about": "Voiceover for continuum-demo.silent.mp4. Each line starts at `start` seconds (scene boundaries found from the fades between scenes; the dashboard lines follow its captions) and runs until the next line's start. When a line is longer than that, narrate.mjs holds the scene's last frame until it ends.",
+  "end": 50.8,
+  "lines": [
+    { "start": 0, "text": "This is Continuum. Claude Code starts a task, Codex finishes it, and nothing is lost in between." },
+    { "start": 3.233, "text": "First, connect both agents to your repository. One command each." },
+    { "start": 6.6, "text": "Claude Code fixes the first bug, records the task and its next step, and stops." },
+    { "start": 12.5, "text": "When Codex starts, Continuum briefs it automatically: what's done, what's left, and exactly what to do next." },
+    { "start": 19.1, "text": "Codex picks up the same task and finishes it. Then you run the tests through Continuum, so the result is verified." },
+    { "start": 24.2, "text": "In the dashboard, it's one task, carried from one agent to the other." },
+    { "start": 27.1, "text": "This check is verified: Continuum ran npm test against the exact contents of every file." },
+    { "start": 29.9, "text": "Here are the acceptance criteria and steps, as the agents reported them." },
+    { "start": 33.4, "text": "And here is the change itself, covered by the passing check." },
+    { "start": 36.8, "text": "Every event is recorded in order: Claude Code's session, then Codex picking up the same task." },
+    { "start": 46.6, "text": "Install it with one command. It runs on your machine, and nothing leaves it." }
+  ]
+}
