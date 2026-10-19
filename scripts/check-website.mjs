@@ -6,7 +6,7 @@ import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { chromium } from 'playwright'
+import { chromium } from '@playwright/test'
 
 const WEB = join(import.meta.dirname, '../apps/web')
 /**
@@ -18,16 +18,24 @@ const FORBIDDEN = ['Developer Portfolio', 'Analytics Platform', 'Docs Site', 'De
 const REQUIRED_FILES = ['index.html', 'demo/continuum-demo.mp4', 'demo/continuum-demo.jpg']
 const PREVIEW_PORT = 4787
 
+/** How long vite preview may take to start. */
+const PREVIEW_START_MS = 30_000
+
 /** Serves the built site and loads it in Chromium: it must render its headline without a single page error. */
 async function renderErrors(dir) {
-  const preview = spawn('npx', ['vite', 'preview', '--outDir', dir, '--port', String(PREVIEW_PORT), '--strictPort'], { cwd: WEB, stdio: ['ignore', 'pipe', 'inherit'] })
-  const browser = await chromium.launch()
+  // Its own process group, so stopping it stops vite and not only the npx wrapper.
+  const preview = spawn('npx', ['vite', 'preview', '--outDir', dir, '--port', String(PREVIEW_PORT), '--strictPort'], { cwd: WEB, detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
+  // Listening from the start, so an early exit is never missed.
+  const ready = new Promise((resolveReady, reject) => {
+    const timer = setTimeout(() => reject(new Error(`vite preview did not start within ${PREVIEW_START_MS / 1000}s`)), PREVIEW_START_MS)
+    preview.stdout.on('data', (chunk) => String(chunk).includes(String(PREVIEW_PORT)) && (clearTimeout(timer), resolveReady()))
+    preview.on('error', (error) => (clearTimeout(timer), reject(error)))
+    preview.on('close', (code) => (clearTimeout(timer), reject(new Error(`vite preview exited with ${code}`))))
+  })
+  let browser
   try {
-    await new Promise((resolveReady, reject) => {
-      preview.stdout.on('data', (chunk) => String(chunk).includes(String(PREVIEW_PORT)) && resolveReady())
-      preview.on('error', reject)
-      preview.on('close', (code) => reject(new Error(`vite preview exited with ${code}`)))
-    })
+    await ready
+    browser = await chromium.launch()
     const page = await browser.newPage()
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message.split('\n')[0]))
@@ -36,8 +44,12 @@ async function renderErrors(dir) {
     if (!(await page.getByRole('heading', { level: 1 }).isVisible())) errors.push('the landing page did not render its headline')
     return errors.map((error) => `the website fails in a browser: ${error}`)
   } finally {
-    await browser.close()
-    preview.kill()
+    await browser?.close()
+    try {
+      process.kill(-preview.pid, 'SIGTERM')
+    } catch {
+      // Already stopped.
+    }
   }
 }
 
