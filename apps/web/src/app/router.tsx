@@ -1,5 +1,6 @@
 import { lazy, type ComponentType } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom'
+import { dataMode } from '../services/dataMode'
 import { AppShell } from '../components/layout/AppShell'
 import { LandingPage } from '../pages/LandingPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -19,8 +20,9 @@ const HandoffsPage = lazyPage(() => import('../pages/HandoffsPage'), 'HandoffsPa
 const HandoffPreviewPage = lazyPage(() => import('../pages/HandoffPreviewPage'), 'HandoffPreviewPage')
 const SettingsPage = lazyPage(() => import('../pages/SettingsPage'), 'SettingsPage')
 
-export const router = createBrowserRouter([
-  { path: '/', element: <LandingPage />, errorElement: <RouteError /> },
+const APP_ROUTES: RouteObject[] = [
+  // `continuum serve` opens the dashboard; the landing page is for the website and local development.
+  { path: '/', element: dataMode() === 'local' ? <Navigate to="/app" replace /> : <LandingPage />, errorElement: <RouteError /> },
   {
     path: '/app',
     element: <AppShell />,
@@ -38,4 +40,6 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <NotFoundPage /> },
-])
+]
+
+export const router = createBrowserRouter(APP_ROUTES)

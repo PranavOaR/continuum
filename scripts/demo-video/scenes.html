@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Continuum demo scenes</title>
+<style>
+  @font-face { font-family: 'Geist'; src: url('../../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: 'Geist Mono'; src: url('../../node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; }
+  :root { --bg: #fafaf7; --fg: #141318; --muted: #5c5a62; --accent: #5b45ff; --term: #16151b; --term-fg: #e9e7f0; --term-dim: #8d8a98; --ok: #4fc58a; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: 'Geist', system-ui, sans-serif; }
+  #stage { position: absolute; inset: 0; transition: none; }
+  .card { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; padding: 0 80px; }
+  .card h1 { font-size: 64px; font-weight: 400; letter-spacing: -0.035em; }
+  .card p { font-size: 24px; color: var(--muted); letter-spacing: -0.01em; }
+  .card code { font-family: 'Geist Mono', monospace; font-size: 26px; color: var(--fg); background: #fff; border: 1px solid #e4e2dc; border-radius: 10px; padding: 14px 22px; }
+  .card .url { font-family: 'Geist Mono', monospace; font-size: 20px; color: var(--accent); }
+  .logo { display: inline-flex; align-items: center; gap: 14px; font-size: 44px; font-weight: 500; letter-spacing: -0.035em; }
+  .wrap { height: 100%; display: flex; flex-direction: column; padding: 40px 64px 36px; gap: 18px; }
+  .caption { font-size: 22px; letter-spacing: -0.015em; color: var(--fg); display: flex; align-items: baseline; gap: 14px; }
+  .caption .step { font-family: 'Geist Mono', monospace; font-size: 14px; color: var(--accent); }
+  .window { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 24px 60px -20px rgb(20 19 24 / 0.45); }
+  .bar { height: 38px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #1f1e26; color: var(--term-dim); font-family: 'Geist Mono', monospace; font-size: 12.5px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #3a3844; }
+  .bar span:last-child { margin-left: 10px; }
+  .screen { flex: 1; min-height: 0; overflow: hidden; padding: 22px 26px; }
+  pre { font-family: 'Geist Mono', monospace; font-size: 16.5px; line-height: 1.6; color: var(--term-fg); white-space: pre-wrap; word-break: break-word; }
+  pre.small { font-size: 14px; line-height: 1.55; }
+  .prompt { color: var(--ok); }
+  .cmd { color: #fff; }
+  .out { color: var(--term-fg); }
+  .dim { color: var(--term-dim); }
+  .cursor { display: inline-block; width: 0.6em; height: 1.15em; vertical-align: -0.2em; background: var(--term-fg); }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script>
+  const LOGO = '<svg viewBox="0 0 32 32" width="46" height="46" fill="none"><path d="M6 22C6 13 16 11 16 16s10 3 10-6" stroke="#141318" stroke-width="2.4" stroke-linecap="round"/><circle cx="6" cy="22" r="3" fill="#fafaf7" stroke="#141318" stroke-width="2"/><circle cx="16" cy="16" r="1.9" fill="#141318"/><circle cx="26" cy="10" r="3.4" fill="#5b45ff"/></svg>'
+  const TYPE_CHARS_PER_MS = 0.11
+  const LINE_MS = 28
+  const PAUSE_AFTER_COMMAND_MS = 450
+  const FADE_MS = 280
+  const esc = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  /** How long each step of a terminal scene takes, so the scene's length follows its content. */
+  function stepDurations(steps) {
+    return steps.map((step) => (step.kind === 'cmd' ? step.text.length / TYPE_CHARS_PER_MS + PAUSE_AFTER_COMMAND_MS : step.text.split('\n').length * LINE_MS))
+  }
+
+  window.sceneLength = (scene) => (scene.kind === 'term' ? stepDurations(scene.steps).reduce((a, b) => a + b, 0) + scene.hold : scene.duration)
+
+  function terminalHtml(scene, t) {
+    const durations = stepDurations(scene.steps)
+    let elapsed = 0
+    let html = ''
+    let isTyping = false
+    for (const [index, step] of scene.steps.entries()) {
+      if (t < elapsed) break
+      const local = t - elapsed
+      if (step.kind === 'cmd') {
+        const shown = Math.min(step.text.length, Math.floor(local * TYPE_CHARS_PER_MS))
+        isTyping = shown < step.text.length || local < durations[index]
+        html += `${html ? '\n' : ''}<span class="prompt">${esc(scene.cwd)} $</span> <span class="cmd">${esc(step.text.slice(0, shown))}</span>`
+        if (shown < step.text.length) break
+      } else {
+        const lines = step.text.split('\n')
+        const shown = Math.min(lines.length, Math.floor(local / LINE_MS) + 1)
+        html += `\n<span class="${step.dim ? 'dim' : 'out'}">${esc(lines.slice(0, shown).join('\n'))}</span>`
+        isTyping = false
+      }
+      elapsed += durations[index]
+    }
+    const caret = isTyping || t >= elapsed ? '<span class="cursor"></span>' : ''
+    return `<div class="wrap">
+      <p class="caption"><span class="step">${esc(scene.step)}</span>${esc(scene.caption)}</p>
+      <div class="window"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span>${esc(scene.title)}</span></div>
+      <div class="screen"><pre class="${scene.small ? 'small' : ''}">${html}${caret}</pre></div></div></div>`
+  }
+
+  function cardHtml(scene) {
+    return `<div class="card">${scene.logo ? `<div class="logo">${LOGO}continuum</div>` : ''}${scene.title ? `<h1>${esc(scene.title)}</h1>` : ''}${scene.code ? `<code>${esc(scene.code)}</code>` : ''}${scene.subtitle ? `<p>${esc(scene.subtitle)}</p>` : ''}${scene.url ? `<p class="url">${esc(scene.url)}</p>` : ''}</div>`
+  }
+
+  /** Draws `scene` as it looks `t` ms after it starts, fading in and out at the edges. */
+  window.renderScene = (scene, t) => {
+    const length = window.sceneLength(scene)
+    const stage = document.getElementById('stage')
+    stage.innerHTML = scene.kind === 'term' ? terminalHtml(scene, t) : cardHtml(scene)
+    stage.style.opacity = String(Math.max(0, Math.min(1, t / FADE_MS, (length - t) / FADE_MS)))
+    // Text starts at the top, like a terminal, and scrolls only once it fills the window.
+    const screen = stage.querySelector('.screen')
+    const pre = screen?.querySelector('pre')
+    if (pre) pre.style.transform = `translateY(${-Math.max(0, pre.offsetHeight - (screen.clientHeight - 44))}px)`
+  }
+</script>
+</body>
+</html>

@@ -22,7 +22,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Both entries export the same mount(); see vite.config.ts */
+    "paths": { "@entry": ["./src/app/mountApp.tsx"] }
   },
   "include": ["src"]
 }

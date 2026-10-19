@@ -112,6 +112,12 @@ test('the printed link opens the dashboard, labelled as live local data', async 
   await expect(page.getByText('Live records from repositories on this machine')).toBeVisible()
 })
 
+test('the root of the dashboard opens the dashboard, not the website', async ({ page }) => {
+  await page.goto(`${url}/`)
+  await expect(page).toHaveURL(`${url}/app`)
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+})
+
 test('shows the repository, its session, changed file and verified check', async ({ page }) => {
   const name = repo.split('/').at(-1) as string
   await page.goto(`${url}/app/projects`)

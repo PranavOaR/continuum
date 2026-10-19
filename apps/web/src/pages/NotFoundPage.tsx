@@ -7,7 +7,7 @@ export function NotFoundPage({ inApp = false }: { inApp?: boolean }) {
   const content = (
     <EmptyState
       title="Page not found"
-      description="This page doesn't exist in the Continuum demo."
+      description="There's nothing at this address."
       action={
         <ButtonLink to={inApp ? '/app' : '/'} variant="primary" size="sm">
           {inApp ? 'Go to Overview' : 'Go home'}

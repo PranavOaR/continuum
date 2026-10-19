@@ -19,7 +19,8 @@
     "bench:scan": "tsx scripts/bench-scan.ts",
     "test:cross-agent": "node scripts/cross-agent.mjs",
     "plugin": "tsx scripts/plugin.ts",
-    "eval": "tsx scripts/eval/run.ts"
+    "eval": "tsx scripts/eval/run.ts",
+    "check:website": "node scripts/check-website.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
