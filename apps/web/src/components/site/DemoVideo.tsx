@@ -13,6 +13,7 @@ export function DemoVideo() {
           playsInline
           preload="metadata"
         >
+          <track kind="captions" src={DEMO_VIDEO.captions} srcLang="en" label="English" default />
           <a href={DEMO_VIDEO.src}>Download the demo video</a>
         </video>
       </div>

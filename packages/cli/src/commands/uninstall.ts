@@ -14,7 +14,7 @@ function removeIfEmpty(path: string): void {
 }
 
 /**
- * Disconnects Claude Code and, with --purge, deletes the recorded history,
+ * Disconnects every agent and, with --purge, deletes the recorded history,
  * leaving the repository as it was before Continuum was set up.
  */
 export async function uninstallCommand(io: Io, args: readonly string[]): Promise<number> {

@@ -26,7 +26,9 @@ const option = (name) => {
 }
 
 const video = resolve(option('--video') ?? join(HERE, 'continuum-demo.silent.mp4'))
-const out = resolve(option('--out') ?? join(ROOT, 'apps/web/public/demo/continuum-demo.mp4'))
+const out = resolve(option('--out') ?? join(ROOT, 'apps/web/site-public/demo/continuum-demo.mp4'))
+// Captions for the voiced video, beside it: continuum-demo.vtt.
+const captionsPath = out.replace(/\.\w+$/, '.vtt')
 const script = JSON.parse(readFileSync(resolve(option('--script') ?? join(HERE, 'narration.json')), 'utf8'))
 const tts = option('--tts') ?? 'elevenlabs'
 const cacheDir = resolve(option('--cache') ?? join(homedir(), '.cache/continuum-demo-voice'))
@@ -100,13 +102,31 @@ for (const [index, line] of script.lines.entries()) {
   clips.push({ path, start: line.start, end, speech, hold: Math.max(0, LEAD_S + speech + TAIL_S - (end - line.start)) })
 }
 
+/** WebVTT time: 00:01:02.345 */
+const vttTime = (seconds) => new Date(Math.max(0, seconds) * 1000).toISOString().slice(11, 23)
+
+/** One caption per sentence, sharing the line's spoken time in proportion to their length. */
+function captions(text, start, speech) {
+  const sentences = text.split(/(?<=[.!?])\s+/)
+  const total = sentences.reduce((sum, sentence) => sum + sentence.length, 0)
+  let at = start
+  return sentences.map((sentence) => {
+    const end = at + (speech * sentence.length) / total
+    const cue = `${vttTime(at)} --> ${vttTime(end)}\n${sentence}`
+    at = end
+    return cue
+  })
+}
+
 // Video: each scene's span, plus a held last frame where its line needs longer. Audio: each line at its span's start.
 const filters = []
+const cues = []
 let at = 0
 for (const [index, segment] of clips.entries()) {
   filters.push(`[0:v]trim=start=${segment.start}:end=${segment.end},setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${segment.hold.toFixed(3)}[v${index}]`)
   const delay = Math.round((at + LEAD_S) * 1000)
   filters.push(`[${index + 1}:a]aresample=44100,aformat=channel_layouts=stereo,adelay=${delay}|${delay}[a${index}]`)
+  cues.push(...captions(script.lines[index].text, at + LEAD_S, segment.speech))
   console.log(`${String(index + 1).padStart(2)}  ${segment.speech.toFixed(1)}s of speech in ${(segment.end - segment.start).toFixed(1)}s of video${segment.hold > 0 ? `, held ${segment.hold.toFixed(1)}s` : ''}`)
   at += segment.end - segment.start + segment.hold
 }
@@ -122,7 +142,8 @@ try {
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', partial,
   ], { stdio: 'inherit' })
   renameSync(partial, out)
+  writeFileSync(captionsPath, `WEBVTT\n\n${cues.join('\n\n')}\n`)
 } finally {
   rmSync(partial, { force: true })
 }
-console.log(`Wrote ${out} (${at.toFixed(1)}s, voice: ${tts === 'say' ? 'macOS say' : `ElevenLabs ${voice}`})`)
+console.log(`Wrote ${out} (${at.toFixed(1)}s, voice: ${tts === 'say' ? 'macOS say' : `ElevenLabs ${voice}`}) and ${cues.length} captions`)

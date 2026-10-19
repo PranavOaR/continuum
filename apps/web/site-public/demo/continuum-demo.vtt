@@ -1,0 +1,46 @@
+WEBVTT
+
+00:00:00.250 --> 00:00:01.499
+This is Continuum.
+
+00:00:01.499 --> 00:00:06.844
+Claude Code starts a task, Codex finishes it, and nothing is lost in between.
+
+00:00:07.544 --> 00:00:10.935
+First, connect both agents to your repository.
+
+00:00:10.935 --> 00:00:12.188
+One command each.
+
+00:00:12.888 --> 00:00:18.461
+Claude Code fixes the first bug, records the task and its next step, and stops.
+
+00:00:19.161 --> 00:00:26.638
+When Codex starts, Continuum briefs it automatically: what's done, what's left, and exactly what to do next.
+
+00:00:27.338 --> 00:00:30.241
+Codex picks up the same task and finishes it.
+
+00:00:30.241 --> 00:00:34.629
+Then you run the tests through Continuum, so the result is verified.
+
+00:00:35.329 --> 00:00:39.137
+In the dashboard, it's one task, carried from one agent to the other.
+
+00:00:39.837 --> 00:00:46.060
+This check is verified: Continuum ran npm test against the exact contents of every file.
+
+00:00:46.760 --> 00:00:51.032
+Here are the acceptance criteria and steps, as the agents reported them.
+
+00:00:51.732 --> 00:00:56.097
+And here is the change itself, covered by the passing check.
+
+00:00:56.797 --> 00:01:02.881
+Every event is recorded in order: Claude Code's session, then Codex picking up the same task.
+
+00:01:06.597 --> 00:01:08.123
+Install it with one command.
+
+00:01:08.123 --> 00:01:10.684
+It runs on your machine, and nothing leaves it.

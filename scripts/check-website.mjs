@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Builds the public website (VITE_CONTINUUM_SITE=website, as Vercel does) and
-// fails if the dashboard's demo dataset, the prototype's wording or a GitHub link is in it.
+// fails if the dashboard's demo dataset or the prototype's wording is in it, or if
+// any page fails to render or links to GitHub.
 //   npm run check:website
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
@@ -10,12 +11,23 @@ import { chromium } from '@playwright/test'
 
 const WEB = join(import.meta.dirname, '../apps/web')
 /**
- * Strings only the dashboard's demo dataset or the prototype's labels contained,
- * and links to the source repository, which the website does not show. (The
- * hero illustration's "Startup App" is part of the landing page's design.)
+ * Strings only the dashboard's demo dataset or the prototype's labels contained.
+ * (The hero illustration's "Startup App" is part of the landing page's design.)
  */
-const FORBIDDEN = ['Developer Portfolio', 'Analytics Platform', 'Docs Site', 'Demo workspace', 'mock data', 'Mock data', 'sample data', 'Interactive demo', 'Explore the demo', 'github.com']
-const REQUIRED_FILES = ['index.html', 'demo/continuum-demo.mp4', 'demo/continuum-demo.jpg']
+const FORBIDDEN = ['Developer Portfolio', 'Analytics Platform', 'Docs Site', 'Demo workspace', 'mock data', 'Mock data', 'sample data', 'Interactive demo', 'Explore the demo']
+/** Links the website must not show: it does not point to the source repository. */
+const FORBIDDEN_LINK = /github\.com/
+const REQUIRED_FILES = ['index.html', 'demo/continuum-demo.mp4', 'demo/continuum-demo.jpg', 'demo/continuum-demo.vtt', 'og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml']
+/** Every page, with the heading it must show; an unknown address must show the 404. */
+const PAGES = [
+  ['/', 'Your work continues.'],
+  ['/docs', 'Getting started'],
+  ['/docs/agents', 'Agents'],
+  ['/docs/commands', 'Commands'],
+  ['/docs/data', 'What gets recorded'],
+  ['/privacy', 'Privacy'],
+  ['/no-such-page', 'This page went missing.'],
+]
 const PREVIEW_PORT = 4787
 
 /** How long vite preview may take to start. */
@@ -40,8 +52,13 @@ async function renderErrors(dir) {
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message.split('\n')[0]))
     page.on('console', (message) => message.type() === 'error' && errors.push(message.text().split('\n')[0]))
-    await page.goto(`http://localhost:${PREVIEW_PORT}/`, { waitUntil: 'networkidle' })
-    if (!(await page.getByRole('heading', { level: 1 }).isVisible())) errors.push('the landing page did not render its headline')
+    for (const [path, heading] of PAGES) {
+      await page.goto(`http://localhost:${PREVIEW_PORT}${path}`, { waitUntil: 'networkidle' })
+      const h1 = page.getByRole('heading', { level: 1 })
+      if (!(await h1.isVisible()) || !(await h1.innerText()).includes(heading)) errors.push(`${path} did not show "${heading}"`)
+      const links = await page.locator('a[href]').evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute('href')))
+      for (const href of links.filter((link) => FORBIDDEN_LINK.test(link))) errors.push(`${path} links to ${href}`)
+    }
     return errors.map((error) => `the website fails in a browser: ${error}`)
   } finally {
     await browser?.close()
@@ -65,7 +82,7 @@ try {
   ]
   for (const failure of failures) console.error(`FAIL ${failure}`)
   if (failures.length > 0) process.exit(1)
-  console.log(`Website OK: ${assets.length} script(s), no demo content, renders without errors.`)
+  console.log(`Website OK: ${assets.length} script(s), no demo content, ${PAGES.length} pages render without errors.`)
 } finally {
   rmSync(out, { recursive: true, force: true })
 }
