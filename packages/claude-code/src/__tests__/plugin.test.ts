@@ -37,13 +37,12 @@ describe('plugin hooks outside Continuum repositories', () => {
     const notGit = mkdtempSync(join(tmpdir(), 'continuum-not-git-'))
     try {
       for (const dir of [plain.root, notGit]) {
-        const started = performance.now()
         // Claude Code writes every hook its payload, which can be large (it carries tool output). A payload
         // bigger than a pipe's buffer fails with EPIPE unless the hook reads it before exiting.
         const output = execFileSync(handler.command, handler.args, { cwd: dir, env: { ...process.env, CLAUDE_PROJECT_DIR: dir, PATH: '/usr/bin:/bin' }, input: LARGE_PAYLOAD, encoding: 'utf8' })
         expect(output).toBe('')
-        // npx is not on that PATH: getting here at all proves it was never started.
-        expect(performance.now() - started).toBeLessThan(2_000)
+        // npx is not on that PATH, so had the guard tried to start it, the hook would have failed: success proves it skipped.
+        // (No timing assertion: a wall-clock limit failed on a slow CI runner without saying anything about the guard.)
       }
     } finally {
       plain.cleanup()
