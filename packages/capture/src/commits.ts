@@ -12,6 +12,8 @@ export interface CommitInfo {
   hash: string
   message: string
   files: string[]
+  /** When it was committed (git's committer date), which a scan may notice much later. */
+  committedAt: string
 }
 
 /** The HEAD the store last recorded, or null before any commit was recorded. */
@@ -26,8 +28,8 @@ function parseLog(output: string): CommitInfo[] {
     .filter((record) => record.trim() !== '')
     .map((record) => {
       const [header, ...files] = record.split('\n')
-      const [hash, message] = header.split(FIELD)
-      return { hash, message: message ?? '', files: files.map((file) => file.trim()).filter(Boolean) }
+      const [hash, committed, message] = header.split(FIELD)
+      return { hash, message: message ?? '', files: files.map((file) => file.trim()).filter(Boolean), committedAt: new Date(committed).toISOString() }
     })
 }
 
@@ -40,7 +42,7 @@ export async function commitsSince(root: string, head: string, since: string | n
   const range = since ? [head, `^${since}`] : [head, '--max-count=1']
   try {
     // -m --first-parent: a merge lists the files it brought into this branch instead of none.
-    const output = await gitOutput(root, ['-c', 'core.quotePath=false', 'log', `--max-count=${MAX_COMMITS_PER_SCAN}`, '--no-renames', '-m', '--first-parent', `--format=${RECORD}%H${FIELD}%s`, '--name-only', ...range, '--'])
+    const output = await gitOutput(root, ['-c', 'core.quotePath=false', 'log', `--max-count=${MAX_COMMITS_PER_SCAN}`, '--no-renames', '-m', '--first-parent', `--format=${RECORD}%H${FIELD}%cI${FIELD}%s`, '--name-only', ...range, '--'])
     const isContinuumIgnored = await loadContinuumIgnore(root)
     return parseLog(output).map((commit) => ({ ...commit, files: commit.files.filter((file) => !isContinuumIgnored(file)) }))
   } catch {

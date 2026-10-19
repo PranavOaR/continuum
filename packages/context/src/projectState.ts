@@ -79,6 +79,8 @@ export interface CommitSummary {
   message: string
   files: number
   recordedAt: string
+  /** When it was committed; recordedAt for commits recorded before this was kept. */
+  committedAt: string
 }
 
 /** Recent events searched for commits; older ones are in git history. */
@@ -90,7 +92,7 @@ function recentCommits(store: ContextStore): CommitSummary[] {
     .recentEvents(COMMIT_LOOKBACK_EVENTS)
     .flatMap(({ event }) =>
       event.type === 'commit.recorded' && !event.payload.baseline
-        ? [{ hash: event.payload.hash, message: event.payload.message, files: event.payload.files.length, recordedAt: event.occurredAt }]
+        ? [{ hash: event.payload.hash, message: event.payload.message, files: event.payload.files.length, recordedAt: event.occurredAt, committedAt: event.payload.committedAt ?? event.occurredAt }]
         : [],
     )
     .slice(0, MAX_COMMITS)

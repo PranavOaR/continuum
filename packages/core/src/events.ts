@@ -76,7 +76,7 @@ export type TaskUpsertedEvent = EventBase<
  * A commit that appeared in the repository (by anyone). `baseline` marks the
  * commit that was already HEAD when Continuum started watching: context, not work.
  */
-export type CommitRecordedEvent = EventBase<'commit.recorded', { hash: string; message: string; files: string[]; baseline?: boolean }>
+export type CommitRecordedEvent = EventBase<'commit.recorded', { hash: string; message: string; files: string[]; baseline?: boolean; committedAt?: string }>
 
 /** Something was deliberately forgotten. Says how much, never what. */
 export type DataForgottenEvent = EventBase<'data.forgotten', { scope: 'path' | 'session' | 'before'; removedEvents: number; changedEvents: number }>

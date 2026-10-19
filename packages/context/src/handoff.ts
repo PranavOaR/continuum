@@ -89,8 +89,11 @@ function taskSection(state: ProjectState): string[] {
   return ['## Current task', ...describeTask(current)]
 }
 
-function commitLines(state: ProjectState, now: Date): string[] {
-  return state.commits.map((commit) => `Committed [observed]: ${code(commit.hash.slice(0, 7))} ${quote(commit.message)} (${agoFromIso(commit.recordedAt, now)})`)
+/** Commits made since `since` (all of them before any session), dated by git, not by when a scan noticed them. */
+function commitLines(state: ProjectState, now: Date, since: string | null = null): string[] {
+  return state.commits
+    .filter((commit) => since === null || commit.committedAt >= since)
+    .map((commit) => `Committed [observed]: ${code(commit.hash.slice(0, 7))} ${quote(commit.message)} (${agoFromIso(commit.committedAt, now)})`)
 }
 
 function leftOffSection(state: ProjectState, now: Date): string[] {
@@ -104,7 +107,7 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
     const shown = files.slice(0, MAX_LISTED).join(', ')
     lines.push(`Files it changed: ${files.length > MAX_LISTED ? `${shown} and ${files.length - MAX_LISTED} more` : shown}`)
   }
-  return [...lines, ...commitLines(state, now)]
+  return [...lines, ...commitLines(state, now, latest.startedAt)]
 }
 
 const FIELD_LABEL: Record<TaskSummary['userEdited'][number], string> = {

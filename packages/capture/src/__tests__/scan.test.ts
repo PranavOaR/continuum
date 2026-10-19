@@ -63,7 +63,10 @@ describe('scanRepository', () => {
     })
   })
 
-  it('records the existing HEAD once as a baseline, then each new commit with its files', async () => {
+  // When the commit was made, from git: a scan may notice it long after.
+  const ISO_TIME = expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/)
+
+  it('records the existing HEAD once as a baseline, then each new commit with its files and time', async () => {
     const { repo, store } = setup({ 'a.ts': 'a' })
     repo.commit('initial')
     await scanRepository(store, repo.root)
@@ -75,9 +78,9 @@ describe('scanRepository', () => {
     await scanRepository(store, repo.root)
     const commits = [...store.events()].filter((event) => event.type === 'commit.recorded').map((event) => event.payload)
     expect(commits).toEqual([
-      { hash: expect.any(String), message: 'initial', files: ['a.ts'], baseline: true },
-      { hash: expect.any(String), message: 'add b', files: ['b.ts'] },
-      { hash: expect.any(String), message: 'change a', files: ['a.ts'] },
+      { hash: expect.any(String), message: 'initial', files: ['a.ts'], committedAt: ISO_TIME, baseline: true },
+      { hash: expect.any(String), message: 'add b', files: ['b.ts'], committedAt: ISO_TIME },
+      { hash: expect.any(String), message: 'change a', files: ['a.ts'], committedAt: ISO_TIME },
     ])
   })
 

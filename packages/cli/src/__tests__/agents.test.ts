@@ -5,8 +5,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
+import { setupCommand } from '../commands/setup'
 import { EXIT_USAGE } from '../io'
-import { cli } from './harness'
+import { cli, NOW, TEST_CONFIG_DIR } from './harness'
 
 const sandboxes: Sandbox[] = []
 afterEach(() => {
@@ -35,6 +36,19 @@ function fireHook(root: string, event: string, fields: Record<string, unknown>, 
   const payload = JSON.stringify({ session_id: sessionId, cwd: root, transcript_path: '/t.jsonl', hook_event_name: event, ...fields })
   return execFileSync(command, args, { cwd: root, input: payload, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
 }
+
+describe('continuum setup through npx', () => {
+  it('records the files it writes, so they are never reported as unexplained changes', async () => {
+    const repo = sandbox()
+    const io = { cwd: repo.root, out: () => {}, err: () => {}, now: () => NOW, configDir: TEST_CONFIG_DIR } as unknown as Parameters<typeof setupCommand>[0]
+    // Through npx the files are portable, so they are not kept out of git and scans see them.
+    const npx = { command: 'npx', args: ['-y', '@pranavoar/continuum@0.1.0'], portable: true }
+    for (const target of ['claude-code', 'codex', 'cursor']) expect(await setupCommand(io, [target], npx)).toBe(0)
+    const status = (await cli(repo.root, ['status'])).out
+    expect(status).toContain('all recorded')
+    expect((await cli(repo.root, ['handoff'])).out).not.toContain('Changed outside agent sessions')
+  })
+})
 
 describe('continuum setup claude-code', () => {
   it('initializes, wires hooks and MCP, and removes them again', async () => {
