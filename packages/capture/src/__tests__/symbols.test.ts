@@ -88,6 +88,19 @@ describe('extractSymbols edge cases', () => {
     expect(hashOf(edited, 'before')).toBe(hashOf(source, 'before'))
   })
 
+  it('reads JSX with self-closing tags and apostrophes in text, common in React files', () => {
+    const source = [
+      'export function Card({ a, e }: Props) {',
+      '  return (',
+      '    <div>{a ? <B /> : <C d={e} />}</div>',
+      "    <p>It's the agent's turn; don't stop.</p>",
+      '  )',
+      '}',
+      'export const after = 1',
+    ].join('\n')
+    expect(extractSymbols('Card.tsx', source)?.map((symbol) => symbol.name)).toEqual(['Card', 'after'])
+  })
+
   it('names anonymous default exports "default", never "extends"', () => {
     expect(extractSymbols('a.ts', 'export default class extends Base {}\n')?.map((symbol) => symbol.name)).toEqual(['default'])
     expect(extractSymbols('a.ts', 'export const x = 1\nexport default function () {\n  return 2\n}\n')?.map((symbol) => symbol.name)).toEqual(['x', 'default'])

@@ -1,5 +1,5 @@
-import { ArrowRight, Check, Copy, Play } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ArrowRight, Play } from 'lucide-react'
+import { useEffect } from 'react'
 import { ActivityFlow } from '../components/landing/ActivityFlow'
 import { FeatureList } from '../components/landing/FeatureList'
 import { HeroPreview } from '../components/landing/HeroPreview'
@@ -10,14 +10,12 @@ import { SiteFooter } from '../components/site/SiteFooter'
 import { SiteHeader } from '../components/site/SiteHeader'
 import { SPY_IDS } from '../components/site/siteNav'
 import { buttonClass } from '../components/shared/Button'
-import { AgentLogos } from '../components/site/AgentLogos'
+import { AgentPicker } from '../components/site/AgentPicker'
 import { DemoVideo } from '../components/site/DemoVideo'
 import { InstallCommand } from '../components/site/InstallCommand'
-import { GET_STARTED, INSTALL_COMMAND, NPM_URL, PACKAGE_NAME } from '../components/site/siteContent'
+import { GET_STARTED, NPM_URL, PACKAGE_NAME } from '../components/site/siteContent'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { copyToClipboard } from '../utils/clipboard'
 
-const COPY_RESET_MS = 2000
 
 const PROBLEMS = [
   { title: 'Every new session starts blank', body: 'You re-explain the architecture, the task, and what was already tried — again.' },
@@ -35,21 +33,6 @@ function ThreadUnderline() {
   )
 }
 
-function CopyInstallButton() {
-  const [isCopied, setCopied] = useState(false)
-  const copy = async () => {
-    const result = await copyToClipboard(INSTALL_COMMAND)
-    if (!result.ok) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), COPY_RESET_MS)
-  }
-  return (
-    <button type="button" onClick={() => void copy()} className="inline-flex items-center gap-2 font-mono text-[12px] text-muted hover:text-fg">
-      {isCopied ? <Check className="size-3.5 text-success" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
-      <span aria-live="polite">{isCopied ? 'Install command copied' : `Copy: ${INSTALL_COMMAND}`}</span>
-    </button>
-  )
-}
 
 function Hero() {
   return (
@@ -64,7 +47,7 @@ function Hero() {
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pr-3 pl-1 text-[13px] text-muted hover:border-line-strong"
           >
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent">v0.1.1</span>
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent">v0.1.2</span>
             Now on npm: {PACKAGE_NAME}
             <ArrowRight className="size-3.5" aria-hidden />
             <span className="sr-only"> (opens in a new tab)</span>
@@ -92,13 +75,8 @@ function Hero() {
               <Play aria-hidden /> Watch the demo
             </a>
           </div>
-          <div className="mt-5">
-            <CopyInstallButton />
-          </div>
-
-          <div className="mt-10 flex flex-wrap items-center gap-2">
-            <p className="mr-3 label-mono text-subtle">Designed for</p>
-            <AgentLogos />
+          <div className="mt-10">
+            <AgentPicker label="Designed for · pick yours" />
           </div>
         </div>
 
@@ -145,9 +123,7 @@ function GetStarted() {
                 <p className="mt-2 text-[14px] leading-[1.55] text-muted">{step.body}</p>
               </div>
               {step.command && (
-                <div className="min-w-0">
-                  <InstallCommand command={step.command} />
-                </div>
+                <div className="min-w-0">{step.command === 'pick-agent' ? <AgentPicker /> : <InstallCommand command={step.command} />}</div>
               )}
             </li>
           ))}

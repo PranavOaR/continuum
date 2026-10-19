@@ -1,7 +1,6 @@
 /** What the public website says about installing and running Continuum, in one place. */
 
 export const PACKAGE_NAME = 'getcontinuum'
-export const INSTALL_COMMAND = `npx ${PACKAGE_NAME} setup claude-code`
 export const DASHBOARD_COMMAND = `npx ${PACKAGE_NAME} serve`
 export const NPM_URL = `https://www.npmjs.com/package/${PACKAGE_NAME}`
 
@@ -15,8 +14,9 @@ export const DEMO_VIDEO = {
 export const GET_STARTED = [
   {
     title: 'Connect your agent',
-    command: INSTALL_COMMAND,
-    body: 'Run it in your repository. Using Codex or Cursor? Run setup codex or setup cursor instead. Nothing is written to your global agent settings.',
+    // Shows the agent picker: the command depends on the agent.
+    command: 'pick-agent',
+    body: 'Pick your agent and run its command in your repository. Nothing is written to your global agent settings.',
   },
   {
     title: 'Work as usual',

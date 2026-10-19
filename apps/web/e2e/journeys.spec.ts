@@ -15,12 +15,27 @@ test('landing page keeps its design, shows the demo video and the install guide,
   await expect(page.getByText(/mock data|sample data|prototype|explore the demo/i)).toHaveCount(0)
 })
 
-test('landing page copies the install command', async ({ page, context }) => {
+test('landing page gives the setup command for the agent you pick, and copies it', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto('/')
-  await page.getByRole('button', { name: /^Copy: npx/ }).click()
-  await expect(page.getByText('Install command copied')).toBeVisible()
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npx getcontinuum setup claude-code')
+  const hero = page.locator('#product')
+  const tabs = hero.getByRole('tablist', { name: 'Choose your agent' })
+  const panel = hero.getByRole('tabpanel')
+  await expect(tabs.getByRole('tab', { name: 'Claude Code' })).toHaveAttribute('aria-selected', 'true')
+  await expect(panel).toContainText('npx getcontinuum setup claude-code')
+
+  await tabs.getByRole('tab', { name: 'Codex' }).click()
+  await expect(panel).toContainText('npx getcontinuum setup codex')
+  await expect(panel).toContainText('/hooks')
+
+  // Arrow keys move between agents.
+  await page.keyboard.press('ArrowRight')
+  await expect(tabs.getByRole('tab', { name: 'Cursor' })).toBeFocused()
+  await expect(panel).toContainText('npx getcontinuum setup cursor')
+
+  await panel.getByRole('button', { name: 'Copy' }).click()
+  await expect(panel.getByRole('button', { name: 'Copied' })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npx getcontinuum setup cursor')
 })
 
 test('overview shows coherent summary values and opens a project', async ({ page }) => {

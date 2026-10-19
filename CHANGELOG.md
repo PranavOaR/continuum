@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2] - 2026-10-19
+
+### Fixed
+- `start_task` with the title of an unfinished task resumes that task instead of creating a duplicate. An agent continuing another agent's work (for example Codex after Claude Code) sometimes calls `start_task` instead of `update_task`; the work used to split across two tasks, with the first one set back to planned. The resumed task keeps its finished steps and met criteria, and gains any new steps and criteria.
+- Symbol anchors work in more React files: a self-closing JSX tag after an `{expression}` on the same line (`<C d={e} />}</div>`) no longer makes the whole file unreadable to the symbol scanner, which then fell back to file-level anchors.
+
 ## [0.1.1] - 2026-10-19
 
 ### Renamed

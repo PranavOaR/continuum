@@ -114,7 +114,8 @@ function topLevelLines(source: string): boolean[] | null {
       skipComment()
       continue
     }
-    if ((char === '"' || char === "'") || (char === '/' && BEFORE_REGEX.has(previous))) {
+    // `/>` closes a self-closing JSX tag (`<C d={e} />`); read as a regex, it would swallow the brackets after it.
+    if (char === '"' || char === "'" || (char === '/' && BEFORE_REGEX.has(previous) && next !== '>')) {
       index += 1
       if (skipLiteral(char, char === '/')) {
         previous = 'a'
