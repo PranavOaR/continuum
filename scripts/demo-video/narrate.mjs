@@ -38,6 +38,8 @@ const voice = option('--voice') ?? DEFAULT_VOICE
 /** Silence before a line starts, and after it ends before the next scene. */
 const LEAD_S = 0.25
 const TAIL_S = 0.45
+/** Integrated loudness of the voiceover: the usual target for speech in web video. */
+const LOUDNESS_LUFS = -16
 
 function apiKey() {
   const fromEnv = process.env.ELEVENLABS_API_KEY?.trim()
@@ -109,7 +111,8 @@ for (const [index, segment] of clips.entries()) {
   at += segment.end - segment.start + segment.hold
 }
 filters.push(`${clips.map((_, index) => `[v${index}]`).join('')}concat=n=${clips.length}:v=1:a=0[v]`)
-filters.push(`${clips.map((_, index) => `[a${index}]`).join('')}amix=inputs=${clips.length}:normalize=0,apad[a]`)
+// Lines never overlap, so mixing cannot clip; loudnorm brings speech to the usual level for web video.
+filters.push(`${clips.map((_, index) => `[a${index}]`).join('')}amix=inputs=${clips.length}:normalize=0,loudnorm=I=${LOUDNESS_LUFS}:TP=-1.5:LRA=11,apad[a]`)
 
 const partial = out.replace(/(\.\w+)$/, '.partial$1')
 try {

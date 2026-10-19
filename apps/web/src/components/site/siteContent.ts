@@ -11,7 +11,7 @@ export const SUPPORTED_AGENTS = ['claude-code', 'codex', 'cursor'] as const
 export const DEMO_VIDEO = {
   src: '/demo/continuum-demo.mp4',
   poster: '/demo/continuum-demo.jpg',
-  caption: 'Claude Code fixes one of two bugs and stops. Codex starts with Continuum’s briefing, finishes the same task, and the dashboard shows who did what. Recorded from real sessions.',
+  caption: 'Claude Code fixes one of two bugs and stops. Codex starts with Continuum’s briefing, finishes the same task, and the dashboard shows who did what. Recorded from real sessions; voiceover by ElevenLabs.',
 } as const
 
 export const GET_STARTED = [
