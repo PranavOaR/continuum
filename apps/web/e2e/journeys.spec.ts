@@ -1,22 +1,25 @@
 import { expect, test } from './fixtures'
 
-test('landing page explains the product, with the install command and the demo video', async ({ page }) => {
+test('landing page keeps its design, shows the demo video and the install guide, and nothing from the demo', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Your work continues.')
-  await expect(page.getByText('npx @pranavoar/continuum setup claude-code')).toBeVisible()
-  await expect(page.locator('video')).toHaveAttribute('src', '/demo/continuum-demo.mp4')
-  await expect(page.getByRole('heading', { name: 'What the next agent is told' })).toBeVisible()
-  await expect(page.locator('pre')).toContainText('## Current task')
-  for (const agent of ['Claude Code', 'Codex', 'Cursor']) await expect(page.getByRole('list').getByText(agent, { exact: true })).toBeVisible()
-  // The prototype's wording is gone for good.
-  await expect(page.getByText(/mock data|prototype|explore the demo|ChatGPT/i)).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Your code stays. Your context disappears.' })).toBeVisible()
+  await expect(page.locator('#demo video')).toHaveAttribute('src', '/demo/continuum-demo.mp4')
+  const guide = page.locator('#get-started')
+  await expect(guide.getByText('npx @pranavoar/continuum setup claude-code')).toBeVisible()
+  await expect(guide.getByText('npx @pranavoar/continuum serve')).toBeVisible()
+  // Every call to action stays on the page; nothing leads into a demo dashboard or to GitHub.
+  await page.getByRole('link', { name: 'Open dashboard' }).first().click()
+  await expect(page).toHaveURL(/#get-started$/)
+  expect(await page.locator('a[href^="/app"], a[href*="github.com"]').count()).toBe(0)
+  await expect(page.getByText(/mock data|sample data|prototype|explore the demo/i)).toHaveCount(0)
 })
 
 test('landing page copies the install command', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto('/')
-  await page.getByRole('button', { name: 'Copy' }).click()
-  await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible()
+  await page.getByRole('button', { name: /^Copy: npx/ }).click()
+  await expect(page.getByText('Install command copied')).toBeVisible()
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npx @pranavoar/continuum setup claude-code')
 })
 
