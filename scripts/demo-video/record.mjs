@@ -6,7 +6,8 @@
 //
 //   node scripts/demo-video/record.mjs --work <dir> [--tts say] [--voice <id>] [--out apps/web/site-public/demo] [--stills 1,8,30]
 //
-// Writes continuum-demo.mp4, .jpg (poster) and .vtt (captions). Needs ffmpeg and Playwright's Chromium.
+// Writes continuum-demo.mp4 and .vtt (captions). The cover image is designed, not a frame: scripts/site/images.mjs.
+// Needs ffmpeg and Playwright's Chromium.
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { createServer } from 'node:net'
@@ -212,20 +213,13 @@ function framer(compose, dashboardPage, plan, box) {
   }
 }
 
-async function render(compose, draw, plan, videoPath, posterPath) {
+async function render(draw, compose, plan, videoPath) {
   const video = startFfmpeg(videoPath)
-  let isPosterTaken = false
   try {
     for (let frame = 0; frame < Math.ceil(plan.total * FPS); frame += 1) {
       const t = frame / FPS
-      const layers = await draw(t)
+      await draw(t)
       await video.write(await compose.screenshot())
-      const dashboardLayer = layers.find((layer) => layer.frame?.beat === 'verified' && layer.frame.settled)
-      if (!isPosterTaken && dashboardLayer && layers.length === 1) {
-        await compose.evaluate((value) => window.renderFrame(value), [{ ...dashboardLayer, frame: { ...dashboardLayer.frame, captionOpacity: 0 } }])
-        await compose.screenshot({ path: posterPath, type: 'jpeg', quality: 88 })
-        isPosterTaken = true
-      }
       if (frame % (FPS * 5) === 0) console.log(`  ${t.toFixed(0)}s / ${plan.total.toFixed(0)}s`)
     }
     await video.close()
@@ -236,7 +230,7 @@ async function render(compose, draw, plan, videoPath, posterPath) {
 }
 
 mkdirSync(out, { recursive: true })
-const final = { video: join(out, 'continuum-demo.mp4'), poster: join(out, 'continuum-demo.jpg'), captions: join(out, 'continuum-demo.vtt') }
+const final = { video: join(out, 'continuum-demo.mp4'), captions: join(out, 'continuum-demo.vtt') }
 // Rendered beside the final files and moved into place only when complete, so a failed run leaves the committed video intact.
 const partial = (path) => path.replace(/(\.\w+)$/, '.partial$1')
 const silent = join(work, 'continuum-demo.silent.mp4')
@@ -279,11 +273,11 @@ try {
     console.log(`Wrote stills to ${join(work, 'stills')}`)
   } else {
     console.log('Rendering…')
-    await render(compose, draw, plan, silent, partial(final.poster))
+    await render(draw, compose, plan, silent)
     console.log('Voice and captions…')
     muxVoice({ silent, clips, lineStarts: plan.lineStarts, texts: narration.map((line) => line.text), total: plan.total, video: partial(final.video), captions: partial(final.captions) })
     for (const path of Object.values(final)) renameSync(partial(path), path)
-    console.log(`Wrote ${final.video} (${plan.total.toFixed(1)}s), its poster and ${final.captions}`)
+    console.log(`Wrote ${final.video} (${plan.total.toFixed(1)}s) and ${final.captions}. Run scripts/site/images.mjs to update the cover's length.`)
   }
 } finally {
   await browser?.close()
