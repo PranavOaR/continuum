@@ -5,9 +5,6 @@ export const INSTALL_COMMAND = `npx ${PACKAGE_NAME} setup claude-code`
 export const DASHBOARD_COMMAND = `npx ${PACKAGE_NAME} serve`
 export const NPM_URL = `https://www.npmjs.com/package/${PACKAGE_NAME}`
 
-/** The agents Continuum connects to today, in the order the site lists them. */
-export const SUPPORTED_AGENTS = ['claude-code', 'codex', 'cursor'] as const
-
 export const DEMO_VIDEO = {
   src: '/demo/continuum-demo.mp4',
   poster: '/demo/continuum-demo.jpg',

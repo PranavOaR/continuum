@@ -7,10 +7,10 @@ import { HeroPreview } from '../components/landing/HeroPreview'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
 import { buttonClass } from '../components/shared/Button'
 import { Logo } from '../components/shared/Logo'
+import { AgentLogos } from '../components/site/AgentLogos'
 import { DemoVideo } from '../components/site/DemoVideo'
 import { InstallCommand } from '../components/site/InstallCommand'
-import { GET_STARTED, INSTALL_COMMAND, NPM_URL, PACKAGE_NAME, SUPPORTED_AGENTS } from '../components/site/siteContent'
-import { AGENTS } from '@continuum/core'
+import { GET_STARTED, INSTALL_COMMAND, NPM_URL, PACKAGE_NAME } from '../components/site/siteContent'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { cn } from '../utils/cn'
 import { copyToClipboard } from '../utils/clipboard'
@@ -154,12 +154,8 @@ function Hero() {
           </div>
 
           <div className="mt-10 flex flex-wrap items-center gap-2">
-            <p className="mr-1 label-mono text-subtle">Designed for</p>
-            {AGENTS.filter((agent) => (SUPPORTED_AGENTS as readonly string[]).includes(agent.id)).map((agent) => (
-              <span key={agent.id} className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[12px] text-muted">
-                {agent.name}
-              </span>
-            ))}
+            <p className="mr-3 label-mono text-subtle">Designed for</p>
+            <AgentLogos />
           </div>
         </div>
 
