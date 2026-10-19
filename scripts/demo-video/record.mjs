@@ -3,7 +3,7 @@
 // real run: terminal scenes replay the captured output, and the dashboard
 // scene is the real `continuum serve` for that repository.
 //
-//   node scripts/demo-video/record.mjs --work <dir> [--out apps/web/public/demo]   (the poster goes to --out)
+//   node scripts/demo-video/record.mjs --work <dir> [--out apps/web/site-public/demo]   (the poster goes to --out)
 //
 // Needs ffmpeg and Playwright's Chromium.
 import { spawn } from 'node:child_process'
@@ -23,7 +23,7 @@ const option = (name) => {
   return value
 }
 const work = resolve(option('--work') ?? 'demo-video-work')
-const out = resolve(option('--out') ?? join(ROOT, 'apps/web/public/demo'))
+const out = resolve(option('--out') ?? join(ROOT, 'apps/web/site-public/demo'))
 const capture = JSON.parse(readFileSync(join(work, 'capture.json'), 'utf8'))
 const repo = join(work, 'pricing')
 

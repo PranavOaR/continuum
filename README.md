@@ -127,7 +127,7 @@ Handoffs separately list **changes no agent session made**, so the next agent as
 | `continuum forget --path <p> \| --session <id> \| --before <date>` | Permanently removes recorded data. The database is rewritten and vacuumed, so the text is gone from the file itself. |
 | `continuum export <file>` / `continuum import <file>` | Moves the whole history between clones or machines as JSON, readable only by you. |
 | `continuum compact` | Folds events older than 30 days into a checkpoint. |
-| `continuum uninstall [--purge]` | Disconnects Claude Code; `--purge` also deletes `.continuum/`. |
+| `continuum uninstall [--purge]` | Disconnects every agent (Claude Code, Codex, Cursor); `--purge` also deletes `.continuum/`. |
 
 ## Use with Codex
 

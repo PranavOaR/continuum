@@ -1,0 +1,52 @@
+# Agents
+
+Continuum connects to each agent per repository. It never writes to your global agent settings.
+
+## Claude Code
+
+```bash
+npx @pranavoar/continuum setup claude-code
+```
+
+Writes the hooks to `.claude/settings.local.json` and the MCP server to `.mcp.json`. Start Claude Code in the repository and approve the `continuum` server. Every session then starts with a briefing, and edits, test runs, tasks and commits are recorded as you work.
+
+You can install the **Claude Code plugin** instead, which brings the hooks, the MCP server and a `/continuum:handoff` command in one step. Its hooks do nothing in repositories that don't use Continuum.
+
+## Codex
+
+```bash
+npx @pranavoar/continuum setup codex
+```
+
+Writes `.codex/hooks.json` and a marked block in `.codex/config.toml`, never `~/.codex`. Codex loads them once you **trust the project** when it asks; then run **`/hooks`** in Codex and trust Continuum's hooks.
+
+- Each Codex session starts briefed on where the work left off, including what Claude or another agent did since.
+- Its patches are recorded as changes, and its last message as an agent-reported note.
+- It can use the same MCP tools: `start_task`, `update_task`, `get_context`, `record_decision`.
+
+Codex does not tell hooks a command's exit code, so its test runs are not recorded as checks. Run them with `continuum run -- <command>` for verified results.
+
+## Cursor
+
+```bash
+npx @pranavoar/continuum setup cursor
+```
+
+Adds the `continuum` MCP server to `.cursor/mcp.json` and an always-applied rule, `.cursor/rules/continuum.mdc`. Enable the server in Cursor's **Settings → MCP**. The rule asks Cursor's agent to read the handoff first, keep the task current, and record decisions.
+
+Cursor has no hooks Continuum uses, so to capture its edits, open a session as described below.
+
+## Any other agent or chat
+
+```bash
+npx @pranavoar/continuum session start --agent cursor   # prints a briefing to paste in
+npx @pranavoar/continuum start                          # in another terminal: records file changes
+npx @pranavoar/continuum session note "Parser done; tests next"
+npx @pranavoar/continuum session end --summary "Parser rewritten, tests pass"
+```
+
+While a session is open, file changes are attributed to it. Notes and summaries are labelled agent-reported, like an agent's own messages.
+
+## Removing an agent
+
+`setup <agent> --remove` takes one agent out again. `uninstall` disconnects every agent, and `uninstall --purge` also deletes `.continuum/`.

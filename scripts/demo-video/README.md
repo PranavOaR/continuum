@@ -1,6 +1,6 @@
 # Demo video
 
-`apps/web/public/demo/continuum-demo.mp4` is recorded from real sessions and narrated:
+`apps/web/site-public/demo/continuum-demo.mp4` is recorded from real sessions and narrated:
 1. Claude Code fixes one of two bugs in a sample repository and stops.
 2. Codex, briefed only by Continuum, finishes the same task.
 3. You record a verified test run.
@@ -24,4 +24,4 @@ rm -rf ~/continuum-demo
 
 - **Terminal scenes:** these replay the captured output of each command (`capture.json`). `scenes.html` draws them.
 - **Dashboard scene:** the recorder starts the real dashboard on the sample repository, scrolls through the project page, and shows the cursor and captions on top.
-- **The npm package:** the video ships only with the website (`VITE_CONTINUUM_SITE=website`). `scripts/bundle.mjs` leaves it out of the package.
+- **The npm package:** the video and its captions (`continuum-demo.vtt`, written by `narrate.mjs`) are in `apps/web/site-public/`, which only the website build (`VITE_CONTINUUM_SITE=website`) uses. They never reach the package.

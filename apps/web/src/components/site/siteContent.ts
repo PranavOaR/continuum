@@ -8,6 +8,7 @@ export const NPM_URL = `https://www.npmjs.com/package/${PACKAGE_NAME}`
 export const DEMO_VIDEO = {
   src: '/demo/continuum-demo.mp4',
   poster: '/demo/continuum-demo.jpg',
+  captions: '/demo/continuum-demo.vtt',
   caption: 'Claude Code fixes one of two bugs and stops. Codex starts with Continuum’s briefing, finishes the same task, and the dashboard shows who did what. Recorded from real sessions; voiceover by ElevenLabs.',
 } as const
 

@@ -1,28 +1,21 @@
 import { ArrowRight, Check, Copy, Play } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { ActivityFlow } from '../components/landing/ActivityFlow'
 import { FeatureList } from '../components/landing/FeatureList'
 import { HeroPreview } from '../components/landing/HeroPreview'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
+import { Faq } from '../components/site/Faq'
+import { Eyebrow, SectionTitle } from '../components/site/SectionHeading'
+import { SiteFooter } from '../components/site/SiteFooter'
+import { SiteHeader } from '../components/site/SiteHeader'
+import { SPY_IDS } from '../components/site/siteNav'
 import { buttonClass } from '../components/shared/Button'
-import { Logo } from '../components/shared/Logo'
 import { AgentLogos } from '../components/site/AgentLogos'
 import { DemoVideo } from '../components/site/DemoVideo'
 import { InstallCommand } from '../components/site/InstallCommand'
 import { GET_STARTED, INSTALL_COMMAND, NPM_URL, PACKAGE_NAME } from '../components/site/siteContent'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { cn } from '../utils/cn'
 import { copyToClipboard } from '../utils/clipboard'
-
-const NAV_SECTIONS = [
-  { id: 'product', label: 'Product' },
-  { id: 'demo', label: 'Demo' },
-  { id: 'how-it-works', label: 'How it works' },
-  { id: 'features', label: 'Features' },
-  { id: 'get-started', label: 'Get started' },
-] as const
-const SPY_IDS = NAV_SECTIONS.map((section) => section.id)
 
 const COPY_RESET_MS = 2000
 
@@ -31,25 +24,6 @@ const PROBLEMS = [
   { title: 'Handoffs are written by hand', body: 'Summaries come from memory, and quietly drift from what actually changed.' },
   { title: 'Unfinished work hides', body: 'Which files changed? Which tests ran? What was abandoned? It all takes digging.' },
 ]
-
-function Eyebrow({ index, children }: { index: string; children: ReactNode }) {
-  return (
-    <p className="mb-4 flex items-center gap-3 label-mono text-accent">
-      <span>{index}</span>
-      <span aria-hidden className="h-px w-8 bg-accent/40" />
-      <span className="text-muted">{children}</span>
-    </p>
-  )
-}
-
-function SectionTitle({ children, lead }: { children: ReactNode; lead?: ReactNode }) {
-  return (
-    <div className="mb-10 max-w-[640px]">
-      <h2 className="text-[30px] leading-[1.15] font-normal tracking-display text-fg sm:text-[36px]">{children}</h2>
-      {lead && <p className="mt-4 text-[17px] leading-[1.6] text-muted">{lead}</p>}
-    </div>
-  )
-}
 
 /** The brand's thread motif, drawn once beneath a word in the headline. */
 function ThreadUnderline() {
@@ -74,37 +48,6 @@ function CopyInstallButton() {
       {isCopied ? <Check className="size-3.5 text-success" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
       <span aria-live="polite">{isCopied ? 'Install command copied' : `Copy: ${INSTALL_COMMAND}`}</span>
     </button>
-  )
-}
-
-function SiteHeader({ activeId }: { activeId: string }) {
-  return (
-    <header className="sticky top-0 z-30 border-b border-line bg-bg/80 backdrop-blur-md">
-      <nav aria-label="Main" className="mx-auto flex h-16 max-w-[1160px] items-center justify-between gap-4 px-4 sm:px-8">
-        <Link to="/" aria-label="Continuum home">
-          <Logo />
-        </Link>
-        <ul className="hidden items-center gap-1 rounded-full border border-line bg-surface p-1 md:flex">
-          {NAV_SECTIONS.map((section) => (
-            <li key={section.id}>
-              <a
-                href={`#${section.id}`}
-                aria-current={activeId === section.id ? 'location' : undefined}
-                className={cn(
-                  'block rounded-full px-3.5 py-1.5 text-[13px] transition-colors',
-                  activeId === section.id ? 'bg-surface-2 text-fg' : 'text-muted hover:text-fg',
-                )}
-              >
-                {section.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-        <a href="#get-started" className={buttonClass('primary', 'sm')}>
-          Open dashboard <ArrowRight aria-hidden />
-        </a>
-      </nav>
-    </header>
   )
 }
 
@@ -240,6 +183,10 @@ function ClosingCta() {
 export function LandingPage() {
   useDocumentTitle('')
   const activeId = useScrollSpy(SPY_IDS)
+  // Arriving from another page at /#section: scroll there once the page has rendered.
+  useEffect(() => {
+    if (window.location.hash) document.getElementById(window.location.hash.slice(1))?.scrollIntoView()
+  }, [])
 
   return (
     <div className="min-h-dvh bg-bg">
@@ -285,24 +232,11 @@ export function LandingPage() {
         </section>
 
         <GetStarted />
+        <Faq />
         <ClosingCta />
       </main>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto flex max-w-[1160px] flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <Logo />
-          <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-muted">
-            <a href="#demo" className="hover:text-fg">Demo</a>
-            <a href="#how-it-works" className="hover:text-fg">How it works</a>
-            <a href="#get-started" className="hover:text-fg">Get started</a>
-            <a href="#get-started" className="hover:text-fg">Open dashboard</a>
-            <a href={NPM_URL} target="_blank" rel="noreferrer" className="hover:text-fg">
-              npm<span className="sr-only"> (opens in a new tab)</span>
-            </a>
-          </nav>
-          <p className="text-[12px] text-subtle">MIT licensed · runs on your machine</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   )
 }
