@@ -14,7 +14,7 @@ export function InstallCommand({ command }: { command: string }) {
   }
   return (
     <div className="flex w-full max-w-[560px] items-center gap-2 rounded-lg border border-line bg-surface py-1.5 pr-1.5 pl-4">
-      <code className="min-w-0 flex-1 overflow-x-auto font-mono text-[13.5px] whitespace-nowrap text-fg">
+      <code className="min-w-0 flex-1 overflow-x-auto font-mono text-[13.5px] break-words text-fg sm:whitespace-nowrap">
         <span aria-hidden className="mr-2 text-subtle select-none">$</span>
         {command}
       </code>
