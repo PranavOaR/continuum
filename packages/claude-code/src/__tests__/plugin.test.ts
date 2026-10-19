@@ -13,7 +13,7 @@ describe('the Claude Code plugin', () => {
     const version = read('packages/cli/package.json').version
     const sandbox = createSandbox({ 'a.txt': 'a' })
     try {
-      await setupClaudeCode(sandbox.root, { command: 'npx', args: ['-y', `@pranavoar/continuum@${version}`], portable: true })
+      await setupClaudeCode(sandbox.root, { command: 'npx', args: ['-y', `getcontinuum@${version}`], portable: true })
       const settings = JSON.parse(readFileSync(join(sandbox.root, '.claude/settings.local.json'), 'utf8'))
       expect(read('plugin/hooks/hooks.json')).toEqual({ hooks: guardedPluginHooks(settings.hooks) })
       expect(read('plugin/.mcp.json')).toEqual(JSON.parse(readFileSync(join(sandbox.root, '.mcp.json'), 'utf8')))
@@ -65,7 +65,7 @@ describe('plugin hooks outside Continuum repositories', () => {
     chmodSync(join(bin, 'npx'), 0o755)
     try {
       const output = execFileSync(handler.command, handler.args, { cwd: repo.root, env: { ...process.env, CLAUDE_PROJECT_DIR: repo.root, PATH: `${bin}:/usr/bin:/bin` }, input: '{"hook_event_name":"SessionStart"}', encoding: 'utf8' })
-      expect(output).toBe(`args: -y @pranavoar/continuum@${read('packages/cli/package.json').version} ingest\n{"hook_event_name":"SessionStart"}`)
+      expect(output).toBe(`args: -y getcontinuum@${read('packages/cli/package.json').version} ingest\n{"hook_event_name":"SessionStart"}`)
     } finally {
       repo.cleanup()
       rmSync(bin, { recursive: true, force: true })

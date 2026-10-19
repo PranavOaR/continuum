@@ -8,7 +8,7 @@ import { createSandbox } from '../packages/capture/src/testing'
 
 const ROOT = join(import.meta.dirname, '..')
 const version = JSON.parse(readFileSync(join(ROOT, 'packages/cli/package.json'), 'utf8')).version as string
-const invocation = { command: 'npx', args: ['-y', `@pranavoar/continuum@${version}`], portable: true }
+const invocation = { command: 'npx', args: ['-y', `getcontinuum@${version}`], portable: true }
 
 /** The hooks and MCP server setup would write for the published package. */
 export async function pluginFiles(): Promise<{ hooks: unknown; mcp: unknown; version: string }> {
@@ -30,5 +30,5 @@ if (import.meta.main ?? process.argv[1]?.endsWith('plugin.ts')) {
   write('plugin/.mcp.json', mcp)
   const manifestPath = join(ROOT, 'plugin/.claude-plugin/plugin.json')
   write('plugin/.claude-plugin/plugin.json', { ...JSON.parse(readFileSync(manifestPath, 'utf8')), version })
-  console.log(`Plugin written for @pranavoar/continuum@${version}`)
+  console.log(`Plugin written for getcontinuum@${version}`)
 }

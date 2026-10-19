@@ -1,8 +1,8 @@
 name: Release
 
-# Publishes @pranavoar/continuum when a version tag is pushed:
+# Publishes getcontinuum when a version tag is pushed:
 #   git tag v0.1.0 && git push origin v0.1.0
-# Needs the NPM_TOKEN repository secret (an npm automation token with publish rights to @pranavoar).
+# Needs the NPM_TOKEN repository secret (an npm token for the pranavoar account, which owns getcontinuum).
 on:
   push:
     tags: ['v*']

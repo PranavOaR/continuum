@@ -125,6 +125,17 @@ describe('setupClaudeCode with existing team configuration', () => {
     await setupClaudeCode(root, INVOCATION)
     expect(readJson(root, HOOKS_FILE).hooks.SessionStart).toHaveLength(1)
   })
+
+  it('recognizes its own entries under every published name, getcontinuum and the old scoped one', async () => {
+    for (const name of ['getcontinuum@0.1.1', '@pranavoar/continuum@0.1.0']) {
+      const { root } = repo()
+      await setupClaudeCode(root, { command: 'npx', args: ['-y', name], portable: true })
+      // A re-run, e.g. after an upgrade, replaces its own hooks and server instead of refusing or duplicating them.
+      await setupClaudeCode(root, { command: 'npx', args: ['-y', 'getcontinuum@0.1.2'], portable: true })
+      expect(readJson(root, HOOKS_FILE).hooks.SessionStart).toHaveLength(1)
+      expect(readJson(root, MCP_FILE).mcpServers.continuum.args).toEqual(['-y', 'getcontinuum@0.1.2', 'mcp'])
+    }
+  })
 })
 
 describe('removeClaudeCodeSetup', () => {

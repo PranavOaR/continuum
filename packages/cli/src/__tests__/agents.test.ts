@@ -42,7 +42,7 @@ describe('continuum setup through npx', () => {
     const repo = sandbox()
     const io = { cwd: repo.root, out: () => {}, err: () => {}, now: () => NOW, configDir: TEST_CONFIG_DIR } as unknown as Parameters<typeof setupCommand>[0]
     // Through npx the files are portable, so they are not kept out of git and scans see them.
-    const npx = { command: 'npx', args: ['-y', '@pranavoar/continuum@0.1.0'], portable: true }
+    const npx = { command: 'npx', args: ['-y', 'getcontinuum@0.1.0'], portable: true }
     for (const target of ['claude-code', 'codex', 'cursor']) expect(await setupCommand(io, [target], npx)).toBe(0)
     const status = (await cli(repo.root, ['status'])).out
     expect(status).toContain('all recorded')

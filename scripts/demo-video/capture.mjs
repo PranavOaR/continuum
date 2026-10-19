@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-const PACKAGE = '@pranavoar/continuum@0.1.0'
+const PACKAGE = 'getcontinuum@0.1.1'
 const AGENT_TIMEOUT_MS = 600_000
 const args = process.argv.slice(2)
 /** The value after `name`; a missing value (the end, or another --flag) is an error, not a path. */
@@ -81,8 +81,8 @@ const step = (name, command, output) => {
   console.log(`\n$ ${command}\n${output.trimEnd()}`)
 }
 
-step('setup-claude', `npx ${PACKAGE.replace('@0.1.0', '')} setup claude-code`, continuum('setup', 'claude-code'))
-step('setup-codex', `npx ${PACKAGE.replace('@0.1.0', '')} setup codex`, continuum('setup', 'codex'))
+step('setup-claude', `npx ${PACKAGE.replace(/@[\d.]+$/, '')} setup claude-code`, continuum('setup', 'claude-code'))
+step('setup-codex', `npx ${PACKAGE.replace(/@[\d.]+$/, '')} setup codex`, continuum('setup', 'codex'))
 // 0.1.0's setup scans before writing its own files; one scan records them before any session starts.
 continuum('scan')
 // Claude Code asks before using a project's MCP server; approve it for this sample repository only.
@@ -93,7 +93,7 @@ console.log('\nClaude Code is working…')
 const claudeReply = run('claude', ['-p', PROMPTS.claude, '--allowedTools', 'Read', 'Edit', 'Bash(npm test)', 'mcp__continuum__start_task', 'mcp__continuum__update_task'])
 step('claude', `claude -p "${PROMPTS.claude}"`, claudeReply)
 
-step('handoff-before-codex', 'npx @pranavoar/continuum handoff', continuum('handoff'))
+step('handoff-before-codex', 'npx getcontinuum handoff', continuum('handoff'))
 
 console.log('\nCodex is working…')
 const lastMessage = join(work, 'codex-last-message.txt')
@@ -103,8 +103,8 @@ run('codex', [
 ])
 step('codex', `codex exec "${PROMPTS.codex}"`, readFileSync(lastMessage, 'utf8'))
 
-step('verified-run', 'npx @pranavoar/continuum run -- npm test', continuum('run', '--', 'npm', 'test'))
-step('handoff-after', 'npx @pranavoar/continuum handoff', continuum('handoff'))
+step('verified-run', 'npx getcontinuum run -- npm test', continuum('run', '--', 'npm', 'test'))
+step('handoff-after', 'npx getcontinuum handoff', continuum('handoff'))
 step('final-code', 'cat src/pricing.js', readFileSync(join(repo, 'src/pricing.js'), 'utf8'))
 
 writeFileSync(join(work, 'capture.json'), `${JSON.stringify(capture, null, 2)}\n`)

@@ -43,8 +43,8 @@ const SCENES = [
   {
     kind: 'term', step: '01', caption: 'Connect both agents to the repository', title: 'zsh — pricing', cwd: CWD, hold: 1600,
     steps: [
-      { kind: 'cmd', text: 'npx @pranavoar/continuum setup claude-code' }, { kind: 'out', text: firstLines(output('setup-claude'), 3) },
-      { kind: 'cmd', text: 'npx @pranavoar/continuum setup codex' }, { kind: 'out', text: firstLines(output('setup-codex'), 3) },
+      { kind: 'cmd', text: 'npx getcontinuum setup claude-code' }, { kind: 'out', text: firstLines(output('setup-claude'), 3) },
+      { kind: 'cmd', text: 'npx getcontinuum setup codex' }, { kind: 'out', text: firstLines(output('setup-codex'), 3) },
     ],
   },
   {
@@ -53,17 +53,17 @@ const SCENES = [
   },
   {
     kind: 'term', step: '03', caption: 'When Codex starts, Continuum briefs it with this', title: 'zsh — pricing', cwd: CWD, hold: 5200, small: true,
-    steps: [{ kind: 'cmd', text: 'npx @pranavoar/continuum handoff' }, { kind: 'out', text: handoffBody(output('handoff-before-codex')) }],
+    steps: [{ kind: 'cmd', text: 'npx getcontinuum handoff' }, { kind: 'out', text: handoffBody(output('handoff-before-codex')) }],
   },
   {
     kind: 'term', step: '04', caption: 'Codex picks up the same task and finishes it; you verify the result', title: 'codex — pricing', cwd: CWD, hold: 2400,
     steps: [
       { kind: 'cmd', text: `codex exec "${capture.prompts.codex}"` }, { kind: 'out', text: `\n${output('codex')}\n` },
-      { kind: 'cmd', text: 'npx @pranavoar/continuum run -- npm test' }, { kind: 'out', text: output('verified-run') },
+      { kind: 'cmd', text: 'npx getcontinuum run -- npm test' }, { kind: 'out', text: output('verified-run') },
     ],
   },
   { kind: 'dashboard' },
-  { kind: 'card', logo: true, code: 'npx @pranavoar/continuum setup claude-code', url: 'continuumgroup.dev', duration: 4200 },
+  { kind: 'card', logo: true, code: 'npx getcontinuum setup claude-code', url: 'continuumgroup.dev', duration: 4200 },
 ]
 
 function startFfmpeg(path) {

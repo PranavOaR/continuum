@@ -16,7 +16,7 @@ const OUT = join(ROOT, 'dist/release')
 const WEB_DIST = join(ROOT, 'apps/web/dist')
 const CLI = JSON.parse(readFileSync(join(ROOT, 'packages/cli/package.json'), 'utf8'))
 /** The published name; CONTINUUM_PACKAGE_NAME overrides it for test builds. */
-const DEFAULT_NAME = '@pranavoar/continuum'
+const DEFAULT_NAME = 'getcontinuum'
 /** node:sqlite runs without a flag from 22.13. */
 const MIN_NODE = '>=22.13'
 

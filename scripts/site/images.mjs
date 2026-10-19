@@ -43,7 +43,7 @@ const OG = `<!doctype html><html><head><style>${STYLE}
   <h1>Your work <span class="thread" style="color:#141318">continues.<svg viewBox="0 0 300 24" preserveAspectRatio="none" fill="none"><path d="M2 16 C 60 4, 110 22, 160 12 S 250 4, 298 14" stroke="#5b45ff" stroke-width="3.5" stroke-linecap="round"/><circle cx="298" cy="14" r="5" fill="#5b45ff"/></svg></span><br><span>Your agents change.</span></h1>
   <p>Local project memory for AI coding agents. Nothing leaves your machine.</p>
   <div class="foot">
-    <code><b>$</b>npx @pranavoar/continuum setup claude-code</code>
+    <code><b>$</b>npx getcontinuum setup claude-code</code>
     <div class="logos">
       <div class="logo"><span class="i">${svg('claude-color')}</span><span class="w">${svg('claude-text')}</span></div>
       <div class="logo"><span class="i">${svg('codex-color')}</span><span class="w">${svg('codex-text')}</span></div>

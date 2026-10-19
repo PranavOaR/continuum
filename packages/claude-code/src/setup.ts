@@ -17,9 +17,9 @@ const SESSION_END_TIMEOUT_S = 10
 const BACKGROUND_TIMEOUT_S = 30
 /**
  * A path or package that is the Continuum CLI: this checkout's bin.ts, a
- * `continuum` binary, the release bundle, or an npm package named continuum.
+ * `continuum` binary, the release bundle, or the npm package: getcontinuum, or a scoped `@…/continuum`.
  */
-const CONTINUUM_PROGRAM = /(^|[\\/])packages[\\/]cli[\\/]src[\\/]bin\.ts$|(^|[\\/@])continuum(@[\w.-]+)?$|(^|[\\/])continuum\.js$/
+const CONTINUUM_PROGRAM = /(^|[\\/])packages[\\/]cli[\\/]src[\\/]bin\.ts$|(^|[\\/@])(get)?continuum(@[\w.-]+)?$|(^|[\\/])continuum\.js$/
 
 /** How to run this CLI, e.g. `node --import tsx …/bin.ts` during development or `npx …` once published. */
 export interface Invocation {

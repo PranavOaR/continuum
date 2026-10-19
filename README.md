@@ -16,8 +16,8 @@ Requires Node.js 22.13+ and git.
 
 ```bash
 cd your-project
-npx @pranavoar/continuum setup claude-code   # or: setup codex, setup cursor
-npx @pranavoar/continuum serve               # the dashboard for every connected repository
+npx getcontinuum setup claude-code   # or: setup codex, setup cursor
+npx getcontinuum serve               # the dashboard for every connected repository
 ```
 
 With Claude Code, you can install the plugin instead (hooks, MCP server and a `/continuum:handoff` command, in one step):

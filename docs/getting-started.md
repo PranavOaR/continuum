@@ -6,7 +6,7 @@ About ten minutes. You need Node.js 22.13 or newer, git, and Claude Code (Codex 
 
 ```bash
 cd ~/code/my-app
-npx @pranavoar/continuum setup claude-code
+npx getcontinuum setup claude-code
 ```
 
 This records the repository's current files in `.continuum/` (kept out of git through `.git/info/exclude`). It also writes two project-scoped files and nothing in `~/.claude`:
@@ -16,7 +16,7 @@ This records the repository's current files in `.continuum/` (kept out of git th
 Check it with:
 
 ```bash
-npx @pranavoar/continuum doctor
+npx getcontinuum doctor
 ```
 
 ## 2. Work in Claude Code
@@ -32,7 +32,7 @@ Ask Claude to "start a Continuum task for this". It then records the task with `
 For a result you can trust, record a check yourself:
 
 ```bash
-npx @pranavoar/continuum run -- npm test
+npx getcontinuum run -- npm test
 ```
 
 That result is *verified*: it is tied to the exact content of every file it ran against. If you edit a covered file afterwards, the check is reported as **out of date**, naming the file.
@@ -47,13 +47,13 @@ Stop the session, and later start a new one. Its first message already knows:
 You can see the same briefing yourself:
 
 ```bash
-npx @pranavoar/continuum handoff
+npx getcontinuum handoff
 ```
 
 ## 4. Open the dashboard
 
 ```bash
-npx @pranavoar/continuum serve
+npx getcontinuum serve
 ```
 
 Open the printed link. It carries a one-time access token, and the dashboard listens on 127.0.0.1 only. You'll see:
@@ -65,8 +65,8 @@ Open the printed link. It carries a one-time access token, and the dashboard lis
 ## 5. Bring in another agent
 
 ```bash
-npx @pranavoar/continuum setup codex    # trust the project in Codex, then review the hooks with /hooks
-npx @pranavoar/continuum setup cursor   # enable the server in Cursor's Settings → MCP
+npx getcontinuum setup codex    # trust the project in Codex, then review the hooks with /hooks
+npx getcontinuum setup cursor   # enable the server in Cursor's Settings → MCP
 ```
 
 A Codex session picks up the same task where Claude stopped. For agents without hooks, use `continuum session start --agent <name>` with `continuum start`.
