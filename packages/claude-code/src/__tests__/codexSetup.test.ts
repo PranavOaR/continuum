@@ -6,7 +6,7 @@ import { CODEX_CONFIG_FILE, CODEX_HOOKS_FILE, removeCodexSetup, setupCodex } fro
 import { SetupError } from '../setup'
 
 const CHECKOUT = { command: '/usr/local/bin/node', args: ['--import', 'file:///x/tsx/loader.mjs', '/x/my continuum/packages/cli/src/bin.ts'], portable: false }
-const NPX = { command: 'npx', args: ['-y', '@pranavoar/continuum@0.1.0'], portable: true }
+const NPX = { command: 'npx', args: ['-y', 'getcontinuum@0.1.0'], portable: true }
 const sandboxes: Sandbox[] = []
 afterEach(() => {
   for (const repo of sandboxes.splice(0)) repo.cleanup()
@@ -47,7 +47,7 @@ describe('setupCodex', () => {
     const { hooks } = JSON.parse(read(root, CODEX_HOOKS_FILE))
     expect(hooks.PostToolUse).toHaveLength(2)
     expect(hooks.PostToolUse[0]).toEqual({ matcher: 'Bash', hooks: [theirs] })
-    expect(hooks.SessionStart[0].hooks[0].command).toBe('npx -y @pranavoar/continuum@0.1.0 ingest --agent codex')
+    expect(hooks.SessionStart[0].hooks[0].command).toBe('npx -y getcontinuum@0.1.0 ingest --agent codex')
     const config = read(root, CODEX_CONFIG_FILE)
     expect(config.match(/\[mcp_servers\.continuum\]/g)).toHaveLength(1)
     expect(config).toContain('model = "gpt-5.6-luna"')

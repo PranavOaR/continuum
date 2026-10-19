@@ -32,6 +32,6 @@ export const FAQ = [
   {
     question: 'How do I remove it?',
     answer:
-      '`npx @pranavoar/continuum uninstall` disconnects every agent from the repository. Add `--purge` to delete `.continuum/` as well. `continuum forget` removes specific data instead.',
+      '`npx getcontinuum uninstall` disconnects every agent from the repository. Add `--purge` to delete `.continuum/` as well. `continuum forget` removes specific data instead.',
   },
 ] as const

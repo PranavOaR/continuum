@@ -27,7 +27,7 @@ function shellQuote(part: string): string {
 const commandLine = (invocation: Invocation, ...rest: string[]) => [invocation.command, ...invocation.args, ...rest].map(shellQuote).join(' ')
 
 /** The program part of a command setup writes: this checkout's bin.ts, the release bundle, or the npm package. */
-const CONTINUUM_PROGRAM = /(^|[\\/'])packages[\\/]cli[\\/]src[\\/]bin\.ts'?$|(^|[\\/'])continuum\.js'?$|(^|[\\/@'])continuum(@[\w.-]+)?'?$/
+const CONTINUUM_PROGRAM = /(^|[\\/'])packages[\\/]cli[\\/]src[\\/]bin\.ts'?$|(^|[\\/'])continuum\.js'?$|(^|[\\/@'])(get)?continuum(@[\w.-]+)?'?$/
 
 /** Ours: a command hook running Continuum's `ingest --agent codex` through a program setup would write. */
 function isOurHandler(handler: unknown): boolean {

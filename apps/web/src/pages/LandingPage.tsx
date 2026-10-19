@@ -64,7 +64,7 @@ function Hero() {
             rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pr-3 pl-1 text-[13px] text-muted hover:border-line-strong"
           >
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent">v0.1.0</span>
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent">v0.1.1</span>
             Now on npm: {PACKAGE_NAME}
             <ArrowRight className="size-3.5" aria-hidden />
             <span className="sr-only"> (opens in a new tab)</span>

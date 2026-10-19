@@ -6,7 +6,7 @@ About ten minutes. You need **Node.js 22.13 or newer**, **git**, and Claude Code
 
 ```bash
 cd ~/code/my-app
-npx @pranavoar/continuum setup claude-code
+npx getcontinuum setup claude-code
 ```
 
 This records the repository's current files in `.continuum/`, which is kept out of git. It also writes two project files, and nothing in your global Claude Code settings:
@@ -17,7 +17,7 @@ This records the repository's current files in `.continuum/`, which is kept out 
 Using Codex or Cursor? Run `setup codex` or `setup cursor` instead; see [Agents](/docs/agents). To check everything is wired up:
 
 ```bash
-npx @pranavoar/continuum doctor
+npx getcontinuum doctor
 ```
 
 ## 2. Work as usual
@@ -34,7 +34,7 @@ Ask Claude to "start a Continuum task for this". It records the task with `start
 For a result you can trust, run a check through Continuum:
 
 ```bash
-npx @pranavoar/continuum run -- npm test
+npx getcontinuum run -- npm test
 ```
 
 That result is **verified**: it is tied to the exact content of every file it ran against. Edit one of them later and the result is reported as **out of date**, naming the file.
@@ -50,13 +50,13 @@ End the session, and later start a new one, in Claude Code or another agent. Its
 You can read the same briefing yourself:
 
 ```bash
-npx @pranavoar/continuum handoff
+npx getcontinuum handoff
 ```
 
 ## 4. Open your dashboard
 
 ```bash
-npx @pranavoar/continuum serve
+npx getcontinuum serve
 ```
 
 It prints a private sign-in link. Open it to see every connected repository: tasks (which you can edit), changed files with their diffs, checks, decisions and live activity. The dashboard runs on your machine, on 127.0.0.1 only, and the link's one-time token is what signs you in.

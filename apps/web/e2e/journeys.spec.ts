@@ -6,8 +6,8 @@ test('landing page keeps its design, shows the demo video and the install guide,
   await expect(page.getByRole('heading', { name: 'Your code stays. Your context disappears.' })).toBeVisible()
   await expect(page.locator('#demo video')).toHaveAttribute('src', '/demo/continuum-demo.mp4')
   const guide = page.locator('#get-started')
-  await expect(guide.getByText('npx @pranavoar/continuum setup claude-code')).toBeVisible()
-  await expect(guide.getByText('npx @pranavoar/continuum serve')).toBeVisible()
+  await expect(guide.getByText('npx getcontinuum setup claude-code')).toBeVisible()
+  await expect(guide.getByText('npx getcontinuum serve')).toBeVisible()
   // Every call to action stays on the page; nothing leads into a demo dashboard or to GitHub.
   await page.getByRole('link', { name: 'Open dashboard' }).first().click()
   await expect(page).toHaveURL(/#get-started$/)
@@ -20,7 +20,7 @@ test('landing page copies the install command', async ({ page, context }) => {
   await page.goto('/')
   await page.getByRole('button', { name: /^Copy: npx/ }).click()
   await expect(page.getByText('Install command copied')).toBeVisible()
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npx @pranavoar/continuum setup claude-code')
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('npx getcontinuum setup claude-code')
 })
 
 test('overview shows coherent summary values and opens a project', async ({ page }) => {

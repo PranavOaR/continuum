@@ -1,6 +1,6 @@
 # Commands
 
-Run any command with `npx @pranavoar/continuum <command>`, from inside the repository. `-C <dir>` runs it as if started in another directory.
+Run any command with `npx getcontinuum <command>`, from inside the repository. `-C <dir>` runs it as if started in another directory.
 
 ## Set up
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.1] - 2026-10-19
+
+### Renamed
+- The package is now **`getcontinuum`**: run `npx getcontinuum setup claude-code`. The command it installs is still `continuum`. `@pranavoar/continuum` is deprecated and points here.
+
+### Fixed
+- Briefings date commits by git, not by when a scan noticed them, so a commit made before a session is no longer listed under it, or as news since an agent's last session.
+- `setup` records the files it writes, so `.codex/` and `.cursor/` files are no longer reported as changes no agent session explained.
+- The Claude Code plugin's hooks read their payload before skipping a repository that doesn't use Continuum, avoiding `EPIPE` errors with large payloads.
+- `--help` and `uninstall` say `setup` and `uninstall` cover Claude Code, Codex and Cursor.
+
 ## [0.1.0] - 2026-10-18
 
 The first public release.
