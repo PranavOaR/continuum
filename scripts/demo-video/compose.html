@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Continuum demo video compositor</title>
+<style>
+  @font-face { font-family: 'Geist'; src: url('../../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; }
+  @font-face { font-family: 'Geist Mono'; src: url('../../node_modules/@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; }
+  :root { --bg: #fafaf7; --fg: #141318; --muted: #5c5a62; --subtle: #8d8a98; --line: #e4e2dc; --accent: #5b45ff; --term: #16151b; --term-fg: #e9e7f0; --ok: #4fc58a; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; background: var(--bg); color: var(--fg); font-family: 'Geist', system-ui, sans-serif; }
+  .backdrop { position: absolute; inset: 0; background: radial-gradient(52rem 30rem at 100% 0%, rgb(91 69 255 / 0.12), transparent 70%), var(--bg); }
+  .dots { position: absolute; inset: 0; background-image: radial-gradient(rgb(20 19 24 / 0.11) 1px, transparent 1px); background-size: 22px 22px; mask-image: linear-gradient(to bottom, black, transparent 90%); }
+  .layer { position: absolute; inset: 0; will-change: transform, opacity; }
+  .corner { position: absolute; left: 34px; top: 26px; display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 500; letter-spacing: -0.035em; opacity: 0.8; }
+  .corner svg { width: 22px; height: 22px; }
+  /* Intro and outro */
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .brand svg { width: 96px; height: 96px; overflow: visible; }
+  .brand .word { font-size: 62px; font-weight: 500; letter-spacing: -0.04em; }
+  .tagline { margin-top: 30px; text-align: center; font-size: 46px; line-height: 1.12; font-weight: 400; letter-spacing: -0.04em; }
+  .tagline .muted { color: var(--muted); }
+  .thread { position: relative; display: inline-block; }
+  .thread svg { position: absolute; left: 0; bottom: -9px; width: 100%; height: 14px; overflow: visible; }
+  .sub { margin-top: 22px; font-size: 20px; color: var(--muted); letter-spacing: -0.01em; }
+  .cmd { margin-top: 30px; font-family: 'Geist Mono', monospace; font-size: 24px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px 24px; box-shadow: 0 12px 40px -18px rgb(20 19 24 / 0.35); }
+  .cmd b { color: var(--subtle); font-weight: 400; margin-right: 12px; }
+  .agents { margin-top: 30px; display: flex; gap: 34px; align-items: center; }
+  .agent { display: flex; align-items: center; gap: 9px; }
+  .agent .i { height: 30px; display: flex; } .agent .w { height: 23px; display: flex; }
+  .agent svg, .chip svg, .bar .logo svg { height: 100%; width: auto; }
+  .url { margin-top: 26px; font-family: 'Geist Mono', monospace; font-size: 19px; color: var(--accent); }
+  /* Terminal scenes */
+  .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 70px 64px 38px; gap: 16px; }
+  .caption { font-size: 23px; letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 14px; }
+  .caption .step { font-family: 'Geist Mono', monospace; font-size: 14px; color: var(--accent); }
+  .window { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 30px 70px -24px rgb(20 19 24 / 0.5); }
+  .bar { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #1f1e26; color: #8d8a98; font-family: 'Geist Mono', monospace; font-size: 12.5px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #3a3844; }
+  .bar .title { margin-left: 10px; display: flex; align-items: center; gap: 8px; }
+  .bar .logo { height: 16px; display: flex; }
+  .screen { flex: 1; min-height: 0; overflow: hidden; padding: 22px 26px; }
+  pre { font-family: 'Geist Mono', monospace; font-size: 16.5px; line-height: 1.6; color: var(--term-fg); white-space: pre-wrap; word-break: break-word; }
+  pre.small { font-size: 14px; line-height: 1.55; }
+  .prompt { color: var(--ok); } .cmdtext { color: #fff; }
+  .hl { border-radius: 4px; }
+  .caret { display: inline-block; width: 0.6em; height: 1.15em; vertical-align: -0.2em; background: var(--term-fg); }
+  /* Dashboard scene */
+  .browser { position: absolute; left: 90px; top: 64px; width: 1100px; border-radius: 14px; overflow: hidden; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 36px 80px -28px rgb(20 19 24 / 0.45); }
+  .chrome { height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 14px; background: #f3f2ee; border-bottom: 1px solid var(--line); }
+  .chrome .dot { background: #d9d6cf; }
+  .address { margin-left: 16px; flex: 1; height: 24px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 7px; background: #fff; border: 1px solid var(--line); font-family: 'Geist Mono', monospace; font-size: 12px; color: var(--muted); }
+  .address .live { margin-left: auto; display: flex; align-items: center; gap: 6px; color: #2f9e6a; font-family: 'Geist', sans-serif; font-size: 11.5px; }
+  .address .live i { width: 7px; height: 7px; border-radius: 50%; background: #2fbf7a; }
+  .viewport { position: relative; width: 1100px; height: 619px; overflow: hidden; }
+  .viewport img { position: absolute; left: 0; top: 0; width: 1100px; height: 619px; transform-origin: 0 0; }
+  .cursor { position: absolute; left: 0; top: 0; width: 26px; height: 26px; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.3)); }
+  .pill { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); background: var(--fg); color: var(--bg); font-size: 17px; font-weight: 500; letter-spacing: -0.01em; padding: 12px 22px; border-radius: 999px; white-space: nowrap; box-shadow: 0 12px 30px -10px rgb(0 0 0 / 0.5); }
+</style>
+</head>
+<body>
+<div class="backdrop"><div class="dots"></div></div>
+<div id="stage"></div>
+<script>
+  // ---- Time helpers: everything is a function of the scene's own time t, in seconds. ----
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+  const progress = (t, from, to) => clamp((t - from) / (to - from))
+  const easeOut = (x) => 1 - (1 - x) ** 3
+  const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2)
+  const easeBack = (x) => { const c = 1.7; return 1 + (c + 1) * (x - 1) ** 3 + c * (x - 1) ** 2 }
+  const esc = (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const fadeUp = (p, distance = 14) => `opacity:${p};transform:translateY(${(1 - p) * distance}px)`
+
+  /** The logo mark, drawn by time: the thread draws from the first dot, the second and third pop in turn. */
+  function mark(t, { start = 0, size } = {}) {
+    const a = easeBack(progress(t, start + 0.1, start + 0.4))
+    const draw = easeInOut(progress(t, start + 0.3, start + 1.15))
+    const b = easeBack(progress(t, start + 0.75, start + 1.0))
+    const c = easeBack(progress(t, start + 1.1, start + 1.4))
+    const ring = progress(t, start + 1.2, start + 2.0)
+    const style = size ? `style="width:${size}px;height:${size}px"` : ''
+    return `<svg viewBox="0 0 32 32" fill="none" ${style}>
+      <path d="M6 22C6 13 16 11 16 16s10 3 10-6" stroke="#141318" stroke-width="2.4" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${1 - draw}"/>
+      <circle cx="6" cy="22" r="${3 * a}" fill="#fafaf7" stroke="#141318" stroke-width="2"/>
+      <circle cx="16" cy="16" r="${1.9 * b}" fill="#141318"/>
+      <circle cx="26" cy="10" r="${3.4 + ring * 7}" fill="none" stroke="#5b45ff" stroke-width="${1.2 * (1 - ring)}" opacity="${ring > 0 ? 1 - ring : 0}"/>
+      <circle cx="26" cy="10" r="${3.4 * c}" fill="#5b45ff"/>
+    </svg>`
+  }
+  const STATIC_MARK = mark(10)
+
+  /** The violet thread under a word, drawn by p (0 to 1). */
+  const underline = (p) => `<svg viewBox="0 0 300 24" preserveAspectRatio="none" fill="none"><path d="M2 16 C 60 4, 110 22, 160 12 S 250 4, 298 14" stroke="#5b45ff" stroke-width="3.5" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${1 - p}"/><circle cx="298" cy="14" r="${5 * easeBack(progress(p, 0.85, 1))}" fill="#5b45ff"/></svg>`
+
+  function intro(scene, t) {
+    // The logo starts alone in the middle, then glides up to make room for the tagline.
+    const lift = easeInOut(progress(t, 2.0, 2.7))
+    return `<div class="center" style="transform:translateY(${(1 - lift) * 88}px)">
+      <div class="brand" style="transform:scale(${1.15 - lift * 0.3})">${mark(t)}<span class="word" style="${fadeUp(easeOut(progress(t, 1.25, 1.8)), 0)};transform:translateX(${(1 - easeOut(progress(t, 1.25, 1.8))) * -18}px)">continuum</span></div>
+      <p class="tagline">
+        <span style="display:inline-block;${fadeUp(easeOut(progress(t, 2.3, 2.8)))}">Your work <span class="thread">continues.${underline(easeInOut(progress(t, 2.9, 3.6)))}</span></span><br>
+        <span class="muted" style="display:inline-block;${fadeUp(easeOut(progress(t, 2.6, 3.1)))}">Your agents change.</span>
+      </p>
+      <p class="sub" style="${fadeUp(easeOut(progress(t, 3.4, 3.9)))}">${esc(scene.subtitle)}</p>
+    </div>`
+  }
+
+  function outro(scene, t) {
+    const agents = window.LOGOS.map((logo, index) => {
+      const p = easeOut(progress(t, 1.5 + index * 0.18, 2.0 + index * 0.18))
+      return `<div class="agent" style="${fadeUp(p)}"><span class="i">${logo.icon}</span><span class="w">${logo.wordmark}</span></div>`
+    }).join('')
+    const typed = Math.floor(clamp((t - 0.7) * 34, 0, scene.command.length))
+    return `<div class="center">
+      <div class="brand" style="transform:scale(0.72)">${mark(t)}<span class="word" style="opacity:${easeOut(progress(t, 1.0, 1.5))}">continuum</span></div>
+      <div class="cmd" style="${fadeUp(easeOut(progress(t, 0.5, 0.9)))}"><b>$</b>${esc(scene.command.slice(0, typed))}</div>
+      <div class="agents">${agents}</div>
+      <p class="url" style="${fadeUp(easeOut(progress(t, 2.4, 2.9)))}">${esc(scene.url)}</p>
+    </div>`
+  }
+
+  // ---- Terminal scenes: commands type, output appears line by line, chosen lines light up. ----
+  const TYPE_PER_S = 110
+  const LINE_S = 0.028
+  const PAUSE_S = 0.45
+  const stepSeconds = (step) => (step.kind === 'cmd' ? step.text.length / TYPE_PER_S + PAUSE_S : step.text.split('\n').length * LINE_S)
+  window.terminalSeconds = (scene) => scene.steps.reduce((sum, step) => sum + stepSeconds(step), 0)
+
+  function terminal(scene, t) {
+    let elapsed = 0.35
+    let html = ''
+    let isTyping = false
+    const doneAt = 0.35 + window.terminalSeconds(scene)
+    const glow = easeOut(progress(t, doneAt + 0.2, doneAt + 0.8))
+    for (const step of scene.steps) {
+      if (t < elapsed) break
+      const local = t - elapsed
+      if (step.kind === 'cmd') {
+        const shown = Math.min(step.text.length, Math.floor(local * TYPE_PER_S))
+        isTyping = shown < step.text.length
+        html += `${html ? '\n' : ''}<span class="prompt">${esc(scene.cwd)} $</span> <span class="cmdtext">${esc(step.text.slice(0, shown))}</span>`
+        if (isTyping) break
+      } else {
+        const lines = step.text.split('\n')
+        const shown = lines.slice(0, Math.min(lines.length, Math.floor(local / LINE_S) + 1))
+        const lit = (line) => (scene.highlight && scene.highlight.some((pattern) => line.startsWith(pattern)) ? `<span class="hl" style="background:rgb(91 69 255 / ${0.32 * glow});box-shadow:-6px 0 0 rgb(143 127 255 / ${glow})">${esc(line)}</span>` : esc(line))
+        html += `\n${shown.map(lit).join('\n')}`
+      }
+      elapsed += stepSeconds(step)
+    }
+    const caret = isTyping || Math.floor(t * 2) % 2 === 0 ? '<span class="caret"></span>' : ''
+    const enter = easeOut(progress(t, 0, 0.5))
+    return `<div class="corner">${STATIC_MARK}continuum</div>
+      <div class="wrap">
+        <p class="caption" style="${fadeUp(enter, 10)}"><span class="step">${esc(scene.step)}</span>${esc(scene.caption)}</p>
+        <div class="window"><div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="title">${scene.logo ? `<span class="logo">${scene.logo}</span>` : ''}${esc(scene.title)}</span></div>
+        <div class="screen"><pre class="${scene.small ? 'small' : ''}">${html}${caret}</pre></div></div>
+      </div>`
+  }
+
+  // ---- Dashboard scene: the real dashboard's screenshot, in a browser frame, zoomed onto what is narrated. ----
+  const CURSOR = '<svg class="cursor" viewBox="0 0 24 24"><path d="M4 2l15 10.5-6.6 1.2 3.9 7.3-3 1.6-3.9-7.4L4 20z" fill="#141318" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>'
+  /** frame: { image, zoom, focusX, focusY, cursorX, cursorY, caption, captionOpacity } in dashboard viewport pixels (1280×720). */
+  function dashboard(scene, t, frame) {
+    const k = 1100 / 1280
+    const z = frame.zoom
+    // Keep the focus point at the same place in the frame as it zooms.
+    const ox = clamp(frame.focusX * k * (1 - z), 1100 * (1 - z), 0)
+    const oy = clamp(frame.focusY * k * (1 - z), 619 * (1 - z), 0)
+    const cx = ox + frame.cursorX * k * z
+    const cy = oy + frame.cursorY * k * z
+    const enter = easeOut(progress(t, 0, 0.6))
+    return `<div class="corner">${STATIC_MARK}continuum</div>
+      <div class="browser" style="opacity:${enter};transform:translateY(${(1 - enter) * 18}px) scale(${0.98 + enter * 0.02})">
+        <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <div class="address">127.0.0.1:${esc(scene.port)}/app/projects/pricing<span class="live"><i></i>Local · Live</span></div></div>
+        <div class="viewport">
+          <img src="${frame.image}" style="transform:translate(${ox}px,${oy}px) scale(${z})">
+          <div style="position:absolute;left:0;top:0;transform:translate(${cx}px,${cy}px)">${CURSOR}</div>
+        </div>
+      </div>
+      <div class="pill" style="opacity:${frame.captionOpacity}">${esc(frame.caption)}</div>`
+  }
+
+  const DRAW = { intro, outro, terminal, dashboard }
+
+  /**
+   * Draws one frame: the current scene and, during a transition, the next one
+   * gliding in over it. Each layer: { scene, t, frame?, exit?, enter? } (exit and
+   * enter are 0..1 transition progress).
+   */
+  window.renderFrame = (layers) => {
+    document.getElementById('stage').innerHTML = layers
+      .map(({ scene, t, frame, exit = 0, enter = 1 }) => {
+        // The outgoing scene is gone by mid-transition and the incoming one arrives after it, so they never muddle together.
+        const out = easeInOut(clamp(exit * 1.6))
+        const into = easeInOut(clamp((enter - 0.3) / 0.7))
+        const style = `opacity:${Math.min(1 - out, into)};transform:translateY(${(1 - into) * 22 - out * 14}px) scale(${1 + (1 - into) * 0.02 - out * 0.025});filter:blur(${(out + (1 - into)) * 3}px)`
+        return `<div class="layer" style="${style}">${DRAW[scene.kind](scene, t, frame)}</div>`
+      })
+      .join('')
+  }
+</script>
+</body>
+</html>

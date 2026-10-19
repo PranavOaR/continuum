@@ -38,6 +38,8 @@ export function siteHead(): Plugin {
       meta('property', 'og:title', TITLE),
       meta('property', 'og:description', DESCRIPTION),
       meta('property', 'og:image', image),
+      meta('property', 'og:image:secure_url', image),
+      meta('property', 'og:image:type', 'image/png'),
       meta('property', 'og:image:width', '1200'),
       meta('property', 'og:image:height', '630'),
       meta('property', 'og:image:alt', 'Continuum: your work continues, your agents change. Works with Claude Code, Codex and Cursor.'),

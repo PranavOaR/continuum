@@ -1,17 +1,21 @@
 #!/usr/bin/env node
-// Step 2 of the demo video: renders it, frame by frame, from capture.mjs's
-// real run: terminal scenes replay the captured output, and the dashboard
-// scene is the real `continuum serve` for that repository.
+// Step 2 of the demo video: renders it from capture.mjs's real run, with the
+// voiceover in narration.json. Each scene lasts as long as its narration needs.
+// Terminal scenes replay the captured output; the dashboard scene is the real
+// `continuum serve` for that repository, framed and zoomed onto what is said.
 //
-//   node scripts/demo-video/record.mjs --work <dir> [--out apps/web/site-public/demo]   (the poster goes to --out)
+//   node scripts/demo-video/record.mjs --work <dir> [--tts say] [--voice <id>] [--out apps/web/site-public/demo] [--stills 1,8,30]
 //
-// Needs ffmpeg and Playwright's Chromium.
+// Writes continuum-demo.mp4, .jpg (poster) and .vtt (captions). Needs ffmpeg and Playwright's Chromium.
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
+import { anchors, beatState, dashboardBeats } from './dashboardTour.mjs'
+import { muxVoice } from './mux.mjs'
+import { speak } from './voice.mjs'
 
 const ROOT = join(import.meta.dirname, '../..')
 const args = process.argv.slice(2)
@@ -25,65 +29,65 @@ const option = (name) => {
 const work = resolve(option('--work') ?? 'demo-video-work')
 const out = resolve(option('--out') ?? join(ROOT, 'apps/web/site-public/demo'))
 const capture = JSON.parse(readFileSync(join(work, 'capture.json'), 'utf8'))
+const narration = JSON.parse(readFileSync(join(import.meta.dirname, 'narration.json'), 'utf8')).lines
 const repo = join(work, 'pricing')
 
 const FPS = 30
-const FRAME_MS = 1000 / FPS
 const VIEWPORT = { width: 1280, height: 720 }
-// 1280×720 laid out, captured at 1920×1080.
+/** Laid out at 1280×720, captured at 1920×1080; the dashboard at 2× so zooms stay sharp. */
 const SCALE = 1.5
+const DASHBOARD_SCALE = 2
+/** Scenes overlap by this much while one glides into the next. */
+const TRANSITION_S = 0.6
+/** Silence before a scene's first line, and after each line. */
+const LEAD_S = 0.45
+const GAP_S = 0.35
 const CWD = '~/continuum-demo/pricing'
 
 const output = (name) => capture.steps.find((step) => step.name === name)?.output ?? ''
+const firstLines = (text, count) => text.split('\n').slice(0, count).join('\n')
+const handoffBody = (text) => text.split('\n').filter((line) => !line.startsWith('Generated ') && !line.startsWith('Evidence labels')).join('\n')
+const npx = capture.package.replace(/@[\d.]+$/, '')
 /** The task's title as the agent named it in this run (it differs from run to run), from the briefing Codex received. */
 const TASK_TITLE = /\[agent-reported\] "([^"]+)"/.exec(output('handoff-before-codex'))?.[1]
 if (!TASK_TITLE) throw new Error('capture.json has no task in the briefing before Codex: re-run capture.mjs')
-const firstLines = (text, count) => text.split('\n').slice(0, count).join('\n')
-const handoffBody = (text) => text.split('\n').filter((line) => !line.startsWith('Generated ') && !line.startsWith('Evidence labels')).join('\n')
 
-const SCENES = [
-  { kind: 'card', logo: true, subtitle: 'Claude Code starts a task. Codex finishes it. Nothing is lost in between.', duration: 3200 },
-  {
-    kind: 'term', step: '01', caption: 'Connect both agents to the repository', title: 'zsh — pricing', cwd: CWD, hold: 1600,
-    steps: [
-      { kind: 'cmd', text: 'npx getcontinuum setup claude-code' }, { kind: 'out', text: firstLines(output('setup-claude'), 3) },
-      { kind: 'cmd', text: 'npx getcontinuum setup codex' }, { kind: 'out', text: firstLines(output('setup-codex'), 3) },
-    ],
-  },
-  {
-    kind: 'term', step: '02', caption: 'Claude Code fixes one of the two bugs, records the task, and stops', title: 'claude — pricing', cwd: CWD, hold: 3200,
-    steps: [{ kind: 'cmd', text: `claude -p "${capture.prompts.claude}"` }, { kind: 'out', text: `\n${output('claude')}` }],
-  },
-  {
-    kind: 'term', step: '03', caption: 'When Codex starts, Continuum briefs it with this', title: 'zsh — pricing', cwd: CWD, hold: 5200, small: true,
-    steps: [{ kind: 'cmd', text: 'npx getcontinuum handoff' }, { kind: 'out', text: handoffBody(output('handoff-before-codex')) }],
-  },
-  {
-    kind: 'term', step: '04', caption: 'Codex picks up the same task and finishes it; you verify the result', title: 'codex — pricing', cwd: CWD, hold: 2400,
-    steps: [
-      { kind: 'cmd', text: `codex exec "${capture.prompts.codex}"` }, { kind: 'out', text: `\n${output('codex')}\n` },
-      { kind: 'cmd', text: 'npx getcontinuum run -- npm test' }, { kind: 'out', text: output('verified-run') },
-    ],
-  },
-  { kind: 'dashboard' },
-  { kind: 'card', logo: true, code: 'npx getcontinuum setup claude-code', url: 'continuumgroup.dev', duration: 4200 },
+const svg = (name) => readFileSync(join(ROOT, 'apps/web/src/assets/agent-logos', `${name}.svg`), 'utf8')
+const LOGOS = [
+  { icon: svg('claude-color'), wordmark: svg('claude-text') },
+  { icon: svg('codex-color'), wordmark: svg('codex-text') },
+  { icon: svg('cursor'), wordmark: svg('cursor-text') },
 ]
 
-function startFfmpeg(path) {
-  const ffmpeg = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path], { stdio: ['pipe', 'inherit', 'inherit'] })
-  const done = new Promise((resolveDone, reject) => {
-    ffmpeg.on('error', (error) => reject(new Error(`could not run ffmpeg: ${error.message}`)))
-    ffmpeg.on('close', (code) => (code === 0 ? resolveDone() : reject(new Error(`ffmpeg exited with ${code}`))))
-  })
-  // A write to an ffmpeg that died fails with EPIPE; `done` reports why it died.
-  ffmpeg.stdin.on('error', () => {})
-  return {
-    // Races `done`, so a dead ffmpeg ends the render instead of waiting forever for 'drain'.
-    write: (frame) => Promise.race([new Promise((resolveWrite) => (ffmpeg.stdin.write(frame) ? resolveWrite() : ffmpeg.stdin.once('drain', resolveWrite))), done]),
-    close: () => (ffmpeg.stdin.end(), done),
-    kill: () => ffmpeg.kill('SIGKILL'),
-  }
+function scenesFor(port) {
+  return [
+    { id: 'intro', kind: 'intro', subtitle: 'Claude Code starts a task. Codex finishes it.', natural: 4.6 },
+    {
+      id: 'connect', kind: 'terminal', step: '01', caption: 'Connect both agents to the repository', title: 'zsh — pricing', cwd: CWD,
+      steps: [
+        { kind: 'cmd', text: `npx ${npx} setup claude-code` }, { kind: 'out', text: firstLines(output('setup-claude'), 3) },
+        { kind: 'cmd', text: `npx ${npx} setup codex` }, { kind: 'out', text: firstLines(output('setup-codex'), 3) },
+      ],
+    },
+    {
+      id: 'claude', kind: 'terminal', step: '02', caption: 'Claude Code fixes one of the two bugs, records the task, and stops', title: 'claude — pricing', logo: LOGOS[0].icon, cwd: CWD,
+      steps: [{ kind: 'cmd', text: `claude -p "${capture.prompts.claude}"` }, { kind: 'out', text: `\n${output('claude')}` }],
+    },
+    {
+      id: 'briefing', kind: 'terminal', step: '03', caption: 'When Codex starts, Continuum briefs it with this', title: 'zsh — pricing', cwd: CWD, small: true,
+      highlight: ['Next action:', 'Done:', '  - [x]'],
+      steps: [{ kind: 'cmd', text: `npx ${npx} handoff` }, { kind: 'out', text: handoffBody(output('handoff-before-codex')) }],
+    },
+    {
+      id: 'codex', kind: 'terminal', step: '04', caption: 'Codex picks up the same task and finishes it; you verify the result', title: 'codex — pricing', logo: LOGOS[1].icon, cwd: CWD,
+      steps: [
+        { kind: 'cmd', text: `codex exec "${capture.prompts.codex}"` }, { kind: 'out', text: `\n${output('codex')}\n` },
+        { kind: 'cmd', text: `npx ${npx} run -- npm test` }, { kind: 'out', text: output('verified-run') },
+      ],
+    },
+    { id: 'dashboard', kind: 'dashboard', port },
+    { id: 'outro', kind: 'outro', command: `npx ${npx} setup claude-code`, url: 'continuumgroup.dev', natural: 4.2 },
+  ]
 }
 
 /** A port nothing is listening on. */
@@ -97,9 +101,10 @@ const freePort = () =>
   })
 
 async function startDashboard() {
+  const port = await freePort()
   const env = { ...process.env, CONTINUUM_CONFIG_DIR: join(work, 'config'), npm_config_update_notifier: 'false' }
   // Its own process group, so stopping it also stops the node process npx starts.
-  const server = spawn('npx', ['-y', capture.package, 'serve', '--port', String(await freePort()), repo], { cwd: repo, env, detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
+  const server = spawn('npx', ['-y', capture.package, 'serve', '--port', String(port), repo], { cwd: repo, env, detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
   const stop = () => {
     try {
       process.kill(-server.pid, 'SIGINT')
@@ -120,154 +125,168 @@ async function startDashboard() {
     stop()
     throw error
   })
-  return { url, stop }
+  return { url, port, stop }
 }
 
-async function recordScenes(page, video, scenes) {
-  await page.goto(pathToFileURL(join(import.meta.dirname, 'scenes.html')).href)
-  await page.evaluate(() => document.fonts.ready)
-  for (const scene of scenes) {
-    const length = await page.evaluate((s) => window.sceneLength(s), scene)
-    console.log(`  scene ${scene.step ?? scene.kind}: ${(length / 1000).toFixed(1)}s`)
-    for (let t = 0; t < length; t += FRAME_MS) {
-      await page.evaluate(([s, time]) => window.renderScene(s, time), [scene, t])
-      await video.write(await page.screenshot())
-    }
+function startFfmpeg(path) {
+  const ffmpeg = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '24', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path], { stdio: ['pipe', 'inherit', 'inherit'] })
+  const done = new Promise((resolveDone, reject) => {
+    ffmpeg.on('error', (error) => reject(new Error(`could not run ffmpeg: ${error.message}`)))
+    ffmpeg.on('close', (code) => (code === 0 ? resolveDone() : reject(new Error(`ffmpeg exited with ${code}`))))
+  })
+  // A write to an ffmpeg that died fails with EPIPE; `done` reports why it died.
+  ffmpeg.stdin.on('error', () => {})
+  return {
+    // Races `done`, so a dead ffmpeg ends the render instead of waiting forever for 'drain'.
+    write: (frame) => Promise.race([new Promise((resolveWrite) => (ffmpeg.stdin.write(frame) ? resolveWrite() : ffmpeg.stdin.once('drain', resolveWrite))), done]),
+    close: () => (ffmpeg.stdin.end(), done),
+    kill: () => ffmpeg.kill('SIGKILL'),
   }
 }
 
-const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2)
-const mix = (a, b, x) => a + (b - a) * x
-
-/** Where the dashboard's key elements sit on the page, found by their text. */
-async function anchors(page, taskTitle) {
-  return page.evaluate((title) => {
-    const find = (text, { exact = true, minFont = 0, within = document.body } = {}) => {
-      const all = [...within.querySelectorAll('*')].filter((el) => el.children.length === 0 || [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
-      const hit = all.find((el) => {
-        const own = el.textContent.trim()
-        return (exact ? own === text : own.includes(text)) && parseFloat(getComputedStyle(el).fontSize) >= minFont && el.getBoundingClientRect().height > 0
-      })
-      if (!hit) throw new Error(`dashboard element not found: ${text}`)
-      const box = hit.getBoundingClientRect()
-      return { x: box.left + Math.min(box.width, 220) / 2, y: box.top + window.scrollY + box.height / 2, el: hit }
+/**
+ * When each scene starts and how long it lasts, and when each line is spoken:
+ * a scene runs as long as its own animation or its lines, whichever is longer.
+ */
+function timeline(scenes, clips, terminalSeconds) {
+  const lineSeconds = (index) => clips[index].seconds + GAP_S
+  let start = 0
+  const lineStarts = []
+  const timed = scenes.map((scene, index) => {
+    const own = narration.map((line, lineIndex) => ({ line, lineIndex })).filter(({ line }) => line.scene === scene.id)
+    const enter = index === 0 ? 0 : TRANSITION_S
+    let natural = scene.natural ?? (scene.kind === 'terminal' ? 0.35 + terminalSeconds[scene.id] + 1.6 : 0)
+    let beats
+    if (scene.kind === 'dashboard') {
+      beats = dashboardBeats(own.map(({ line, lineIndex }) => ({ id: line.beat, seconds: lineSeconds(lineIndex) })))
+      natural = beats.at(-1).end
     }
-    const section = (heading) => find(heading).el.closest('section, article, [class*="rounded"]') ?? document.body
-    const at = ({ x, y }) => ({ x, y })
-    return {
-      task: at(find(title, { minFont: 18 })),
-      verified: at(find('Verified', { within: section('Verification') })),
-      criteria: at(find('Acceptance criteria')),
-      file: at(find('src/pricing.js', { within: section('File changes') })),
-      activity: at(find('Agent activity')),
-      codex: at(find('Codex session started')),
-      maxScroll: document.documentElement.scrollHeight - window.innerHeight,
+    let at = start + enter + LEAD_S
+    for (const { lineIndex, line } of own) {
+      const beat = beats?.find((candidate) => candidate.id === line.beat)
+      if (beat) at = start + enter + beat.start + 0.25
+      lineStarts[lineIndex] = at
+      at += lineSeconds(lineIndex)
     }
-  }, taskTitle)
+    const spoken = own.length > 0 ? at - start + 0.4 : 0
+    const length = Math.max(natural + enter, spoken, 2) + TRANSITION_S
+    const timedScene = { ...scene, start, length, enter, beats }
+    start += length - TRANSITION_S
+    return timedScene
+  })
+  return { scenes: timed, lineStarts, total: start + TRANSITION_S }
 }
 
-const OVERLAY = `
-  const layer = document.createElement('div')
-  layer.innerHTML = '<div id="demo-fade" style="position:fixed;inset:0;background:#fafaf7;z-index:99998;pointer-events:none"></div>' +
-    '<div id="demo-caption" style="position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:99999;pointer-events:none;background:#141318;color:#fafaf7;font:500 17px Geist,system-ui,sans-serif;letter-spacing:-0.01em;padding:12px 20px;border-radius:999px;box-shadow:0 10px 30px -10px rgb(0 0 0/.5);white-space:nowrap"></div>' +
-    '<svg id="demo-cursor" width="26" height="26" viewBox="0 0 24 24" style="position:fixed;left:0;top:0;z-index:99999;pointer-events:none;filter:drop-shadow(0 2px 3px rgb(0 0 0/.3))"><path d="M4 2l15 10.5-6.6 1.2 3.9 7.3-3 1.6-3.9-7.4L4 20z" fill="#141318" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/></svg>'
-  document.body.append(layer)
-  window.demoFrame = ({ scrollY, x, y, caption, fade }) => {
-    window.scrollTo(0, scrollY)
-    document.getElementById('demo-cursor').style.transform = 'translate(' + x + 'px,' + y + 'px)'
-    const pill = document.getElementById('demo-caption')
-    pill.textContent = caption
-    pill.style.opacity = caption ? '1' : '0'
-    document.getElementById('demo-fade').style.opacity = String(fade)
-  }`
-
-/** The dashboard tour: keyframes of scroll position, cursor position (page coordinates) and caption. */
-function tour(a) {
-  const top = (y, offset) => Math.max(0, Math.min(a.maxScroll, y - offset))
-  return [
-    { t: 0, scroll: 0, at: { x: 980, y: 420 }, caption: '' },
-    { t: 700, scroll: 0, at: { x: 980, y: 420 }, caption: 'One task, carried from Claude Code to Codex' },
-    { t: 2400, scroll: 0, at: a.task, caption: 'One task, carried from Claude Code to Codex' },
-    { t: 3400, scroll: 0, at: a.task, caption: 'Verified: Continuum ran npm test against the exact file contents' },
-    { t: 5000, scroll: 0, at: a.verified, caption: 'Verified: Continuum ran npm test against the exact file contents' },
-    { t: 6400, scroll: 0, at: a.verified, caption: 'The acceptance criteria and steps, as the agents reported them' },
-    { t: 8600, scroll: top(a.criteria.y, 130), at: { x: a.criteria.x + 120, y: a.criteria.y + 60 }, caption: 'The acceptance criteria and steps, as the agents reported them' },
-    { t: 9800, scroll: top(a.criteria.y, 130), at: { x: a.criteria.x + 120, y: a.criteria.y + 60 }, caption: 'The change itself, covered by the passing check' },
-    { t: 12000, scroll: top(a.file.y, 260), at: a.file, caption: 'The change itself, covered by the passing check' },
-    { t: 13200, scroll: top(a.file.y, 260), at: a.file, caption: 'Every event in order: Claude Code’s session, then Codex’s' },
-    { t: 15600, scroll: top(a.activity.y, 90), at: { x: a.activity.x, y: a.activity.y + 90 }, caption: 'Every event in order: Claude Code’s session, then Codex’s' },
-    { t: 19600, scroll: top(a.codex.y, 360), at: a.codex, caption: 'Every event in order: Claude Code’s session, then Codex’s' },
-    { t: 22400, scroll: top(a.codex.y, 360), at: a.codex, caption: 'Every event in order: Claude Code’s session, then Codex’s' },
-  ]
+/** The layers to draw at time t: one scene, or two while one glides into the next. */
+function layersAt(scenes, t) {
+  return scenes
+    .filter((scene) => t >= scene.start && t < scene.start + scene.length)
+    .map((scene) => ({
+      scene,
+      t: t - scene.start,
+      enter: scene.start === 0 ? 1 : Math.min(1, (t - scene.start) / TRANSITION_S),
+      exit: Math.max(0, (t - (scene.start + scene.length - TRANSITION_S)) / TRANSITION_S),
+    }))
 }
 
-function frameAt(keys, t) {
-  const next = keys.findIndex((key) => key.t > t)
-  if (next === -1) return keys.at(-1)
-  if (next === 0) return keys[0]
-  const [a, b] = [keys[next - 1], keys[next]]
-  const x = ease((t - a.t) / (b.t - a.t))
-  return { scroll: mix(a.scroll, b.scroll, x), at: { x: mix(a.at.x, b.at.x, x), y: mix(a.at.y, b.at.y, x) }, caption: b.caption === a.caption ? a.caption : x < 0.5 ? a.caption : b.caption }
+/** Draws the frame at time t; the dashboard is screenshotted again only when its scroll changed. */
+function framer(compose, dashboardPage, plan, box) {
+  let lastScroll = null
+  let image = ''
+  return async (t) => {
+    const layers = layersAt(plan.scenes, t)
+    for (const layer of layers) {
+      if (layer.scene.kind !== 'dashboard') continue
+      const state = beatState(layer.scene.beats, box, Math.max(0, layer.t - layer.scene.enter))
+      // Zoom, cursor and caption are drawn by the compositor, so a still page reuses its screenshot.
+      if (state.scroll !== lastScroll) {
+        await dashboardPage.evaluate((y) => window.scrollTo(0, y), state.scroll)
+        image = `data:image/png;base64,${(await dashboardPage.screenshot()).toString('base64')}`
+        lastScroll = state.scroll
+      }
+      layer.frame = { ...state, image }
+    }
+    await compose.evaluate((value) => window.renderFrame(value), layers)
+    return layers
+  }
 }
 
-async function recordDashboard(page, video, url, posterPath) {
-  console.log('  dashboard: opening the project page')
-  // The launch link sets the dashboard's access cookie; then open the project.
-  await page.goto(url, { waitUntil: 'networkidle' })
-  await page.goto(new URL('/app/projects/pricing', url).href, { waitUntil: 'networkidle' })
-  await page.getByText(TASK_TITLE).first().waitFor()
-  await page.evaluate(() => document.fonts.ready)
-  await page.addStyleTag({ content: '*{transition:none!important;animation:none!important;scroll-behavior:auto!important}' })
-  await page.evaluate(OVERLAY)
-  const keys = tour(await anchors(page, TASK_TITLE))
-  console.log(`  dashboard: ${(keys.at(-1).t / 1000).toFixed(1)}s`)
-  const length = keys.at(-1).t
-  const FADE = 350
+async function render(compose, draw, plan, videoPath, posterPath) {
+  const video = startFfmpeg(videoPath)
   let isPosterTaken = false
-  for (let t = 0; t < length; t += FRAME_MS) {
-    const { scroll, at, caption } = frameAt(keys, t)
-    const fade = Math.max(0, 1 - t / FADE, 1 - (length - t) / FADE)
-    const viewY = at.y - scroll
-    await page.evaluate((state) => window.demoFrame(state), { scrollY: scroll, x: at.x, y: viewY, caption, fade })
-    await page.mouse.move(at.x, viewY)
-    const frame = await page.screenshot()
-    await video.write(frame)
-    if (!isPosterTaken && t >= 4600) {
-      await page.evaluate(() => (document.getElementById('demo-caption').style.opacity = '0'))
-      await page.screenshot({ path: posterPath, type: 'jpeg', quality: 88 })
-      isPosterTaken = true
+  try {
+    for (let frame = 0; frame < Math.ceil(plan.total * FPS); frame += 1) {
+      const t = frame / FPS
+      const layers = await draw(t)
+      await video.write(await compose.screenshot())
+      const dashboardLayer = layers.find((layer) => layer.frame?.beat === 'verified' && layer.frame.settled)
+      if (!isPosterTaken && dashboardLayer && layers.length === 1) {
+        await compose.evaluate((value) => window.renderFrame(value), [{ ...dashboardLayer, frame: { ...dashboardLayer.frame, captionOpacity: 0 } }])
+        await compose.screenshot({ path: posterPath, type: 'jpeg', quality: 88 })
+        isPosterTaken = true
+      }
+      if (frame % (FPS * 5) === 0) console.log(`  ${t.toFixed(0)}s / ${plan.total.toFixed(0)}s`)
     }
+    await video.close()
+  } catch (error) {
+    video.kill()
+    throw error
   }
 }
 
 mkdirSync(out, { recursive: true })
-// The silent master; narrate.mjs adds the voice and writes the website's video.
-const videoPath = join(import.meta.dirname, 'continuum-demo.silent.mp4')
-const posterPath = join(out, 'continuum-demo.jpg')
+const final = { video: join(out, 'continuum-demo.mp4'), poster: join(out, 'continuum-demo.jpg'), captions: join(out, 'continuum-demo.vtt') }
 // Rendered beside the final files and moved into place only when complete, so a failed run leaves the committed video intact.
 const partial = (path) => path.replace(/(\.\w+)$/, '.partial$1')
+const silent = join(work, 'continuum-demo.silent.mp4')
 let dashboard
 let browser
-let video
 try {
+  console.log('Voice…')
+  const clips = await speak(narration.map((line) => line.text), { tts: option('--tts'), voice: option('--voice') })
   console.log('Starting the dashboard…')
   dashboard = await startDashboard()
   browser = await chromium.launch()
-  const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: SCALE })
-  video = startFfmpeg(partial(videoPath))
-  const split = SCENES.findIndex((scene) => scene.kind === 'dashboard')
-  await recordScenes(page, video, SCENES.slice(0, split))
-  await recordDashboard(page, video, dashboard.url, partial(posterPath))
-  await recordScenes(page, video, SCENES.slice(split + 1))
-  await video.close()
-  video = undefined
-  renameSync(partial(videoPath), videoPath)
-  renameSync(partial(posterPath), posterPath)
-  console.log(`Wrote ${videoPath} and ${posterPath}`)
+  const compose = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: SCALE })
+  await compose.goto(pathToFileURL(join(import.meta.dirname, 'compose.html')).href)
+  await compose.evaluate((logos) => (window.LOGOS = logos), LOGOS)
+  await compose.evaluate(() => document.fonts.ready)
+  const dashboardPage = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: DASHBOARD_SCALE })
+  // The launch link sets the dashboard's access cookie; then open the project.
+  await dashboardPage.goto(dashboard.url, { waitUntil: 'networkidle' })
+  await dashboardPage.goto(new URL('/app/projects/pricing', dashboard.url).href, { waitUntil: 'networkidle' })
+  await dashboardPage.getByText(TASK_TITLE).first().waitFor()
+  await dashboardPage.addStyleTag({ content: '*{transition:none!important;animation:none!important;scroll-behavior:auto!important}' })
+
+  const scenes = scenesFor(dashboard.port)
+  const terminalSeconds = Object.fromEntries(
+    await Promise.all(scenes.filter((scene) => scene.kind === 'terminal').map(async (scene) => [scene.id, await compose.evaluate((value) => window.terminalSeconds(value), scene)])),
+  )
+  const plan = timeline(scenes, clips, terminalSeconds)
+  for (const scene of plan.scenes) console.log(`  ${scene.id.padEnd(10)} ${scene.start.toFixed(1)}s +${scene.length.toFixed(1)}s`)
+
+  const draw = framer(compose, dashboardPage, plan, await anchors(dashboardPage, TASK_TITLE))
+  const stills = option('--stills')
+  if (stills) {
+    // A quick look: just these moments (seconds), as images in <work>/stills.
+    mkdirSync(join(work, 'stills'), { recursive: true })
+    console.log('Dashboard anchors:', JSON.stringify(await anchors(dashboardPage, TASK_TITLE)))
+    for (const seconds of stills.split(',').map(Number)) {
+      await draw(seconds)
+      await compose.screenshot({ path: join(work, 'stills', `${String(seconds).padStart(5, '0')}.png`) })
+    }
+    console.log(`Wrote stills to ${join(work, 'stills')}`)
+  } else {
+    console.log('Rendering…')
+    await render(compose, draw, plan, silent, partial(final.poster))
+    console.log('Voice and captions…')
+    muxVoice({ silent, clips, lineStarts: plan.lineStarts, texts: narration.map((line) => line.text), total: plan.total, video: partial(final.video), captions: partial(final.captions) })
+    for (const path of Object.values(final)) renameSync(partial(path), path)
+    console.log(`Wrote ${final.video} (${plan.total.toFixed(1)}s), its poster and ${final.captions}`)
+  }
 } finally {
-  video?.kill()
   await browser?.close()
   dashboard?.stop()
-  rmSync(partial(videoPath), { force: true })
-  rmSync(partial(posterPath), { force: true })
+  for (const path of Object.values(final)) rmSync(partial(path), { force: true })
 }
