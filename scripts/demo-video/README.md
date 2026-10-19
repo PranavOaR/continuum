@@ -14,6 +14,8 @@ node scripts/demo-video/capture.mjs --work ~/continuum-demo --codex-model gpt-5.
 # 2. Render the video, poster and captions at 1920×1080, with the voiceover. Needs ffmpeg.
 #    Run it right after step 1, so the dashboard shows times like "5 min ago".
 node scripts/demo-video/record.mjs --work ~/continuum-demo
+# 3. Refresh the video's cover, which shows its length.
+node scripts/site/images.mjs
 rm -rf ~/continuum-demo
 ```
 
