@@ -30,7 +30,7 @@ New here? [docs/getting-started.md](docs/getting-started.md) walks through a fir
 
 [![Demo: Claude Code starts a task, Codex finishes it from Continuum's briefing, and the dashboard shows who did what. Recorded from real sessions.](https://continuumgroup.dev/demo/continuum-demo.jpg)](https://continuumgroup.dev/demo/continuum-demo.mp4)
 
-*Watch the demo (71 s, with voiceover): Claude Code fixes one of two bugs and stops; Codex is briefed by Continuum, finishes the same task, and the dashboard shows who did what. Recorded from real sessions with the published package; voiceover by ElevenLabs.*
+*Watch the demo (77 s, with voiceover): Claude Code fixes one of two bugs and stops; Codex is briefed by Continuum, finishes the same task, and the dashboard shows who did what. Recorded from real sessions with the published package; voiceover by ElevenLabs.*
 
 > **The dashboard shows live data only.** `continuum serve` shows your repositories ("Local workspace · Live"). The website, [continuumgroup.dev](https://continuumgroup.dev), is a landing page with no dashboard. `npm run dev` shows a labelled sample dataset, for developing the UI. Nothing is sent anywhere.
 
