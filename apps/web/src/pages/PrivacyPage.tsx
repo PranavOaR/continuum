@@ -37,8 +37,8 @@ export function PrivacyPage() {
         <Block title="This website">
           <p>No cookies, no analytics, no tracking scripts. The fonts, images and demo video are served from this site, not from third parties.</p>
           <p>
-            The site is hosted on Vercel, which, like any web host, processes standard request data such as IP addresses to deliver the pages. Settings the
-            site remembers, such as reduced motion, are kept in your browser’s local storage and never sent anywhere.
+            The site is hosted on Vercel, which, like any web host, processes standard request data such as IP addresses to deliver the pages. The site
+            itself stores nothing in your browser.
           </p>
           <p>The demo video's voiceover was generated with ElevenLabs once, before publishing. Watching it sends nothing to ElevenLabs.</p>
         </Block>

@@ -32,7 +32,9 @@ export function DocsPage() {
   const onContentClick = (event: MouseEvent<HTMLElement>) => {
     const anchor = (event.target as HTMLElement).closest('a')
     const href = anchor?.getAttribute('href')
-    if (!href?.startsWith('/') || event.metaKey || event.ctrlKey || event.shiftKey) return
+    const isModified = event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+    // A same-site path ('/x', not the protocol-relative '//host'), opened normally, without a target or download.
+    if (!href || !/^\/(?!\/)/.test(href) || isModified || event.defaultPrevented || anchor?.target || anchor?.hasAttribute('download')) return
     event.preventDefault()
     navigate(href)
   }

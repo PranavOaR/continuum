@@ -1,10 +1,19 @@
 import { ArrowRight } from 'lucide-react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { buttonClass } from '../components/shared/Button'
 import { SitePage } from '../components/site/SitePage'
 
 /** The website's 404, in the site's own design. */
 export function SiteNotFoundPage() {
+  // The host serves every path with status 200, so this keeps search engines from indexing missing pages.
+  useEffect(() => {
+    const robots = document.createElement('meta')
+    robots.name = 'robots'
+    robots.content = 'noindex'
+    document.head.append(robots)
+    return () => robots.remove()
+  }, [])
   return (
     <SitePage title="Page not found">
       <div className="relative overflow-hidden">

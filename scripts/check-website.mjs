@@ -19,14 +19,15 @@ const FORBIDDEN = ['Developer Portfolio', 'Analytics Platform', 'Docs Site', 'De
 const FORBIDDEN_LINK = /github\.com/
 const REQUIRED_FILES = ['index.html', 'demo/continuum-demo.mp4', 'demo/continuum-demo.jpg', 'demo/continuum-demo.vtt', 'og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml']
 /** Every page, with the heading it must show; an unknown address must show the 404. */
+const NOT_FOUND = '/no-such-page'
 const PAGES = [
-  ['/', 'Your work continues.'],
-  ['/docs', 'Getting started'],
-  ['/docs/agents', 'Agents'],
-  ['/docs/commands', 'Commands'],
-  ['/docs/data', 'What gets recorded'],
-  ['/privacy', 'Privacy'],
-  ['/no-such-page', 'This page went missing.'],
+  ['/', 'Your work continues.', 'npx @pranavoar/continuum setup claude-code'],
+  ['/docs', 'Getting started', 'npx @pranavoar/continuum doctor'],
+  ['/docs/agents', 'Agents', 'setup codex'],
+  ['/docs/commands', 'Commands', 'export <file>'],
+  ['/docs/data', 'What gets recorded', '.continuumignore'],
+  ['/privacy', 'Privacy', 'No cookies, no analytics'],
+  [NOT_FOUND, 'This page went missing.', 'Read the docs'],
 ]
 const PREVIEW_PORT = 4787
 
@@ -52,10 +53,15 @@ async function renderErrors(dir) {
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message.split('\n')[0]))
     page.on('console', (message) => message.type() === 'error' && errors.push(message.text().split('\n')[0]))
-    for (const [path, heading] of PAGES) {
-      await page.goto(`http://localhost:${PREVIEW_PORT}${path}`, { waitUntil: 'networkidle' })
+    for (const [path, heading, content] of PAGES) {
+      const response = await page.goto(`http://localhost:${PREVIEW_PORT}${path}`, { waitUntil: 'networkidle', timeout: 30_000 })
+      if (response?.status() !== 200) errors.push(`${path} answered ${response?.status()}`)
       const h1 = page.getByRole('heading', { level: 1 })
       if (!(await h1.isVisible()) || !(await h1.innerText()).includes(heading)) errors.push(`${path} did not show "${heading}"`)
+      if (!(await page.locator('main').innerText()).includes(content)) errors.push(`${path} is missing its content ("${content}")`)
+      // The host answers 200 for every path, so only the 404 page may ask search engines not to index it.
+      const isNoindex = (await page.locator('meta[name="robots"][content="noindex"]').count()) > 0
+      if (isNoindex !== (path === NOT_FOUND)) errors.push(`${path} ${isNoindex ? 'is' : 'is not'} marked noindex`)
       const links = await page.locator('a[href]').evaluateAll((anchors) => anchors.map((anchor) => anchor.getAttribute('href')))
       for (const href of links.filter((link) => FORBIDDEN_LINK.test(link))) errors.push(`${path} links to ${href}`)
     }

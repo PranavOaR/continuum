@@ -46,7 +46,7 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
     return EXIT_OK
   }
   if (!purge) {
-    io.out(`Claude Code is disconnected. The recorded history is kept in ${storePath}.`)
+    io.out(`Every agent is disconnected. The recorded history is kept in ${storePath}.`)
     io.out('To delete it as well, stop any `continuum start` or `continuum serve` for this repository and run `continuum uninstall --purge`.')
     return EXIT_OK
   }

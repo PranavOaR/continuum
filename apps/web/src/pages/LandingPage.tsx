@@ -183,9 +183,19 @@ function ClosingCta() {
 export function LandingPage() {
   useDocumentTitle('')
   const activeId = useScrollSpy(SPY_IDS)
-  // Arriving from another page at /#section: scroll there once the page has rendered.
+  // Arriving at /#section from another page: scroll there now, again once images have loaded and
+  // shifted the layout, and whenever the hash changes.
   useEffect(() => {
-    if (window.location.hash) document.getElementById(window.location.hash.slice(1))?.scrollIntoView()
+    const scrollToHash = () => {
+      if (window.location.hash) document.getElementById(window.location.hash.slice(1))?.scrollIntoView()
+    }
+    scrollToHash()
+    if (document.readyState !== 'complete') window.addEventListener('load', scrollToHash, { once: true })
+    window.addEventListener('hashchange', scrollToHash)
+    return () => {
+      window.removeEventListener('load', scrollToHash)
+      window.removeEventListener('hashchange', scrollToHash)
+    }
   }, [])
 
   return (

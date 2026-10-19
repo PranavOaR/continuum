@@ -1,5 +1,5 @@
 import { ArrowRight, Menu, X } from 'lucide-react'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../../utils/cn'
 import { buttonClass } from '../shared/Button'
@@ -19,11 +19,16 @@ export function SiteHeader({ activeId = '' }: { activeId?: string }) {
   const isMenuOpen = menuOpenOn === pathname
   const setMenuOpen = (isOpen: boolean) => setMenuOpenOn(isOpen ? pathname : null)
   const menuId = useId()
+  const toggleRef = useRef<HTMLButtonElement>(null)
 
-  // Escape closes it too.
+  // Escape closes it too, and puts focus back on the button that opened it.
   useEffect(() => {
     if (!isMenuOpen) return
-    const close = (event: KeyboardEvent) => event.key === 'Escape' && setMenuOpenOn(null)
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setMenuOpenOn(null)
+      toggleRef.current?.focus()
+    }
     window.addEventListener('keydown', close)
     return () => window.removeEventListener('keydown', close)
   }, [isMenuOpen])
@@ -59,6 +64,7 @@ export function SiteHeader({ activeId = '' }: { activeId?: string }) {
             Open dashboard <ArrowRight aria-hidden />
           </a>
           <button
+            ref={toggleRef}
             type="button"
             className={buttonClass('ghost', 'sm', 'px-2 md:hidden')}
             aria-expanded={isMenuOpen}

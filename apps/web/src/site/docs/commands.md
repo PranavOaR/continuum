@@ -33,7 +33,7 @@ Run any command with `npx @pranavoar/continuum <command>`, from inside the repos
 | Command | What it does |
 |---|---|
 | `config` | Shows settings. `config agent-checks off` stops recording agent-run checks; `config prompts on` records what you type to agents, redacted. |
-| `forget` | Permanently removes recorded data: `--path <p>`, `--session <id>` or `--before <date>`. |
+| `forget` | Permanently removes recorded data: everything about a file or folder (`--path <p>`), what a session said and was asked (`--session <id>`), or the prompts, notes and check output from before a date (`--before <date>`). |
 | `export <file>` · `import <file>` | Moves the whole history between clones or machines as JSON. |
 | `compact` | Folds events older than 30 days into a checkpoint (`--keep-days <n>`). |
 
