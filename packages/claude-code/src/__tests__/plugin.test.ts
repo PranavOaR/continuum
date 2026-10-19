@@ -24,6 +24,8 @@ describe('the Claude Code plugin', () => {
   })
 })
 
+const LARGE_PAYLOAD = JSON.stringify({ hook_event_name: 'PostToolUse', tool_response: 'x'.repeat(1_000_000) })
+
 describe('plugin hooks outside Continuum repositories', () => {
   it('exit at once, without starting npx, where Continuum is not set up', async () => {
     const { execFileSync } = await import('node:child_process')
@@ -36,7 +38,9 @@ describe('plugin hooks outside Continuum repositories', () => {
     try {
       for (const dir of [plain.root, notGit]) {
         const started = performance.now()
-        const output = execFileSync(handler.command, handler.args, { cwd: dir, env: { ...process.env, CLAUDE_PROJECT_DIR: dir, PATH: '/usr/bin:/bin' }, input: '{}', encoding: 'utf8' })
+        // Claude Code writes every hook its payload, which can be large (it carries tool output). A payload
+        // bigger than a pipe's buffer fails with EPIPE unless the hook reads it before exiting.
+        const output = execFileSync(handler.command, handler.args, { cwd: dir, env: { ...process.env, CLAUDE_PROJECT_DIR: dir, PATH: '/usr/bin:/bin' }, input: LARGE_PAYLOAD, encoding: 'utf8' })
         expect(output).toBe('')
         // npx is not on that PATH: getting here at all proves it was never started.
         expect(performance.now() - started).toBeLessThan(2_000)
