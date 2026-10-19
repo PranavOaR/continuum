@@ -7,7 +7,7 @@
 // CONTINUUM_PACKAGE_NAME sets the npm name stamped into the bundle; setup
 // writes `npx -y <name>@<version>` into Claude Code's configuration.
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
 
@@ -48,7 +48,8 @@ await build({
 })
 
 // The website's demo video stays out of the package: the dashboard does not use it.
-cpSync(WEB_DIST, join(OUT, 'web'), { recursive: true, filter: (source) => !source.startsWith(join(WEB_DIST, 'demo')) })
+const DEMO_DIR = join(WEB_DIST, 'demo')
+cpSync(WEB_DIST, join(OUT, 'web'), { recursive: true, filter: (source) => source !== DEMO_DIR && !source.startsWith(DEMO_DIR + sep) })
 cpSync(join(ROOT, 'README.md'), join(OUT, 'README.md'))
 if (existsSync(join(ROOT, 'LICENSE'))) cpSync(join(ROOT, 'LICENSE'), join(OUT, 'LICENSE'))
 

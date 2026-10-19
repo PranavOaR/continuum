@@ -9,13 +9,20 @@
 // Uses your Claude Code and Codex accounts. Nothing is written outside <dir>
 // (Codex trust is passed per run, and Continuum's registry lives in <dir>).
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const PACKAGE = '@pranavoar/continuum@0.1.0'
 const AGENT_TIMEOUT_MS = 600_000
 const args = process.argv.slice(2)
-const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined)
+/** The value after `name`; a missing value (the end, or another --flag) is an error, not a path. */
+const option = (name) => {
+  if (!args.includes(name)) return undefined
+  const value = args[args.indexOf(name) + 1]
+  if (value === undefined || value.startsWith('--')) throw new Error(`${name} needs a value`)
+  return value
+}
 const work = resolve(option('--work') ?? 'demo-video-work')
 const codexModel = option('--codex-model')
 
@@ -50,6 +57,17 @@ export const PROMPTS = {
   codex: 'Continue the task from your Continuum briefing. When the tests pass, mark the task completed. Reply in one sentence.',
 }
 
+/**
+ * The work directory is deleted and rebuilt, so only one that is new, empty, or
+ * a previous capture's (it holds capture.json) is accepted, never one of yours.
+ */
+function assertDisposable(dir) {
+  const isPrecious = [process.cwd(), homedir(), '/'].some((precious) => precious === dir || precious.startsWith(`${dir}/`))
+  const isOurs = !existsSync(dir) || readdirSync(dir).length === 0 || existsSync(join(dir, 'capture.json'))
+  if (isPrecious || !isOurs) throw new Error(`Refusing to use ${dir} as the work directory: it is deleted and rebuilt. Pick a new directory.`)
+}
+
+assertDisposable(work)
 rmSync(work, { recursive: true, force: true })
 mkdirSync(join(repo, 'src'), { recursive: true })
 for (const [path, text] of Object.entries(FILES)) writeFileSync(join(repo, path), text)

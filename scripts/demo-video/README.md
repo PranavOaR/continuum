@@ -12,6 +12,7 @@ To record it again:
 # 1. The real run, with the published package. Uses your Claude Code and Codex accounts.
 node scripts/demo-video/capture.mjs --work ~/continuum-demo --codex-model gpt-5.6-luna
 # 2. Render the video and poster, frame by frame at 1920×1080. Needs ffmpeg.
+#    Run it right after step 1: the dashboard shows times like "5 min ago".
 node scripts/demo-video/record.mjs --work ~/continuum-demo
 rm -rf ~/continuum-demo
 ```

@@ -15,6 +15,7 @@ function ExternalLink({ href, className, children }: { href: string; className?:
   return (
     <a href={href} target="_blank" rel="noreferrer" className={className}>
       {children}
+      <span className="sr-only"> (opens in a new tab)</span>
     </a>
   )
 }
@@ -106,7 +107,7 @@ function Briefing() {
     <Section
       id="briefing"
       title="What the next agent is told"
-      lead="The briefing Codex received in the video, word for word. Every claim carries a label saying how Continuum knows it."
+      lead="The briefing Codex received in the video, as Continuum wrote it. Every claim carries a label saying how Continuum knows it."
     >
       <div className="grid gap-10 lg:grid-cols-[1.35fr_1fr]">
         <pre className="max-h-[440px] overflow-auto rounded-lg border border-line bg-surface p-5 font-mono text-[12.5px] leading-[1.65] whitespace-pre-wrap text-fg">

@@ -7,14 +7,21 @@
 //
 // Needs ffmpeg and Playwright's Chromium.
 import { spawn } from 'node:child_process'
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
+import { createServer } from 'node:net'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 
 const ROOT = join(import.meta.dirname, '../..')
 const args = process.argv.slice(2)
-const option = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined)
+/** The value after `name`; a missing value (the end, or another --flag) is an error, not a path. */
+const option = (name) => {
+  if (!args.includes(name)) return undefined
+  const value = args[args.indexOf(name) + 1]
+  if (value === undefined || value.startsWith('--')) throw new Error(`${name} needs a value`)
+  return value
+}
 const work = resolve(option('--work') ?? 'demo-video-work')
 const out = resolve(option('--out') ?? join(ROOT, 'apps/web/public/demo'))
 const capture = JSON.parse(readFileSync(join(work, 'capture.json'), 'utf8'))
@@ -62,16 +69,41 @@ const SCENES = [
 function startFfmpeg(path) {
   const ffmpeg = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path], { stdio: ['pipe', 'inherit', 'inherit'] })
-  const done = new Promise((resolveDone, reject) => ffmpeg.on('close', (code) => (code === 0 ? resolveDone() : reject(new Error(`ffmpeg exited with ${code}`)))))
+  const done = new Promise((resolveDone, reject) => {
+    ffmpeg.on('error', (error) => reject(new Error(`could not run ffmpeg: ${error.message}`)))
+    ffmpeg.on('close', (code) => (code === 0 ? resolveDone() : reject(new Error(`ffmpeg exited with ${code}`))))
+  })
+  // A write to an ffmpeg that died fails with EPIPE; `done` reports why it died.
+  ffmpeg.stdin.on('error', () => {})
   return {
-    write: (frame) => new Promise((resolveWrite) => (ffmpeg.stdin.write(frame) ? resolveWrite() : ffmpeg.stdin.once('drain', resolveWrite))),
+    // Races `done`, so a dead ffmpeg ends the render instead of waiting forever for 'drain'.
+    write: (frame) => Promise.race([new Promise((resolveWrite) => (ffmpeg.stdin.write(frame) ? resolveWrite() : ffmpeg.stdin.once('drain', resolveWrite))), done]),
     close: () => (ffmpeg.stdin.end(), done),
+    kill: () => ffmpeg.kill('SIGKILL'),
   }
 }
 
+/** A port nothing is listening on. */
+const freePort = () =>
+  new Promise((resolvePort, reject) => {
+    const probe = createServer().once('error', reject)
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address()
+      probe.close(() => resolvePort(port))
+    })
+  })
+
 async function startDashboard() {
   const env = { ...process.env, CONTINUUM_CONFIG_DIR: join(work, 'config'), npm_config_update_notifier: 'false' }
-  const server = spawn('npx', ['-y', capture.package, 'serve', '--port', '4792', repo], { cwd: repo, env, stdio: ['ignore', 'pipe', 'inherit'] })
+  // Its own process group, so stopping it also stops the node process npx starts.
+  const server = spawn('npx', ['-y', capture.package, 'serve', '--port', String(await freePort()), repo], { cwd: repo, env, detached: true, stdio: ['ignore', 'pipe', 'inherit'] })
+  const stop = () => {
+    try {
+      process.kill(-server.pid, 'SIGINT')
+    } catch {
+      // Already stopped.
+    }
+  }
   const url = await new Promise((resolveUrl, reject) => {
     let text = ''
     server.stdout.on('data', (chunk) => {
@@ -79,9 +111,13 @@ async function startDashboard() {
       const match = /dashboard: (http\S+)/.exec(text)
       if (match) resolveUrl(match[1])
     })
+    server.on('error', (error) => reject(new Error(`could not start continuum serve: ${error.message}`)))
     server.on('close', () => reject(new Error(`continuum serve stopped: ${text}`)))
+  }).catch((error) => {
+    stop()
+    throw error
   })
-  return { url, stop: () => server.kill('SIGINT') }
+  return { url, stop }
 }
 
 async function recordScenes(page, video, scenes) {
@@ -89,6 +125,7 @@ async function recordScenes(page, video, scenes) {
   await page.evaluate(() => document.fonts.ready)
   for (const scene of scenes) {
     const length = await page.evaluate((s) => window.sceneLength(s), scene)
+    console.log(`  scene ${scene.step ?? scene.kind}: ${(length / 1000).toFixed(1)}s`)
     for (let t = 0; t < length; t += FRAME_MS) {
       await page.evaluate(([s, time]) => window.renderScene(s, time), [scene, t])
       await video.write(await page.screenshot())
@@ -171,6 +208,7 @@ function frameAt(keys, t) {
 }
 
 async function recordDashboard(page, video, url, posterPath) {
+  console.log('  dashboard: opening the project page')
   // The launch link sets the dashboard's access cookie; then open the project.
   await page.goto(url, { waitUntil: 'networkidle' })
   await page.goto(new URL('/app/projects/pricing', url).href, { waitUntil: 'networkidle' })
@@ -179,6 +217,7 @@ async function recordDashboard(page, video, url, posterPath) {
   await page.addStyleTag({ content: '*{transition:none!important;animation:none!important;scroll-behavior:auto!important}' })
   await page.evaluate(OVERLAY)
   const keys = tour(await anchors(page))
+  console.log(`  dashboard: ${(keys.at(-1).t / 1000).toFixed(1)}s`)
   const length = keys.at(-1).t
   const FADE = 350
   let isPosterTaken = false
@@ -201,18 +240,30 @@ async function recordDashboard(page, video, url, posterPath) {
 mkdirSync(out, { recursive: true })
 const videoPath = join(out, 'continuum-demo.mp4')
 const posterPath = join(out, 'continuum-demo.jpg')
-const dashboard = await startDashboard()
-const browser = await chromium.launch()
+// Rendered beside the final files and moved into place only when complete, so a failed run leaves the committed video intact.
+const partial = (path) => path.replace(/(\.\w+)$/, '.partial$1')
+let dashboard
+let browser
+let video
 try {
+  console.log('Starting the dashboard…')
+  dashboard = await startDashboard()
+  browser = await chromium.launch()
   const page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: SCALE })
-  const video = startFfmpeg(videoPath)
+  video = startFfmpeg(partial(videoPath))
   const split = SCENES.findIndex((scene) => scene.kind === 'dashboard')
   await recordScenes(page, video, SCENES.slice(0, split))
-  await recordDashboard(page, video, dashboard.url, posterPath)
+  await recordDashboard(page, video, dashboard.url, partial(posterPath))
   await recordScenes(page, video, SCENES.slice(split + 1))
   await video.close()
+  video = undefined
+  renameSync(partial(videoPath), videoPath)
+  renameSync(partial(posterPath), posterPath)
   console.log(`Wrote ${videoPath} and ${posterPath}`)
 } finally {
-  await browser.close()
-  dashboard.stop()
+  video?.kill()
+  await browser?.close()
+  dashboard?.stop()
+  rmSync(partial(videoPath), { force: true })
+  rmSync(partial(posterPath), { force: true })
 }
