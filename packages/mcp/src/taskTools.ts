@@ -66,29 +66,60 @@ type UpdateInput = z.infer<z.ZodObject<typeof updateTaskInput>>
 
 const unique = (values: readonly string[]) => [...new Set(values)]
 
+/** Titles that name the same task: case, spacing and punctuation aside. */
+const sameTitle = (a: string, b: string) => slug(a) === slug(b)
+
 /**
- * Creates a task and makes it current. Other in-progress tasks are paused
- * (back to planned) so an abandoned task cannot keep absorbing new work;
- * blocked tasks stay blocked.
+ * The open task the agent is continuing, resumed: an agent briefed on a task
+ * often calls start_task again with its title instead of update_task. Its
+ * finished steps and met criteria stay; new steps and criteria are added.
  */
-export function startTask(store: ContextStore, input: StartInput, now: Date): Snapshot {
-  const title = clean(input.title)
-  const payload: Snapshot = {
-    id: `${slug(title)}-${randomUUID().slice(0, 8)}`,
-    title,
+function resumed(task: TaskSummary, input: StartInput): Snapshot {
+  const current = snapshotOf(task)
+  const criteria = current.acceptanceCriteria ?? []
+  const done = current.completedSteps ?? []
+  const remaining = current.remainingSteps ?? []
+  const newCriteria = input.acceptance_criteria.map(clean).filter((text) => !criteria.some((criterion) => criterion.text === text))
+  const newSteps = input.steps.map(clean).filter((step) => !done.includes(step) && !remaining.includes(step))
+  return {
+    ...current,
     status: 'in-progress',
-    ...(input.objective ? { objective: clean(input.objective) } : {}),
-    acceptanceCriteria: input.acceptance_criteria.map((text) => ({ text: clean(text), met: false })),
-    completedSteps: [],
-    remainingSteps: unique(input.steps.map(clean)),
+    ...(!current.objective && input.objective ? { objective: clean(input.objective) } : {}),
+    acceptanceCriteria: [...criteria, ...newCriteria.map((text) => ({ text, met: false }))],
+    remainingSteps: unique([...remaining, ...newSteps]),
   }
+}
+
+/**
+ * Makes a task current: an unfinished task with the same title is resumed,
+ * otherwise a new one is created. Other in-progress tasks are paused (back to
+ * planned) so an abandoned task cannot keep absorbing new work; blocked tasks
+ * stay blocked.
+ */
+export function startTask(store: ContextStore, input: StartInput, now: Date): { snapshot: Snapshot; isResumed: boolean } {
+  const title = clean(input.title)
+  let result: { snapshot: Snapshot; isResumed: boolean } | undefined
   store.transact(() => {
-    const paused = taskSummaries(store)
-      .filter((task) => task.status === 'in-progress')
+    const tasks = taskSummaries(store)
+    const open = tasks.find((task) => task.status !== 'completed' && sameTitle(task.title, title))
+    const snapshot: Snapshot = open
+      ? resumed(open, input)
+      : {
+          id: `${slug(title)}-${randomUUID().slice(0, 8)}`,
+          title,
+          status: 'in-progress',
+          ...(input.objective ? { objective: clean(input.objective) } : {}),
+          acceptanceCriteria: input.acceptance_criteria.map((text) => ({ text: clean(text), met: false })),
+          completedSteps: [],
+          remainingSteps: unique(input.steps.map(clean)),
+        }
+    const paused = tasks
+      .filter((task) => task.status === 'in-progress' && task.id !== snapshot.id)
       .map((task) => event({ ...snapshotOf(task), status: 'planned' }, now))
-    return [...paused, event(payload, now)]
+    result = { snapshot, isResumed: open !== undefined }
+    return [...paused, event(snapshot, now)]
   })
-  return payload
+  return result as { snapshot: Snapshot; isResumed: boolean }
 }
 
 function hasChanges(input: UpdateInput): boolean {
@@ -154,11 +185,15 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date):
     {
       title: 'Start task',
       description:
-        'Record the task you are starting (or switching to) so later sessions and other agents continue it. Call this when you begin a distinct piece of work; it becomes the current task, and file edits are attributed to it.',
+        'Record the task you are starting (or switching to) so later sessions and other agents continue it. Call this when you begin a distinct piece of work; it becomes the current task, and file edits are attributed to it. To continue the task your briefing names, use update_task instead; starting a task with the title of an unfinished one resumes it rather than creating a duplicate.',
       inputSchema: startTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (input) => run((store) => `Started. ${describe(startTask(store, input, now()))}`),
+    async (input) =>
+      run((store) => {
+        const { snapshot, isResumed } = startTask(store, input, now())
+        return `${isResumed ? `Resumed the open task "${snapshot.title}" instead of starting a duplicate.` : 'Started.'} ${describe(snapshot)}`
+      }),
   )
   server.registerTool(
     'update_task',

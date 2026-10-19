@@ -13,7 +13,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-const PACKAGE = 'getcontinuum@0.1.1'
+const PACKAGE = 'getcontinuum@0.1.2'
 const AGENT_TIMEOUT_MS = 600_000
 const args = process.argv.slice(2)
 /** The value after `name`; a missing value (the end, or another --flag) is an error, not a path. */

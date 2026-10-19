@@ -82,6 +82,39 @@ describe('task tools', () => {
     expect((await call('get_handoff', {})).text).not.toContain('## Current task')
   })
 
+  it('resumes an unfinished task with the same title instead of starting a duplicate', async () => {
+    const { repo, call } = await connect()
+    // Claude Code starts the task and finishes the first step.
+    await call('start_task', { title: 'Fix pricing bugs', acceptance_criteria: ['npm test passes'], steps: ['Fix applyDiscount', 'Fix addTax'] })
+    await call('update_task', { completed_steps: ['Fix applyDiscount'], next_action: 'Fix addTax' })
+    // Codex, briefed on that task, calls start_task again with the same title in its own words.
+    const resumed = await call('start_task', { title: '  fix PRICING bugs ', acceptance_criteria: ['npm test passes', 'Taxes round to cents'], steps: ['Fix addTax', 'Run npm test'] })
+    expect(resumed.text).toMatch(/^Resumed the open task "Fix pricing bugs" instead of starting a duplicate\. Task fix-pricing-bugs-[0-9a-f]{8}: "Fix pricing bugs" is in-progress\./)
+    expect(resumed.text).toContain('0/2 acceptance criteria met. 2 step(s) remaining. Next: Fix addTax')
+
+    const { store } = await openWorkspace(repo.root)
+    try {
+      const tasks = store.graph.keysOfKind('task').map((key) => store.graph.get(key)?.props)
+      expect(tasks).toHaveLength(1)
+      expect(tasks[0]).toMatchObject({ status: 'in-progress', completedSteps: ['Fix applyDiscount'], remainingSteps: ['Fix addTax', 'Run npm test'] })
+    } finally {
+      store.close()
+    }
+  })
+
+  it('starts a new task when the one with the same title is already completed', async () => {
+    const { repo, call } = await connect()
+    await call('start_task', { title: 'Release notes' })
+    await call('update_task', { status: 'completed' })
+    expect((await call('start_task', { title: 'Release notes' })).text).toMatch(/^Started\./)
+    const { store } = await openWorkspace(repo.root)
+    try {
+      expect(store.graph.keysOfKind('task')).toHaveLength(2)
+    } finally {
+      store.close()
+    }
+  })
+
   it('records each finished step once', async () => {
     const { call } = await connect()
     await call('start_task', { title: 'Steps', steps: ['a', 'b'] })

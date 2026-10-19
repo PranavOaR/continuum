@@ -35,6 +35,9 @@ const SCALE = 1.5
 const CWD = '~/continuum-demo/pricing'
 
 const output = (name) => capture.steps.find((step) => step.name === name)?.output ?? ''
+/** The task's title as the agent named it in this run (it differs from run to run), from the briefing Codex received. */
+const TASK_TITLE = /\[agent-reported\] "([^"]+)"/.exec(output('handoff-before-codex'))?.[1]
+if (!TASK_TITLE) throw new Error('capture.json has no task in the briefing before Codex: re-run capture.mjs')
 const firstLines = (text, count) => text.split('\n').slice(0, count).join('\n')
 const handoffBody = (text) => text.split('\n').filter((line) => !line.startsWith('Generated ') && !line.startsWith('Evidence labels')).join('\n')
 
@@ -137,8 +140,8 @@ const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2)
 const mix = (a, b, x) => a + (b - a) * x
 
 /** Where the dashboard's key elements sit on the page, found by their text. */
-async function anchors(page) {
-  return page.evaluate(() => {
+async function anchors(page, taskTitle) {
+  return page.evaluate((title) => {
     const find = (text, { exact = true, minFont = 0, within = document.body } = {}) => {
       const all = [...within.querySelectorAll('*')].filter((el) => el.children.length === 0 || [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
       const hit = all.find((el) => {
@@ -152,7 +155,7 @@ async function anchors(page) {
     const section = (heading) => find(heading).el.closest('section, article, [class*="rounded"]') ?? document.body
     const at = ({ x, y }) => ({ x, y })
     return {
-      task: at(find('Fix pricing.js bugs', { minFont: 18 })),
+      task: at(find(title, { minFont: 18 })),
       verified: at(find('Verified', { within: section('Verification') })),
       criteria: at(find('Acceptance criteria')),
       file: at(find('src/pricing.js', { within: section('File changes') })),
@@ -160,7 +163,7 @@ async function anchors(page) {
       codex: at(find('Codex session started')),
       maxScroll: document.documentElement.scrollHeight - window.innerHeight,
     }
-  })
+  }, taskTitle)
 }
 
 const OVERLAY = `
@@ -212,11 +215,11 @@ async function recordDashboard(page, video, url, posterPath) {
   // The launch link sets the dashboard's access cookie; then open the project.
   await page.goto(url, { waitUntil: 'networkidle' })
   await page.goto(new URL('/app/projects/pricing', url).href, { waitUntil: 'networkidle' })
-  await page.getByText('Fix pricing.js bugs').first().waitFor()
+  await page.getByText(TASK_TITLE).first().waitFor()
   await page.evaluate(() => document.fonts.ready)
   await page.addStyleTag({ content: '*{transition:none!important;animation:none!important;scroll-behavior:auto!important}' })
   await page.evaluate(OVERLAY)
-  const keys = tour(await anchors(page))
+  const keys = tour(await anchors(page, TASK_TITLE))
   console.log(`  dashboard: ${(keys.at(-1).t / 1000).toFixed(1)}s`)
   const length = keys.at(-1).t
   const FADE = 350
