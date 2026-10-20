@@ -29,6 +29,11 @@ const PAGES = [
   ['/no-such-page', 'This page went missing.'],
 ]
 const PREVIEW_PORT = 4787
+const DEMO_VIDEO = 'demo/continuum-demo.mp4'
+/** Phones (iOS Safari, many Android decoders) refuse a whole MP4 whose AAC audio is above this. */
+const MAX_MOBILE_SAMPLE_RATE = 48_000
+/** MP4 boxes that only contain other boxes, on the way to each track's media header. */
+const CONTAINER_BOXES = new Set(['moov', 'trak', 'mdia'])
 
 /** How long vite preview may take to start. */
 const PREVIEW_START_MS = 30_000
@@ -70,6 +75,42 @@ async function renderErrors(dir) {
   }
 }
 
+/** Each child box of `buffer[start, end)`: its four-letter type and where its contents lie. */
+function* boxes(buffer, start, end) {
+  for (let at = start; at + 8 <= end; ) {
+    const size = buffer.readUInt32BE(at)
+    if (size < 8 || at + size > end) return
+    yield { type: buffer.toString('latin1', at + 4, at + 8), start: at + 8, end: at + size }
+    at += size
+  }
+}
+
+/** Sample rates of the MP4's sound tracks: each track's media timescale, which is its sample rate. */
+function audioSampleRates(buffer) {
+  const rates = []
+  const walk = (start, end) => {
+    const children = [...boxes(buffer, start, end)]
+    const handler = children.find((box) => box.type === 'hdlr')
+    const header = children.find((box) => box.type === 'mdhd')
+    // hdlr: version/flags, pre_defined, then the handler type. mdhd: the timescale follows the dates (4 bytes each in version 0, 8 in version 1).
+    if (handler && header && buffer.toString('latin1', handler.start + 8, handler.start + 12) === 'soun') {
+      rates.push(buffer.readUInt32BE(header.start + (buffer[header.start] === 1 ? 20 : 12)))
+    }
+    for (const box of children) if (CONTAINER_BOXES.has(box.type)) walk(box.start, box.end)
+  }
+  walk(0, buffer.length)
+  return rates
+}
+
+/** The demo video must play on phones, not only in desktop browsers. */
+function videoFailures(dir) {
+  const path = join(dir, DEMO_VIDEO)
+  if (!existsSync(path)) return []
+  const rates = audioSampleRates(readFileSync(path))
+  if (rates.length === 0) return [`${DEMO_VIDEO} has no audio track the check could read`]
+  return rates.filter((rate) => rate > MAX_MOBILE_SAMPLE_RATE).map((rate) => `${DEMO_VIDEO} has ${rate} Hz audio, which phones cannot play; re-encode it at ${MAX_MOBILE_SAMPLE_RATE} Hz`)
+}
+
 const out = mkdtempSync(join(tmpdir(), 'continuum-website-'))
 try {
   execFileSync('npx', ['vite', 'build', '--outDir', out, '--emptyOutDir'], { cwd: WEB, env: { ...process.env, VITE_CONTINUUM_SITE: 'website' }, stdio: ['ignore', 'ignore', 'inherit'] })
@@ -78,11 +119,12 @@ try {
   const failures = [
     ...FORBIDDEN.filter((text) => code.includes(text)).map((text) => `the website contains demo content: "${text}"`),
     ...REQUIRED_FILES.filter((file) => !existsSync(join(out, file))).map((file) => `the website is missing ${file}`),
+    ...videoFailures(out),
     ...(await renderErrors(out)),
   ]
   for (const failure of failures) console.error(`FAIL ${failure}`)
   if (failures.length > 0) process.exit(1)
-  console.log(`Website OK: ${assets.length} script(s), no demo content, ${PAGES.length} pages render without errors.`)
+  console.log(`Website OK: ${assets.length} script(s), no demo content, a demo video phones can play, ${PAGES.length} pages render without errors.`)
 } finally {
   rmSync(out, { recursive: true, force: true })
 }
