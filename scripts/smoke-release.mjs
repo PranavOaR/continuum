@@ -106,7 +106,13 @@ try {
   if (!existsSync(join(RELEASE, 'continuum.js'))) throw new Error('dist/release is missing: run `npm run build && npm run bundle` first.')
   const bin = packAndInstall()
   const name = JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8')).name
-  check('the package ships its MIT license', existsSync(join(dirname(dirname(bin)), name, 'LICENSE')) && readFileSync(join(dirname(dirname(bin)), name, 'LICENSE'), 'utf8').startsWith('MIT License'))
+  const installed = join(dirname(dirname(bin)), name)
+  const shipped = (file) => (existsSync(join(installed, file)) ? readFileSync(join(installed, file), 'utf8') : '')
+  check('the package ships its license', shipped('LICENSE').startsWith('Continuum Software License'))
+  check('the package ships the licenses of what it bundles', /## react \d/.test(shipped('THIRD_PARTY_NOTICES.md')) && /## zod \d/.test(shipped('THIRD_PARTY_NOTICES.md')))
+  check('the package ships the user README, not the repository one', shipped('README.md').includes('npx getcontinuum setup') && !shipped('README.md').includes('npm run dev'))
+  // Fully minified: Continuum's own function names do not survive into the bundle.
+  check('the bundle is minified, with no source map', !shipped('continuum.js').includes('function renderHandoff') && !shipped('continuum.js').includes('sourceMappingURL'))
   check('--version prints the package version', run(bin, ['--version'], scratch).trim() === JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8')).version)
 
   const repo = makeRepo()

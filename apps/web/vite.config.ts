@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import { siteHead } from './siteHead.ts'
+import { thirdPartyPackages } from './thirdPartyPackages.ts'
 
 // During development, CONTINUUM_API=<the link printed by `continuum serve`> points the app at that daemon.
 // The link's access token is sent as a bearer token, since the daemon's cookie belongs to its own origin.
@@ -17,7 +18,8 @@ const entry = isWebsite ? './src/site/mountSite.tsx' : './src/app/mountApp.tsx'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), ...(isWebsite ? [siteHead()] : [])],
+  // The dashboard ships in the npm package, which carries the licenses of what it bundles.
+  plugins: [react(), tailwindcss(), ...(isWebsite ? [siteHead()] : [thirdPartyPackages()])],
   publicDir: isWebsite ? 'site-public' : 'public',
   resolve: { alias: { '@entry': fileURLToPath(new URL(entry, import.meta.url)) } },
   server: api

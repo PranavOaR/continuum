@@ -26,5 +26,5 @@
   "devDependencies": {
     "@axe-core/playwright": "4.13.0"
   },
-  "license": "MIT"
+  "license": "UNLICENSED"
 }

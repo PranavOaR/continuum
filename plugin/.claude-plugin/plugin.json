@@ -5,9 +5,9 @@
   "author": {
     "name": "Pranav Rao"
   },
-  "homepage": "https://github.com/PranavOaR/continuum",
-  "repository": "https://github.com/PranavOaR/continuum",
-  "license": "MIT",
+  "homepage": "https://continuumgroup.dev",
+  "repository": "https://github.com/PranavOaR/continuum-plugin",
+  "license": "SEE LICENSE IN LICENSE",
   "keywords": [
     "handoff",
     "context",
