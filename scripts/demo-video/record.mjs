@@ -131,7 +131,8 @@ async function startDashboard() {
 
 function startFfmpeg(path) {
   const ffmpeg = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '24', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path], { stdio: ['pipe', 'inherit', 'inherit'] })
+    // High profile at level 4.0: what every phone decodes in hardware. Left to itself, x264 picks 5.0 for 1080p, which some phones refuse.
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '24', '-profile:v', 'high', '-level:v', '4.0', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path], { stdio: ['pipe', 'inherit', 'inherit'] })
   const done = new Promise((resolveDone, reject) => {
     ffmpeg.on('error', (error) => reject(new Error(`could not run ffmpeg: ${error.message}`)))
     ffmpeg.on('close', (code) => (code === 0 ? resolveDone() : reject(new Error(`ffmpeg exited with ${code}`))))

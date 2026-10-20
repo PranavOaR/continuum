@@ -32,8 +32,17 @@ const PREVIEW_PORT = 4787
 const DEMO_VIDEO = 'demo/continuum-demo.mp4'
 /** Phones (iOS Safari, many Android decoders) refuse a whole MP4 whose AAC audio is above this. */
 const MAX_MOBILE_SAMPLE_RATE = 48_000
-/** MP4 boxes that only contain other boxes, on the way to each track's media header. */
-const CONTAINER_BOXES = new Set(['moov', 'trak', 'mdia'])
+/**
+ * Highest H.264 level phones decode in hardware without exception: a higher one
+ * (5.0 for 1080p with many reference frames) plays on desktops and fails on some phones.
+ */
+const MAX_MOBILE_H264_LEVEL = 41
+/** MP4 boxes that only contain other boxes, on the way to each track's media header and sample description. */
+const CONTAINER_BOXES = new Set(['moov', 'trak', 'mdia', 'minf', 'stbl'])
+/** stsd's version, flags and entry count come before its entries. */
+const STSD_HEADER_BYTES = 8
+/** A visual sample entry's fixed fields (reserved bytes, size, resolution, compressor name…) come before its child boxes. */
+const VISUAL_SAMPLE_ENTRY_BYTES = 78
 
 /** How long vite preview may take to start. */
 const PREVIEW_START_MS = 30_000
@@ -102,13 +111,39 @@ function audioSampleRates(buffer) {
   return rates
 }
 
+/** The H.264 levels of the MP4's video tracks, read from each avc1 entry's decoder configuration (avcC: version, profile, compatibility, level). */
+function h264Levels(buffer) {
+  const levels = []
+  const walk = (start, end) => {
+    for (const box of boxes(buffer, start, end)) {
+      if (CONTAINER_BOXES.has(box.type)) walk(box.start, box.end)
+      if (box.type !== 'stsd') continue
+      for (const entry of boxes(buffer, box.start + STSD_HEADER_BYTES, box.end)) {
+        if (entry.type !== 'avc1') continue
+        const config = [...boxes(buffer, entry.start + VISUAL_SAMPLE_ENTRY_BYTES, entry.end)].find((child) => child.type === 'avcC')
+        if (config) levels.push(buffer[config.start + 3])
+      }
+    }
+  }
+  walk(0, buffer.length)
+  return levels
+}
+
 /** The demo video must play on phones, not only in desktop browsers. */
 function videoFailures(dir) {
   const path = join(dir, DEMO_VIDEO)
   if (!existsSync(path)) return []
-  const rates = audioSampleRates(readFileSync(path))
-  if (rates.length === 0) return [`${DEMO_VIDEO} has no audio track the check could read`]
-  return rates.filter((rate) => rate > MAX_MOBILE_SAMPLE_RATE).map((rate) => `${DEMO_VIDEO} has ${rate} Hz audio, which phones cannot play; re-encode it at ${MAX_MOBILE_SAMPLE_RATE} Hz`)
+  const file = readFileSync(path)
+  const rates = audioSampleRates(file)
+  const levels = h264Levels(file)
+  return [
+    ...(rates.length === 0 ? [`${DEMO_VIDEO} has no audio track the check could read`] : []),
+    ...rates.filter((rate) => rate > MAX_MOBILE_SAMPLE_RATE).map((rate) => `${DEMO_VIDEO} has ${rate} Hz audio, which phones cannot play; re-encode it at ${MAX_MOBILE_SAMPLE_RATE} Hz`),
+    ...(levels.length === 0 ? [`${DEMO_VIDEO} has no H.264 video track the check could read`] : []),
+    ...levels
+      .filter((level) => level > MAX_MOBILE_H264_LEVEL)
+      .map((level) => `${DEMO_VIDEO} is H.264 level ${level / 10}, which some phones cannot decode; re-encode it with -level:v 4.0 (scripts/demo-video/record.mjs does)`),
+  ]
 }
 
 const out = mkdtempSync(join(tmpdir(), 'continuum-website-'))

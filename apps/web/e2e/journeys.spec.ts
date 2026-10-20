@@ -200,3 +200,29 @@ test('the demo shows tasks read-only: editing needs your own dashboard', async (
   await expect(panel.getByLabel('Status')).toHaveCount(0)
   await expect(panel.getByRole('button', { name: /Mark ".*" as done/ })).toHaveCount(0)
 })
+
+test.describe('the demo video', () => {
+  // Only the website build serves the video; these tests serve it themselves.
+  const VIDEO = '**/demo/continuum-demo.mp4'
+  const FILE = new URL('../site-public/demo/continuum-demo.mp4', import.meta.url).pathname
+
+  test('plays from its cover with one play button, then hands over to the native controls', async ({ page }) => {
+    await page.route(VIDEO, (route) => route.fulfill({ path: FILE, contentType: 'video/mp4' }))
+    await page.goto('/')
+    const video = page.locator('#demo video')
+    await expect(video).not.toHaveAttribute('controls')
+    await page.getByRole('button', { name: /Play the demo video \(1:17, with sound\)/ }).click()
+    await expect(video).toHaveAttribute('controls')
+    await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0)
+    await expect(page.getByRole('button', { name: /Play the demo video/ })).toHaveCount(0)
+  })
+
+  test('offers to open the video in the browser’s own player when it cannot play inline', async ({ page }) => {
+    await page.route(VIDEO, (route) => route.fulfill({ body: 'not a video', contentType: 'video/mp4' }))
+    await page.goto('/')
+    await page.locator('#demo').scrollIntoViewIfNeeded()
+    const fallback = page.getByRole('status').filter({ hasText: 'can’t play the video here' })
+    await expect(fallback).toBeVisible()
+    await expect(fallback.getByRole('link', { name: 'Open the video' })).toHaveAttribute('href', '/demo/continuum-demo.mp4')
+  })
+})
