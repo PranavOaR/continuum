@@ -23,13 +23,14 @@ interface SummaryCardProps {
 
 function SummaryCard({ label, value, hint, icon: Icon, to }: SummaryCardProps) {
   return (
-    <Link to={to} className="cn-thread group flex flex-col rounded-lg border border-line bg-surface px-5 pt-5 pb-4 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-line-strong">
+    <Link to={to} className="cn-thread group flex flex-col rounded-lg border border-line bg-surface px-4 pt-4 pb-4 shadow-card transition-[border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-line-strong hover:shadow-raised sm:px-5 sm:pt-5">
       <div className="flex items-start justify-between gap-2">
         <p className="text-[15px] font-medium tracking-[-0.01em] text-fg">{label}</p>
         <Icon className="size-4 text-subtle transition-colors group-hover:text-accent" aria-hidden />
       </div>
-      <p className="mt-1 label-mono text-subtle">{hint}</p>
-      <p className="mt-5 text-[44px] leading-none font-normal tracking-display text-fg tabular-nums">{value}</p>
+      {/* On a phone the label says enough; the hint would wrap word by word. */}
+      <p className="mt-1 hidden label-mono text-subtle sm:block">{hint}</p>
+      <p className="mt-4 text-[36px] leading-none font-normal tracking-display text-fg tabular-nums sm:mt-5 sm:text-[44px]">{value}</p>
     </Link>
   )
 }

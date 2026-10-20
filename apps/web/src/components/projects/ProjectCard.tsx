@@ -32,7 +32,7 @@ export function ProjectCard({ summary }: { summary: ProjectSummary }) {
   return (
     <Link
       to={`/app/projects/${project.id}`}
-      className="cn-thread group flex h-full flex-col rounded-lg border border-line bg-surface p-5 transition-[border-color,transform] hover:-translate-y-0.5 hover:border-line-strong"
+      className="cn-thread group flex h-full flex-col rounded-lg border border-line bg-surface p-5 shadow-card transition-[border-color,transform,box-shadow] hover:-translate-y-0.5 hover:border-line-strong hover:shadow-raised"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
