@@ -38,6 +38,8 @@ export function Dialog({ open, onClose, title, description, variant = 'modal', s
     if (!dialog) return
     if (open && !dialog.open) {
       dialog.showModal()
+      // showModal focuses the first focusable element (the close button); a field marked data-autofocus is where typing should go.
+      dialog.querySelector<HTMLElement>('[data-autofocus]')?.focus()
       document.body.style.overflow = 'hidden'
     } else if (!open && dialog.open) {
       dialog.close()
@@ -61,7 +63,8 @@ export function Dialog({ open, onClose, title, description, variant = 'modal', s
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
-      className={cn('cn-dialog', isDrawer ? 'cn-drawer m-0 ml-auto h-dvh max-h-dvh w-full sm:w-auto' : 'm-0 h-dvh w-full sm:m-auto sm:h-auto sm:w-auto')}
+      // Fit, not auto: a fixed element with inset 0 stretches to the viewport at width auto, which leaves margin auto nothing to centre.
+      className={cn('cn-dialog', isDrawer ? 'cn-drawer m-0 ml-auto h-dvh max-h-dvh w-full sm:w-fit' : 'm-0 h-dvh w-full sm:m-auto sm:h-fit sm:w-fit')}
     >
       {open && (
         <div
