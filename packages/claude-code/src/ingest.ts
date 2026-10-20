@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
@@ -18,7 +19,7 @@ import {
 import { currentTaskId, projectState, renderHandoff, sinceYouLeft } from '@continuum/context'
 import { ContextStore, keys, normalizePath } from '@continuum/store'
 import { agentCheckOf } from './agentCheck'
-import { editedFiles, parseHookPayload, reportedTaskId, SHELL_TOOL, type HookAgent, type HookPayload } from './hookPayload'
+import { editedFiles, parseHookPayload, reportedTaskId, SHELL_TOOL, withVsCodeDefaults, type HookAgent, type HookPayload } from './hookPayload'
 import { cleanPrompt, translateHook, type FileEdit } from './translate'
 
 /** How this adapter's sessions are recorded; "since you left" compares with this agent's previous session. */
@@ -31,6 +32,24 @@ export interface IngestOptions {
   now?: () => Date
   /** Which agent's hooks are calling; Codex uses the same payloads as Claude Code. */
   agent?: HookAgent
+  /** Where the hook runs, for payloads that may omit `cwd` (VS Code). Defaults to the process's directory. */
+  cwd?: string
+}
+
+const SESSION_ID_HASH_CHARS = 16
+
+/** A stable session id for a VS Code chat that sent none: one transcript, one session. */
+const vsCodeSessionId = (transcriptPath: string) => `vscode-${createHash('sha256').update(transcriptPath).digest('hex').slice(0, SESSION_ID_HASH_CHARS)}`
+
+/** VS Code may leave out the session id; without one there is no session to record into. */
+function hasSessionId(raw: string, prepare: (data: Record<string, unknown>) => Record<string, unknown>): boolean {
+  try {
+    const data: unknown = JSON.parse(raw)
+    return typeof data === 'object' && data !== null && typeof prepare(data as Record<string, unknown>).session_id === 'string'
+  } catch {
+    // parseHookPayload reports malformed input.
+    return true
+  }
 }
 
 export type IngestOutcome =
@@ -119,13 +138,15 @@ async function sessionStartContext(store: ContextStore, root: string, sessionId:
  */
 export async function ingestHook(raw: string, options: IngestOptions = {}): Promise<IngestOutcome> {
   const now = (options.now ?? (() => new Date()))()
-  const payload = parseHookPayload(raw)
+  const agent = options.agent ?? DEFAULT_AGENT
+  const prepare = agent === 'vscode' ? withVsCodeDefaults(options.cwd ?? process.cwd(), vsCodeSessionId) : undefined
+  if (prepare && !hasSessionId(raw, prepare)) return { status: 'ignored', reason: 'VS Code sent no session id or transcript path' }
+  const payload = parseHookPayload(raw, prepare)
   if (!payload) return { status: 'ignored', reason: 'hook event not used by Continuum' }
   const workspace = await findWorkspace(payload.cwd)
   if (!workspace) return { status: 'ignored', reason: 'Continuum is not set up in this repository' }
   await applyRepositoryRedactions(workspace.root)
 
-  const agent = options.agent ?? DEFAULT_AGENT
   if ('tool_name' in payload && payload.tool_name === SHELL_TOOL) {
     // Only Claude Code reports a command's exit code; without it a run is not evidence of anything.
     return agent === 'claude-code' ? recordAgentCheck(payload, workspace, now) : { status: 'ignored', reason: `${agent} does not report exit codes` }

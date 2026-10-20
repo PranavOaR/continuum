@@ -5,7 +5,19 @@ import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError, readRegistry } from '@continuum/capture'
-import { CODEX_HOOKS_FILE, CURSOR_MCP_FILE, HOOK_EVENTS, HOOKS_FILE, isContinuumHandler, isContinuumServer, MCP_FILE, MCP_SERVER_NAME, type Invocation } from '@continuum/claude-code'
+import {
+  CODEX_HOOKS_FILE,
+  CURSOR_MCP_FILE,
+  HOOK_EVENTS,
+  HOOKS_FILE,
+  isContinuumHandler,
+  isContinuumServer,
+  MCP_FILE,
+  MCP_SERVER_NAME,
+  VSCODE_HOOKS_FILE,
+  VSCODE_MCP_FILE,
+  type Invocation,
+} from '@continuum/claude-code'
 import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@continuum/store'
 
 /** node:sqlite works without a flag from this version on. */
@@ -156,6 +168,26 @@ async function checkCursor(root: string): Promise<Finding | null> {
   return { status: 'ok', label: 'Cursor MCP server registered', detail: 'enable it in Cursor Settings → MCP; capture edits with `continuum session start --agent cursor` and `continuum start`' }
 }
 
+/**
+ * VS Code (Copilot agent mode) is connected when its workspace hooks run Continuum; nothing to report when it is not set up here.
+ * A missing server is a problem: without it Copilot cannot keep the task current.
+ */
+async function checkVsCode(root: string): Promise<Finding[]> {
+  const hooks = await readJson(join(root, VSCODE_HOOKS_FILE))
+  if (hooks === null) return []
+  const fix = 'Fix or remove it, then run `continuum setup vscode`.'
+  if (hooks === 'invalid') return [{ status: 'fail', label: `${VSCODE_HOOKS_FILE} is not a valid JSON object`, fix }]
+  if (!JSON.stringify(hooks).includes('ingest --agent vscode')) return []
+  const config = await readJson(join(root, VSCODE_MCP_FILE))
+  const server = isObject(config) && isObject(config.servers) ? config.servers[MCP_SERVER_NAME] : undefined
+  const hooksFound: Finding = { status: 'ok', label: 'VS Code (Copilot) hooks registered', detail: 'VS Code runs them in a trusted workspace while the chat.useHooks setting (a preview) is on' }
+  if (config === 'invalid') return [hooksFound, { status: 'fail', label: `${VSCODE_MCP_FILE} is not a valid JSON object`, fix }]
+  if (!isContinuumServer(server)) {
+    return [hooksFound, { status: 'warn', label: `MCP server is not in ${VSCODE_MCP_FILE}`, detail: 'it may be in your VS Code profile instead, which Continuum cannot see', fix: 'In VS Code, run "MCP: List Servers" and check that "continuum" is listed and running.' }]
+  }
+  return [hooksFound, { status: 'ok', label: `VS Code MCP server registered in ${VSCODE_MCP_FILE}`, detail: 'start it when VS Code asks, or from "MCP: List Servers"' }]
+}
+
 function checkDashboard(webDist: string): Finding {
   return existsSync(join(webDist, 'index.html'))
     ? { status: 'ok', label: 'Dashboard available', detail: 'continuum serve' }
@@ -177,7 +209,7 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   if (!isInitialized(workspace)) return [...findings, { status: 'fail', label: 'Continuum is not set up here', fix: SETUP_FIX }]
   findings.push(checkStore(workspace.storePath))
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
-  const others = [await checkCodex(workspace.root), await checkCursor(workspace.root)].filter((finding): finding is Finding => finding !== null)
+  const others = [await checkCodex(workspace.root), await checkCursor(workspace.root), ...(await checkVsCode(workspace.root))].filter((finding): finding is Finding => finding !== null)
   const claudeHooks = checkHooks(settings, env.invocation)
   const claudeMissing = settings === null && claudeHooks.status === 'fail'
   if (claudeMissing && others.length > 0) {

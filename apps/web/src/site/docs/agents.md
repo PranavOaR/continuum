@@ -26,6 +26,24 @@ Writes `.codex/hooks.json` and a marked block in `.codex/config.toml`, never `~/
 
 Codex does not tell hooks a command's exit code, so its test runs are not recorded as checks. Run them with `continuum run -- <command>` for verified results.
 
+## GitHub Copilot in VS Code
+
+```bash
+npx getcontinuum setup vscode
+```
+
+Connects Copilot's agent mode in VS Code. It writes three files in the repository, never your VS Code profile:
+- `.vscode/mcp.json`: the `continuum` MCP server.
+- `.github/hooks/continuum.json`: agent hooks that brief each chat and record Copilot's edits.
+- `.github/instructions/continuum.instructions.md`: instructions for every chat, to keep the task current.
+
+Open the repository in VS Code, **trust the workspace**, and start the `continuum` server when VS Code offers to (or with **MCP: List Servers**).
+- Each Copilot agent chat starts briefed on where the work left off, including what Claude Code, Codex or a hand edit did since.
+- Copilot's file edits are recorded as changes. Reads, searches and terminal commands don't start Continuum at all, so they cost nothing.
+- It can use the same MCP tools: `start_task`, `update_task`, `get_context`, `record_decision`.
+
+Agent hooks are a preview in VS Code (1.109 or newer, `chat.useHooks` on), and an organization can turn them off. Without them, the instructions ask Copilot to call `get_handoff` itself. VS Code does not tell hooks a command's exit code, and it has no end-of-session event, so Copilot's test runs are not recorded as checks and its sessions stay open. Run tests with `continuum run -- <command>` for verified results.
+
 ## Cursor
 
 ```bash

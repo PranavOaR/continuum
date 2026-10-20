@@ -140,3 +140,51 @@ describe('Claude Code session, end to end through the configured commands', () =
     }
   }, 60_000)
 })
+
+describe('VS Code (Copilot) session, end to end through the configured commands', () => {
+  /** Runs a configured VS Code hook as VS Code does: one shell string, the payload on stdin, from the workspace folder. */
+  function fireVsCodeHook(root: string, event: string, fields: Record<string, unknown>, sessionId: string): string {
+    const { hooks } = JSON.parse(readFileSync(join(root, '.github/hooks/continuum.json'), 'utf8'))
+    const payload = JSON.stringify({ timestamp: NOW.toISOString(), session_id: sessionId, hook_event_name: event, ...fields })
+    return execFileSync('sh', ['-c', hooks[event][0].command], { cwd: root, input: payload, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] })
+  }
+
+  /** PostToolUse records in the background; wait until the edit is in the store. */
+  async function waitForHandoff(root: string, text: string): Promise<string> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const { out } = await cli(root, ['handoff'])
+      if (out.includes(text)) return out
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    throw new Error(`the handoff never showed ${text}`)
+  }
+
+  it('captures an edit without cwd in the payload, briefs the next chat, and serves MCP from the workspace folder', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'vscode'])
+
+    expect(fireVsCodeHook(repo.root, 'SessionStart', { source: 'new' }, 'chat-1')).toBe('')
+    repo.write('src/login.ts', 'export const login = (user: string) => user\n')
+    // VS Code may leave out cwd; the hook runs in the workspace folder.
+    expect(fireVsCodeHook(repo.root, 'PostToolUse', { tool_name: 'replace_string_in_file', tool_input: { filePath: join(repo.root, 'src/login.ts') }, tool_response: '' }, 'chat-1')).toBe('')
+    expect(await waitForHandoff(repo.root, 'Files it changed: `src/login.ts`')).toContain('`vscode` session')
+
+    const output = JSON.parse(fireVsCodeHook(repo.root, 'SessionStart', { source: 'new' }, 'chat-2'))
+    expect(output.hookSpecificOutput).toMatchObject({ hookEventName: 'SessionStart', additionalContext: expect.stringContaining('`src/login.ts`') })
+
+    const server = JSON.parse(readFileSync(join(repo.root, '.vscode/mcp.json'), 'utf8')).servers.continuum
+    expect(server.cwd).toBe('${workspaceFolder}')
+    const transport = new StdioClientTransport({ command: server.command, args: server.args, cwd: server.cwd.replace('${workspaceFolder}', repo.root), stderr: 'pipe' })
+    const client = new Client({ name: 'e2e-vscode', version: '0' })
+    await client.connect(transport)
+    try {
+      const handoff = await client.callTool({ name: 'get_handoff', arguments: {} })
+      // The second chat is now the latest session; the first one, with its edit, is listed before it.
+      const text = (handoff.content as { text: string }[])[0].text
+      expect(text).toContain('Latest: `vscode` session')
+      expect(text).toContain('## Earlier sessions')
+    } finally {
+      await client.close()
+    }
+  }, 60_000)
+})

@@ -66,7 +66,7 @@ const manifest = {
   author: 'Pranav Rao',
   homepage: 'https://github.com/PranavOaR/continuum#readme',
   bugs: { url: 'https://github.com/PranavOaR/continuum/issues' },
-  keywords: ['claude-code', 'codex', 'cursor', 'mcp', 'ai-agents', 'handoff', 'context', 'local-first'],
+  keywords: ['claude-code', 'codex', 'cursor', 'vscode', 'github-copilot', 'mcp', 'ai-agents', 'handoff', 'context', 'local-first'],
   repository: { type: 'git', url: 'git+https://github.com/PranavOaR/continuum.git' },
 }
 writeFileSync(join(OUT, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)

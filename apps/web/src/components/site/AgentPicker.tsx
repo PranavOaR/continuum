@@ -28,7 +28,7 @@ export function AgentPicker({ label }: { label?: string }) {
   return (
     <div className="max-w-[560px]">
       {label && <p className="mb-3 label-mono text-subtle">{label}</p>}
-      <div role="tablist" aria-label="Choose your agent" className="flex flex-wrap gap-1 sm:gap-2" onKeyDown={onKeyDown}>
+      <div role="tablist" aria-label="Choose your agent" className="grid grid-cols-2 gap-1 sm:flex sm:flex-wrap" onKeyDown={onKeyDown}>
         {AGENTS.map((candidate, index) => {
           const isSelected = index === selected
           return (
@@ -46,7 +46,7 @@ export function AgentPicker({ label }: { label?: string }) {
               tabIndex={isSelected ? 0 : -1}
               onClick={() => setSelected(index)}
               className={cn(
-                'flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-fg transition-[background-color,border-color,opacity] sm:h-10 sm:gap-2 sm:px-3',
+                'flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-fg transition-[background-color,border-color,opacity] sm:h-10 sm:gap-2',
                 isSelected ? 'border-line-strong bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.05)]' : 'border-transparent opacity-55 hover:opacity-90',
               )}
             >

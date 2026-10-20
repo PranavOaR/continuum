@@ -4,6 +4,7 @@ export const AGENTS: readonly AgentInfo[] = [
   { id: 'claude-code', name: 'Claude Code', monogram: 'CC' },
   { id: 'codex', name: 'Codex', monogram: 'CX' },
   { id: 'cursor', name: 'Cursor', monogram: 'CU' },
+  { id: 'vscode', name: 'VS Code Copilot', monogram: 'VS' },
   { id: 'chatgpt', name: 'ChatGPT', monogram: 'GP' },
   { id: 'other', name: 'Other agent', monogram: 'OT' },
 ]

@@ -4,6 +4,8 @@ import codexIcon from '../../assets/agent-logos/codex-color.svg?raw'
 import codexWordmark from '../../assets/agent-logos/codex-text.svg?raw'
 import cursorIcon from '../../assets/agent-logos/cursor.svg?raw'
 import cursorWordmark from '../../assets/agent-logos/cursor-text.svg?raw'
+import copilotIcon from '../../assets/agent-logos/githubcopilot.svg?raw'
+import copilotWordmark from '../../assets/agent-logos/githubcopilot-text.svg?raw'
 import { PACKAGE_NAME } from './siteContent'
 
 /**
@@ -31,6 +33,14 @@ export const AGENTS = [
     icon: cursorIcon,
     wordmark: cursorWordmark,
     next: 'Then open the repository in Cursor and enable the continuum server in Settings → MCP.',
+  },
+  {
+    // GitHub Copilot's agent mode in VS Code: the logo is the agent's, the command names the editor.
+    id: 'vscode',
+    name: 'GitHub Copilot in VS Code',
+    icon: copilotIcon,
+    wordmark: copilotWordmark,
+    next: 'Then open the repository in VS Code, trust the workspace, and start the continuum server. Copilot agent chats start briefed.',
   },
 ] as const
 

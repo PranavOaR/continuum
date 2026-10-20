@@ -1,4 +1,4 @@
-export type AgentType = 'claude-code' | 'codex' | 'cursor' | 'chatgpt' | 'other'
+export type AgentType = 'claude-code' | 'codex' | 'cursor' | 'vscode' | 'chatgpt' | 'other'
 
 export interface AgentInfo {
   id: AgentType

@@ -1,6 +1,6 @@
 # Getting started with Continuum
 
-About ten minutes. You need Node.js 22.13 or newer, git, and Claude Code (Codex and Cursor work too; see the end).
+About ten minutes. You need Node.js 22.13 or newer, git, and Claude Code (Codex, Cursor and GitHub Copilot in VS Code work too; see the end).
 
 ## 1. Connect a repository
 
@@ -67,6 +67,7 @@ Open the printed link. It carries a one-time access token, and the dashboard lis
 ```bash
 npx getcontinuum setup codex    # trust the project in Codex, then review the hooks with /hooks
 npx getcontinuum setup cursor   # enable the server in Cursor's Settings → MCP
+npx getcontinuum setup vscode   # trust the workspace in VS Code, then start the continuum server
 ```
 
 A Codex session picks up the same task where Claude stopped. For agents without hooks, use `continuum session start --agent <name>` with `continuum start`.

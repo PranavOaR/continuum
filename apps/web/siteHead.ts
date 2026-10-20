@@ -6,7 +6,7 @@ import type { HtmlTagDescriptor, Plugin } from 'vite'
 export const SITE_URL = 'https://continuumgroup.dev'
 
 const TITLE = 'Continuum — Your work continues. Your agents change.'
-const DESCRIPTION = 'Local project memory for AI coding agents. Every Claude Code, Codex or Cursor session starts knowing where the last one left off. Nothing leaves your machine.'
+const DESCRIPTION = 'Local project memory for AI coding agents. Every Claude Code, Codex, Cursor or Copilot session starts knowing where the last one left off. Nothing leaves your machine.'
 
 /**
  * The share image's address, with a fingerprint of its content: WhatsApp, Slack and others cache

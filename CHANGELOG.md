@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **GitHub Copilot in VS Code** (`setup vscode`): Copilot's agent mode gets the MCP server (`.vscode/mcp.json`), agent hooks (`.github/hooks/continuum.json`) and instructions for every chat (`.github/instructions/continuum.instructions.md`).
+  - Each chat starts briefed on where the work left off.
+  - Copilot's edits (`create_file`, `replace_string_in_file`, `multi_replace_string_in_file`, `apply_patch` and the rest) and task updates are recorded.
+  - VS Code runs its `PostToolUse` hook for every tool, so the hook starts Continuum only for those tools, in the background, and never holds Copilot up.
+  - `doctor`, `setup vscode --remove` and `uninstall` cover it.
+  - VS Code reports no exit codes and no session end to hooks, so its test runs are not recorded as checks, and its sessions stay open.
+
+### Fixed
+- `uninstall` without `--purge` said only Claude Code was disconnected; it disconnects every agent.
+
 ## [0.1.2] - 2026-10-19
 
 ### Fixed

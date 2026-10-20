@@ -8,7 +8,7 @@ export const FAQ = [
   {
     question: 'Which agents does it work with?',
     answer:
-      'Claude Code (hooks and MCP server, or the Claude Code plugin), Codex (hooks and MCP server) and Cursor (MCP server and an always-applied rule). Any other agent or chat can still leave a trail with `continuum session` and read `continuum handoff`.',
+      'Claude Code (hooks and MCP server, or the Claude Code plugin), Codex (hooks and MCP server), GitHub Copilot in VS Code (agent hooks, MCP server and instructions) and Cursor (MCP server and an always-applied rule). Any other agent or chat can still leave a trail with `continuum session` and read `continuum handoff`.',
   },
   {
     question: 'Is it free?',
