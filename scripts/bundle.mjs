@@ -10,6 +10,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFil
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build } from 'esbuild'
+import { packageDirOf, thirdPartyNotices } from './third-party-notices.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = join(ROOT, 'dist/release')
@@ -19,6 +20,10 @@ const CLI = JSON.parse(readFileSync(join(ROOT, 'packages/cli/package.json'), 'ut
 const DEFAULT_NAME = 'getcontinuum'
 /** node:sqlite runs without a flag from 22.13. */
 const MIN_NODE = '>=22.13'
+/** Written by the dashboard build (apps/web/thirdPartyPackages.ts): the packages it bundles. */
+const WEB_PACKAGES = 'third-party-packages.json'
+/** The public plugin repository hosts help and bug reports while the source is private. */
+const SUPPORT_REPO = 'https://github.com/PranavOaR/continuum-plugin'
 
 const packageName = process.env.CONTINUUM_PACKAGE_NAME ?? DEFAULT_NAME
 const version = process.env.CONTINUUM_VERSION ?? CLI.version
@@ -31,16 +36,17 @@ if (!existsSync(join(WEB_DIST, 'index.html'))) {
 rmSync(OUT, { recursive: true, force: true })
 mkdirSync(OUT, { recursive: true })
 
-await build({
+const { metafile } = await build({
   entryPoints: [join(ROOT, 'packages/cli/src/bin.ts')],
   outfile: join(OUT, 'continuum.js'),
   bundle: true,
   platform: 'node',
   format: 'esm',
   target: 'node22',
-  minifyWhitespace: true,
-  minifySyntax: true,
+  // Fully minified, with no source map: Continuum is proprietary. Third-party license comments are kept.
+  minify: true,
   legalComments: 'eof',
+  metafile: true,
   // Bundled CommonJS dependencies call require(); give them one in ESM.
   banner: { js: "import { createRequire as __continuumRequire } from 'node:module'; const require = __continuumRequire(import.meta.url);" },
   define: { __CONTINUUM_BUILD__: JSON.stringify({ version, packageName }) },
@@ -48,10 +54,19 @@ await build({
 })
 
 // The website's demo video stays out of the package: the dashboard does not use it.
+// The package list is for the notices below, not for the dashboard.
 const DEMO_DIR = join(WEB_DIST, 'demo')
-cpSync(WEB_DIST, join(OUT, 'web'), { recursive: true, filter: (source) => source !== DEMO_DIR && !source.startsWith(DEMO_DIR + sep) })
-cpSync(join(ROOT, 'README.md'), join(OUT, 'README.md'))
-if (existsSync(join(ROOT, 'LICENSE'))) cpSync(join(ROOT, 'LICENSE'), join(OUT, 'LICENSE'))
+const leftOut = new Set([DEMO_DIR, join(WEB_DIST, WEB_PACKAGES)])
+cpSync(WEB_DIST, join(OUT, 'web'), { recursive: true, filter: (source) => !leftOut.has(source) && !source.startsWith(DEMO_DIR + sep) })
+// The repository README is for developing Continuum; npm shows users their own.
+cpSync(join(ROOT, 'scripts/release/README.md'), join(OUT, 'README.md'))
+cpSync(join(ROOT, 'CHANGELOG.md'), join(OUT, 'CHANGELOG.md'))
+cpSync(join(ROOT, 'LICENSE'), join(OUT, 'LICENSE'))
+
+// esbuild lists inputs relative to the working directory, the repository root under `npm run bundle`.
+const cliPackages = Object.keys(metafile.inputs).map(packageDirOf).filter((dir) => dir !== null)
+const webPackages = JSON.parse(readFileSync(join(WEB_DIST, WEB_PACKAGES), 'utf8'))
+writeFileSync(join(OUT, 'THIRD_PARTY_NOTICES.md'), thirdPartyNotices(ROOT, [...cliPackages, ...webPackages]))
 
 const manifest = {
   name: packageName,
@@ -60,14 +75,13 @@ const manifest = {
   type: 'module',
   // npm rewrites './continuum.js' at publish (and warns that it removed it), so write its normal form.
   bin: { continuum: 'continuum.js' },
-  files: ['continuum.js', 'web', 'README.md', 'LICENSE'],
+  files: ['continuum.js', 'web', 'README.md', 'CHANGELOG.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'],
   engines: { node: MIN_NODE },
-  license: 'MIT',
+  license: 'SEE LICENSE IN LICENSE',
   author: 'Pranav Rao',
-  homepage: 'https://github.com/PranavOaR/continuum#readme',
-  bugs: { url: 'https://github.com/PranavOaR/continuum/issues' },
+  homepage: 'https://continuumgroup.dev',
+  bugs: { url: `${SUPPORT_REPO}/issues` },
   keywords: ['claude-code', 'codex', 'cursor', 'vscode', 'github-copilot', 'mcp', 'ai-agents', 'handoff', 'context', 'local-first'],
-  repository: { type: 'git', url: 'git+https://github.com/PranavOaR/continuum.git' },
 }
 writeFileSync(join(OUT, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
 

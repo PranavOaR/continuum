@@ -12,7 +12,8 @@ export const FAQ = [
   },
   {
     question: 'Is it free?',
-    answer: 'Yes. It is open source under the MIT license, with no account and no sign-up.',
+    answer:
+      'Yes, for any project, personal or commercial, with no account and no sign-up. Continuum is proprietary software: free to use, but not open source, so it may not be modified or redistributed.',
   },
   {
     question: 'What do I need?',

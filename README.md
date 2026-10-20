@@ -23,7 +23,7 @@ npx getcontinuum serve               # the dashboard for every connected reposit
 With Claude Code, you can install the plugin instead (hooks, MCP server and a `/continuum:handoff` command, in one step):
 
 ```
-/plugin install continuum --marketplace PranavOaR/continuum
+/plugin install continuum --marketplace PranavOaR/continuum-plugin
 ```
 
 New here? [docs/getting-started.md](docs/getting-started.md) walks through a first handoff in about ten minutes. `continuum doctor` diagnoses any setup problem. [CHANGELOG.md](CHANGELOG.md) lists what is in each release.
@@ -206,6 +206,12 @@ Every item in a handoff is labelled with its evidence:
 - **agent-reported:** something an agent said. It is a note, not a fact.
 
 A recorded check whose files have since changed is reported as out of date, along with the files that changed.
+
+## License and the public plugin repository
+
+Continuum is proprietary: free to use, not open source (see [LICENSE](LICENSE); versions up to 0.1.2 were MIT). The npm package carries a user-facing README (`scripts/release/README.md`), the CHANGELOG, the license, and `THIRD_PARTY_NOTICES.md`, which `npm run bundle` writes from the packages actually bundled into the CLI and the dashboard.
+
+The Claude Code plugin is installed from a separate public repository, [PranavOaR/continuum-plugin](https://github.com/PranavOaR/continuum-plugin), which holds no source code and hosts issues. After `npm run plugin`, update it with `node scripts/sync-plugin-repo.mjs <checkout of continuum-plugin>`, then commit and push there.
 
 ## Structure
 

@@ -16,5 +16,5 @@
     "@continuum/core": "*",
     "@continuum/store": "*"
   },
-  "license": "MIT"
+  "license": "UNLICENSED"
 }

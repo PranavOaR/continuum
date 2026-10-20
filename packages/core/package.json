@@ -11,5 +11,5 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run"
   },
-  "license": "MIT"
+  "license": "UNLICENSED"
 }

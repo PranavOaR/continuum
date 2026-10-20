@@ -18,7 +18,7 @@ export function SiteFooter() {
             npm<span className="sr-only"> (opens in a new tab)</span>
           </a>
         </nav>
-        <p className="text-[12px] text-subtle">MIT licensed · runs on your machine</p>
+        <p className="text-[12px] text-subtle">Free to use · runs on your machine</p>
       </div>
     </footer>
   )

@@ -1,21 +1,46 @@
-MIT License
+Continuum Software License
 
-Copyright (c) 2026 Pranav Rao
+Copyright (c) 2026 Pranav Rao. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Continuum (the "Software") is proprietary software. It is free to use, but it
+is not open source.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Permission to use. You may install and use the Software free of charge, on
+   any number of machines, for any lawful purpose, including commercial work.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Restrictions. Except as this license or applicable law expressly allows, you
+   may not:
+   a. copy the Software, other than as needed to install and use it and to keep
+      backups;
+   b. modify, adapt or translate the Software, or create derivative works of it;
+   c. reverse engineer, decompile or disassemble the Software, except to the
+      extent applicable law permits despite this restriction;
+   d. distribute, sell, sublicense, rent or lend the Software, or offer it to
+      others as a hosted service;
+   e. remove or alter any copyright, license or attribution notice.
+
+3. Your data. Everything the Software records stays on your machine and belongs
+   to you. The Software sends none of it to the author or to anyone else.
+
+4. Third-party components. The Software includes components licensed by others
+   under their own terms, listed with their license texts in
+   THIRD_PARTY_NOTICES.md. Nothing in this license limits your rights under
+   those terms.
+
+5. Earlier versions. Versions 0.1.2 and earlier were released under the MIT
+   License. Copies of those versions remain available to you under it. This
+   license applies to later versions.
+
+6. Termination. This license ends automatically if you break its terms. You must
+   then stop using the Software and delete your copies of it.
+
+7. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+8. Limitation of liability. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+   OF OR OTHER DEALINGS IN THE SOFTWARE.
+
+The author may publish new terms for future versions of the Software.

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+- **Continuum is now proprietary software, free to use** for personal and commercial work, under the Continuum Software License (LICENSE). It is no longer open source; versions up to 0.1.2 remain available under the MIT License.
+- The package ships `THIRD_PARTY_NOTICES.md`, the licenses of the open-source packages it bundles, and its own README for users.
+- The Claude Code plugin installs from a new public repository: `/plugin install continuum --marketplace PranavOaR/continuum-plugin`. Report bugs there.
+
 ### Added
 - **GitHub Copilot in VS Code** (`setup vscode`): Copilot's agent mode gets the MCP server (`.vscode/mcp.json`), agent hooks (`.github/hooks/continuum.json`) and instructions for every chat (`.github/instructions/continuum.instructions.md`).
   - Each chat starts briefed on where the work left off.
