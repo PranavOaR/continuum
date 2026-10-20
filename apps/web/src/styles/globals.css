@@ -27,6 +27,10 @@
   --danger: #cc2f2f;
   --backdrop: rgb(20 19 24 / 0.32);
   --dot: rgb(20 19 24 / 0.1);
+  /* Elevation: resting cards, raised (hovered) cards, and overlays (popovers, dialogs). */
+  --shadow-card: 0 1px 2px rgb(20 19 24 / 0.04);
+  --shadow-raised: 0 1px 2px rgb(20 19 24 / 0.04), 0 8px 20px -10px rgb(20 19 24 / 0.16);
+  --shadow-overlay: 0 2px 4px rgb(20 19 24 / 0.04), 0 16px 40px -12px rgb(20 19 24 / 0.22);
   color-scheme: light;
 }
 
@@ -50,6 +54,10 @@
   --danger: #f06a6a;
   --backdrop: rgb(0 0 0 / 0.6);
   --dot: rgb(244 242 238 / 0.08);
+  /* Shadows barely show on a dark canvas: a faint top highlight lifts surfaces instead. */
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.035), 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 10px 24px -10px rgb(0 0 0 / 0.6);
+  --shadow-overlay: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 18px 48px -12px rgb(0 0 0 / 0.75);
   color-scheme: dark;
 }
 
@@ -71,6 +79,9 @@
   --color-live: var(--live);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
   --font-sans: "Geist Variable", "Geist", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
 
@@ -162,6 +173,39 @@
 .cn-thread:focus-within::before {
   width: 64px;
   opacity: 1;
+}
+
+/*
+ * A horizontal scroller whose edges fade while there is more to scroll to, so
+ * cut-off items read as "more this way" rather than as clipped.
+ */
+.cn-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cn-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+@supports (animation-timeline: scroll(inline)) {
+  .cn-scroll-x {
+    --fade-start: 0px;
+    --fade-end: 32px;
+    mask-image: linear-gradient(to right, transparent, black var(--fade-start), black calc(100% - var(--fade-end)), transparent);
+    animation: cn-scroll-edges linear both;
+    animation-timeline: scroll(self inline);
+  }
+
+  @property --fade-start { syntax: "<length>"; inherits: false; initial-value: 0px; }
+  @property --fade-end { syntax: "<length>"; inherits: false; initial-value: 32px; }
+
+  @keyframes cn-scroll-edges {
+    0% { --fade-start: 0px; --fade-end: 32px; }
+    8% { --fade-start: 32px; }
+    92% { --fade-end: 32px; }
+    100% { --fade-start: 32px; --fade-end: 0px; }
+  }
 }
 
 /* Dotted grid used behind diagrams and the graph canvas. */

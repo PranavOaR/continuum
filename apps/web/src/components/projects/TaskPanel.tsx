@@ -141,7 +141,7 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
       }
       bodyClassName="p-0"
     >
-      <div className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2" role="group" aria-label="Project tasks">
+      <div className="cn-scroll-x flex gap-1 border-b border-line px-3 py-2" role="group" aria-label="Project tasks">
         {tasks.map((candidate) => (
           <button
             key={candidate.id}

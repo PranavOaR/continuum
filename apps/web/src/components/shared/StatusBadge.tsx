@@ -36,7 +36,8 @@ const VERIFICATION_VISUAL: Record<VerificationStatus, Visual> = {
 }
 
 const EVIDENCE_VISUAL: Record<EvidenceType, Visual> = {
-  observed: { tone: 'neutral', icon: <Eye /> },
+  // Most records are observed; it stays labelled but recedes, so verified, agent-reported and yours stand out.
+  observed: { tone: 'quiet', icon: <Eye /> },
   verified: { tone: 'success', icon: <ShieldCheck /> },
   'agent-reported': { tone: 'muted', icon: <Bot /> },
   'user-reported': { tone: 'accent', icon: <UserRound /> },
