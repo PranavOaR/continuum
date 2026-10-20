@@ -166,6 +166,40 @@ test('global search finds files and navigates to them', async ({ page }) => {
   await expect(page.getByRole('dialog')).toContainText('createSessionFromOAuth')
 })
 
+test('the command palette moves between pages and runs actions from the keyboard', async ({ page }) => {
+  await page.goto('/app')
+  await page.keyboard.press('ControlOrMeta+k')
+  const dialog = page.getByRole('dialog', { name: 'Search' })
+  const field = dialog.getByRole('combobox', { name: 'Search query' })
+  // Opens centred, with the field focused: typing straight after the shortcut searches.
+  await expect(field).toBeFocused()
+  const box = await dialog.locator('.cn-dialog-panel').boundingBox()
+  const viewport = page.viewportSize()
+  expect(Math.abs(box!.x + box!.width / 2 - viewport!.width / 2)).toBeLessThan(2)
+  // With no query, every page is one keystroke away.
+  await expect(dialog.getByRole('option', { name: 'Activity' })).toBeVisible()
+  await page.keyboard.type('memory')
+  await expect(dialog.getByRole('option').first()).toHaveAccessibleName(/Memory/)
+  await field.press('Enter')
+  await expect(page).toHaveURL(/\/app\/memory$/)
+
+  await page.keyboard.press('ControlOrMeta+k')
+  await field.fill('dark theme')
+  await field.press('ArrowDown')
+  await field.press('ArrowUp')
+  await field.press('Enter')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+})
+
+test('the command palette lists matching commands before search results', async ({ page }) => {
+  await page.goto('/app')
+  await page.keyboard.press('ControlOrMeta+k')
+  const dialog = page.getByRole('dialog', { name: 'Search' })
+  await dialog.getByRole('combobox', { name: 'Search query' }).fill('startup')
+  await expect(dialog.getByRole('option').first()).toHaveAccessibleName(/Startup App/)
+  await expect(dialog.getByText('Results', { exact: true })).toBeVisible()
+})
+
 test('settings change theme and reset handoff history', async ({ page }) => {
   await page.goto('/app/settings')
   await page.getByRole('radio', { name: 'Dark' }).click()
