@@ -6,7 +6,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 
 | Command | What it does |
 |---|---|
-| `setup claude-code` | Connects Claude Code to this repository. `setup codex` and `setup cursor` connect those agents. `--remove` undoes it. |
+| `setup claude-code` | Connects Claude Code to this repository. `setup codex`, `setup cursor` and `setup vscode` (GitHub Copilot in VS Code) connect those agents. `--remove` undoes it. |
 | `init` | Sets up Continuum in this git repository and records its files, without connecting an agent. |
 | `doctor` | Checks the install and this repository's setup, and says how to fix each problem. |
 | `uninstall` | Disconnects every agent. `--purge` also deletes `.continuum/`. |

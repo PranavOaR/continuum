@@ -17,7 +17,7 @@ export interface ActiveSession {
   startedAt: string
 }
 
-const AGENT_TYPES = new Set(['claude-code', 'codex', 'cursor', 'chatgpt', 'other'])
+const AGENT_TYPES = new Set(['claude-code', 'codex', 'cursor', 'vscode', 'chatgpt', 'other'])
 const pathOf = (root: string) => join(root, CONTINUUM_DIR, ACTIVE_SESSION_FILE)
 
 /** A missing or malformed file means no open session. */

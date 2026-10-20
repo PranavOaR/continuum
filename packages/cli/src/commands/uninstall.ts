@@ -2,7 +2,18 @@ import { existsSync, readdirSync, rmdirSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { CONTINUUM_DIR, includeInGit, locateWorkspace, unregisterRepository } from '@continuum/capture'
-import { CODEX_HOOKS_FILE, CURSOR_RULE_FILE, HOOKS_FILE, removeClaudeCodeSetup, removeCodexSetup, removeCursorSetup } from '@continuum/claude-code'
+import {
+  CODEX_HOOKS_FILE,
+  CURSOR_RULE_FILE,
+  HOOKS_FILE,
+  removeClaudeCodeSetup,
+  removeCodexSetup,
+  removeCursorSetup,
+  removeVsCodeSetup,
+  VSCODE_HOOKS_FILE,
+  VSCODE_INSTRUCTIONS_FILE,
+  VSCODE_MCP_FILE,
+} from '@continuum/claude-code'
 import { isStoreBusy } from '@continuum/store'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -32,12 +43,17 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
   const claude = await removeClaudeCodeSetup(root)
   const codex = await removeCodexSetup(root)
   const cursor = await removeCursorSetup(root)
-  const result = { files: [...claude.files, ...codex.files, ...cursor.files] }
+  const vscode = await removeVsCodeSetup(root)
+  const result = { files: [...claude.files, ...codex.files, ...cursor.files, ...vscode.files] }
   await unregisterRepository(io.configDir, root)
   removeIfEmpty(join(root, dirname(HOOKS_FILE)))
   removeIfEmpty(join(root, dirname(CODEX_HOOKS_FILE)))
   removeIfEmpty(join(root, dirname(CURSOR_RULE_FILE)))
   removeIfEmpty(join(root, dirname(dirname(CURSOR_RULE_FILE))))
+  removeIfEmpty(join(root, dirname(VSCODE_MCP_FILE)))
+  removeIfEmpty(join(root, dirname(VSCODE_HOOKS_FILE)))
+  removeIfEmpty(join(root, dirname(VSCODE_INSTRUCTIONS_FILE)))
+  removeIfEmpty(join(root, dirname(dirname(VSCODE_HOOKS_FILE))))
   for (const file of result.files) io.out(`  ${file.action.padEnd(9)} ${file.path}`)
 
   const storeDir = join(root, CONTINUUM_DIR)
@@ -46,7 +62,7 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
     return EXIT_OK
   }
   if (!purge) {
-    io.out(`Claude Code is disconnected. The recorded history is kept in ${storePath}.`)
+    io.out(`Every agent is disconnected. The recorded history is kept in ${storePath}.`)
     io.out('To delete it as well, stop any `continuum start` or `continuum serve` for this repository and run `continuum uninstall --purge`.')
     return EXIT_OK
   }

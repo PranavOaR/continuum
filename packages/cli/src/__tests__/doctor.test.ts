@@ -131,3 +131,18 @@ describe('continuum doctor with Cursor', () => {
     expect(find(findings, /Cursor MCP server registered/)?.status).toBe('ok')
   })
 })
+
+describe('continuum doctor with VS Code', () => {
+  it('passes a repository connected only to VS Code, and warns when its server is missing', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'vscode'])
+    const findings = await doctor(repo.root)
+    expect(findings.filter((finding) => finding.status === 'fail')).toEqual([])
+    expect(find(findings, /VS Code \(Copilot\) hooks registered/)?.status).toBe('ok')
+    expect(find(findings, /VS Code MCP server registered/)?.status).toBe('ok')
+    expect(find(findings, /Claude Code not connected/)?.status).toBe('ok')
+
+    repo.write('.vscode/mcp.json', JSON.stringify({ servers: {} }))
+    expect(find(await doctor(repo.root), /MCP server is not in \.vscode\/mcp\.json/)?.status).toBe('warn')
+  })
+})

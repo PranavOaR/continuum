@@ -4,9 +4,11 @@ import {
   removeClaudeCodeSetup,
   removeCodexSetup,
   removeCursorSetup,
+  removeVsCodeSetup,
   setupClaudeCode,
   setupCodex,
   setupCursor,
+  setupVsCode,
   type Invocation,
   type SetupResult,
 } from '@continuum/claude-code'
@@ -18,6 +20,8 @@ interface Target {
   remove: (root: string) => Promise<SetupResult>
   /** What to do next, shown after setup. */
   next: (invocation: Invocation) => string[]
+  /** What can be committed to share the setup with your team, when it runs through npx. */
+  shared: string
 }
 
 const TARGETS: Record<string, Target> = {
@@ -29,6 +33,7 @@ const TARGETS: Record<string, Target> = {
       'Next: start (or restart) Claude Code in this repository and approve the "continuum" MCP server.',
       'New sessions are briefed on where the last one left off; edits and progress are recorded as you work.',
     ],
+    shared: MCP_FILE,
   },
   codex: {
     name: 'Codex',
@@ -40,6 +45,7 @@ const TARGETS: Record<string, Target> = {
       'New sessions are briefed on where the last one left off; edits (apply_patch) and progress are recorded as you work.',
       'Codex does not report exit codes, so record tests with `continuum run -- <command>` for verified results.',
     ],
+    shared: '.codex/',
   },
   cursor: {
     name: 'Cursor',
@@ -50,6 +56,19 @@ const TARGETS: Record<string, Target> = {
       'The always-applied rule asks Cursor to read the handoff first and keep the task current through the MCP tools.',
       'Cursor has no hooks Continuum uses: run `continuum session start --agent cursor` and `continuum start` to capture its edits.',
     ],
+    shared: '.cursor/',
+  },
+  vscode: {
+    name: 'VS Code (GitHub Copilot)',
+    setup: setupVsCode,
+    remove: removeVsCodeSetup,
+    next: () => [
+      'Next: open this repository in VS Code, trust the workspace, and start the "continuum" server when VS Code offers to (or from .vscode/mcp.json).',
+      'Copilot agent sessions are then briefed on where the last one left off, and its edits and progress are recorded as you work.',
+      'Agent hooks are a preview in VS Code 1.109+; check that the chat.useHooks setting is on. Without them, the instructions file asks Copilot to call get_handoff.',
+      'VS Code does not report exit codes, so record tests with `continuum run -- <command>` for verified results.',
+    ],
+    shared: '.vscode/mcp.json and .github/',
   },
 }
 
@@ -93,7 +112,7 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
   for (const line of target.next(invocation)) io.out(line)
   io.out(
     invocation.portable
-      ? `The configuration runs Continuum through npx, so you can commit ${targetName === 'codex' ? '.codex/' : targetName === 'cursor' ? '.cursor/' : MCP_FILE} to share it with your team.`
+      ? `The configuration runs Continuum through npx, so you can commit ${target.shared} to share it with your team.`
       : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
   )
   return EXIT_OK

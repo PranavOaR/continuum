@@ -90,10 +90,10 @@ describe('continuum uninstall', () => {
 })
 
 describe('continuum uninstall with every agent', () => {
-  it('leaves the repository exactly as it was after Claude Code, Codex and Cursor were all set up', async () => {
+  it('leaves the repository exactly as it was after Claude Code, Codex, Cursor and VS Code were all set up', async () => {
     const repo = sandbox()
     const before = snapshot(repo.root)
-    for (const target of ['claude-code', 'codex', 'cursor']) expect((await cli(repo.root, ['setup', target])).code).toBe(EXIT_OK)
+    for (const target of ['claude-code', 'codex', 'cursor', 'vscode']) expect((await cli(repo.root, ['setup', target])).code).toBe(EXIT_OK)
     await cli(repo.root, ['uninstall', '--purge'])
     expect(snapshot(repo.root)).toEqual(before)
   })

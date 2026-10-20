@@ -2,7 +2,7 @@
 
 **Your work continues. Your agents change.**
 
-Continuum is local project memory for AI coding agents. Every Claude Code, Codex or Cursor session starts briefed on where the work left off:
+Continuum is local project memory for AI coding agents. Every Claude Code, Codex, Cursor or GitHub Copilot (VS Code) session starts briefed on where the work left off:
 - the current task and its next step;
 - which test results still hold for the code as it is now;
 - what another agent or a hand edit changed;
@@ -16,7 +16,7 @@ Requires Node.js 22.13+ and git.
 
 ```bash
 cd your-project
-npx getcontinuum setup claude-code   # or: setup codex, setup cursor
+npx getcontinuum setup claude-code   # or: setup codex, setup cursor, setup vscode
 npx getcontinuum serve               # the dashboard for every connected repository
 ```
 
@@ -127,7 +127,7 @@ Handoffs separately list **changes no agent session made**, so the next agent as
 | `continuum forget --path <p> \| --session <id> \| --before <date>` | Permanently removes recorded data. The database is rewritten and vacuumed, so the text is gone from the file itself. |
 | `continuum export <file>` / `continuum import <file>` | Moves the whole history between clones or machines as JSON, readable only by you. |
 | `continuum compact` | Folds events older than 30 days into a checkpoint. |
-| `continuum uninstall [--purge]` | Disconnects every agent (Claude Code, Codex, Cursor); `--purge` also deletes `.continuum/`. |
+| `continuum uninstall [--purge]` | Disconnects every agent (Claude Code, Codex, Cursor, VS Code); `--purge` also deletes `.continuum/`. |
 
 ## Use with Codex
 
@@ -141,6 +141,19 @@ This writes project-scoped `.codex/hooks.json` and a marked block in `.codex/con
 - It can use the same MCP tools (`start_task`, `update_task`, `get_context`, `record_decision`).
 
 Codex does not report a shell command's exit code to hooks, so its test runs are not recorded as checks. Use `continuum run -- <command>` for verified results. `continuum setup codex --remove` and `continuum uninstall` take it out again.
+
+## Use with GitHub Copilot in VS Code
+
+```bash
+continuum setup vscode
+```
+
+This connects Copilot's agent mode in VS Code with three project files, never your VS Code profile:
+- `.vscode/mcp.json`: the `continuum` MCP server, started from the workspace folder.
+- `.github/hooks/continuum.json`: agent hooks. Each chat starts briefed on where the work left off, and Copilot's file edits are recorded. VS Code runs a `PostToolUse` hook for every tool, so the hook checks the tool name in the shell and starts Continuum only for edits and task updates, in the background.
+- `.github/instructions/continuum.instructions.md`: instructions for every chat, to keep the task current with `start_task` and `update_task`, and to call `get_handoff` if a chat did not start briefed.
+
+Open the repository in VS Code, trust the workspace, and start the `continuum` server. Agent hooks are a preview in VS Code (1.109 or newer, with `chat.useHooks` on), and an organization can turn them off. VS Code reports neither a command's exit code nor the end of a session to hooks: Copilot's test runs are not recorded as checks (use `continuum run -- <command>`), and its sessions stay open. `continuum setup vscode --remove` and `continuum uninstall` take it out again.
 
 ## Use with Cursor
 

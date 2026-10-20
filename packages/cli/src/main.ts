@@ -41,7 +41,7 @@ Commands
   handoff              Print where the project left off, for any agent or chat
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   session start|note|end  Record a session for an agent without hooks (Cursor, a chat)
-  setup <agent>        Connect claude-code, codex or cursor to this repository (--remove to undo)
+  setup <agent>        Connect claude-code, codex, cursor or vscode to this repository (--remove to undo)
   config [name on|off] Show or change settings: agent-checks, prompts
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
   export <file>        Write the recorded history to a JSON file (import <file> restores it)

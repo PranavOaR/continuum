@@ -1,6 +1,6 @@
 # Getting started
 
-About ten minutes. You need **Node.js 22.13 or newer**, **git**, and Claude Code, Codex or Cursor. Continuum is tested on macOS and Linux.
+About ten minutes. You need **Node.js 22.13 or newer**, **git**, and Claude Code, Codex, Cursor or GitHub Copilot in VS Code. Continuum is tested on macOS and Linux.
 
 ## 1. Connect a repository
 
@@ -14,7 +14,7 @@ This records the repository's current files in `.continuum/`, which is kept out 
 - `.claude/settings.local.json`, with the hooks;
 - `.mcp.json`, with the MCP server.
 
-Using Codex or Cursor? Run `setup codex` or `setup cursor` instead; see [Agents](/docs/agents). To check everything is wired up:
+Using Codex, Cursor or Copilot in VS Code? Run `setup codex`, `setup cursor` or `setup vscode` instead; see [Agents](/docs/agents). To check everything is wired up:
 
 ```bash
 npx getcontinuum doctor
