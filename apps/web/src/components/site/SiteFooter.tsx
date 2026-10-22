@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Logo } from '../shared/Logo'
-import { NPM_URL } from './siteContent'
 import { sectionHref } from './siteNav'
 
 export function SiteFooter() {
@@ -14,9 +13,6 @@ export function SiteFooter() {
           <a href={sectionHref('get-started', isHome)} className="hover:text-fg">Get started</a>
           <Link to="/docs" className="hover:text-fg">Docs</Link>
           <Link to="/privacy" className="hover:text-fg">Privacy</Link>
-          <a href={NPM_URL} target="_blank" rel="noreferrer" className="hover:text-fg">
-            npm<span className="sr-only"> (opens in a new tab)</span>
-          </a>
         </nav>
         <p className="text-[12px] text-subtle">Free to use · runs on your machine</p>
       </div>
