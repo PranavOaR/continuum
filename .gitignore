@@ -28,3 +28,7 @@ coverage
 test-results
 playwright-report
 .vercel
+
+# Added by scripts/sync-plugin-repo.mjs in the public plugin repository only
+plugin/bin
+plugin/THIRD_PARTY_NOTICES.md
