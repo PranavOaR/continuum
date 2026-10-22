@@ -8,8 +8,8 @@ export const DEMO_VIDEO = {
   poster: '/demo/continuum-demo.jpg',
   captions: '/demo/continuum-demo.vtt',
   /** As the cover shows it (scripts/site/images.mjs reads it from the video). */
-  length: '1:17',
-  caption: 'Claude Code fixes one of two bugs and stops. Codex starts with Continuum’s briefing, finishes the same task, and the dashboard shows who did what. Recorded from real sessions; voiceover by ElevenLabs.',
+  length: '1:05',
+  caption: 'Claude Code fixes one of two bugs and stops. Codex starts with Continuum’s briefing, fixes the second, the test run is verified, and the dashboard shows one task carried from one agent to the next. Every terminal line and screen is from a real run; voiceover and sound by ElevenLabs.',
 } as const
 
 export const GET_STARTED = [

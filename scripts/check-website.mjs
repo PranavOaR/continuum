@@ -142,7 +142,7 @@ function videoFailures(dir) {
     ...(levels.length === 0 ? [`${DEMO_VIDEO} has no H.264 video track the check could read`] : []),
     ...levels
       .filter((level) => level > MAX_MOBILE_H264_LEVEL)
-      .map((level) => `${DEMO_VIDEO} is H.264 level ${level / 10}, which some phones cannot decode; re-encode it with -level:v 4.0 (scripts/demo-video/record.mjs does)`),
+      .map((level) => `${DEMO_VIDEO} is H.264 level ${level / 10}, which some phones cannot decode; re-encode it with -level:v 4.0 (scripts/demo-video/film/publish.mjs does)`),
   ]
 }
 

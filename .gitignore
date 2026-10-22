@@ -32,3 +32,11 @@ playwright-report
 # Added by scripts/sync-plugin-repo.mjs in the public plugin repository only
 plugin/bin
 plugin/THIRD_PARTY_NOTICES.md
+
+# The demo film: renders, scratch takes, snapshots and preview caches stay local (scripts/demo-video/README.md)
+scripts/demo-video/film/renders
+scripts/demo-video/film/.work
+scripts/demo-video/film/.hyperframes
+scripts/demo-video/film/.media
+scripts/demo-video/film/.thumbnails
+scripts/demo-video/film/.waveform-cache

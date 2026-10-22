@@ -1,0 +1,140 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #carry-claude { left: 210px; top: 250px; width: 1500px; height: 590px; }
+    #carry-taskid { position: absolute; inset: -4px -8px; border: 3px solid #8f7fff; border-radius: 8px; }
+    .carry-tok { position: relative; }
+
+    #carry-card { left: 790px; top: 230px; width: 1010px; padding: 44px 48px 46px; font-family: "Geist", sans-serif; }
+    #carry-card h3 { font-weight: 500; font-size: 56px; letter-spacing: -0.03em; line-height: 64px; }
+    .carry-head { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .carry-section { margin-top: 34px; }
+    .carry-section .label { font-size: 23px; color: var(--muted); }
+    .carry-row { margin-top: 12px; display: flex; gap: 16px; align-items: flex-start; font-size: 31px; line-height: 42px; }
+    .carry-row svg { flex: none; width: 34px; height: 34px; margin-top: 4px; }
+    #carry-next { margin-top: 12px; position: relative; padding: 16px 22px 18px 26px; border-radius: 14px; background: rgb(91 69 255 / 0.07); font-size: 31px; line-height: 42px; }
+    #carry-next::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 5px; border-radius: 3px; background: var(--color-accent); }
+    .carry-mono { font-family: "Geist Mono", monospace; font-size: 28px; }
+
+    #carry-cam { position: absolute; inset: 0; }
+    #carry-codex { left: 180px; top: 100px; width: 1560px; height: 880px; }
+    #carry-brief { font-size: 28px; line-height: 42px; padding-top: 30px; }
+    #carry-brief .term-line { height: 42px; }
+    .carry-band { position: absolute; left: -16px; right: -16px; top: 0; height: 42px; border-radius: 8px; background: rgb(244 242 238 / 0.08); }
+    #carry-band-next { background: rgb(91 69 255 / 0.32); height: 84px; }
+    #carry-band-next::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 5px; border-radius: 3px; background: #8f7fff; }
+    .carry-mark { display: inline-block; width: 30px; height: 30px; vertical-align: -6px; margin-right: 10px; }
+    .carry-h { color: #fff; font-weight: 600; }
+  </style>
+  <div data-hf-id="hf-g4er" id="root" data-composition-id="carry" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <!-- Claude Code at work: the reply that recorded the task. -->
+    <div data-hf-id="hf-hwz4" id="carry-claude" class="term">
+      <div data-hf-id="hf-vwwm" class="term-bar">
+        <div data-hf-id="hf-pwyk" class="term-lights"><i data-hf-id="hf-wt6k"></i><i data-hf-id="hf-zeb8"></i><i data-hf-id="hf-y7e5"></i></div>
+        <img data-hf-id="hf-nrya" class="term-logo" src="assets/logos/claude-color.svg" alt="" />
+        <span data-hf-id="hf-ljuf" class="term-title" data-layout-ignore>claude — pricing</span>
+      </div>
+      <div data-hf-id="hf-ty2f" class="term-body">
+        <div data-hf-id="hf-xouj" class="term-line"><span data-hf-id="hf-zuq3" class="dim">$ </span>claude -p "src/pricing.js has two bugs. Track the fix as a Continuum…"</div>
+        <div data-hf-id="hf-tyf9" class="term-line"></div>
+        <div data-hf-id="hf-ehlq" class="term-line">I fixed <span data-hf-id="hf-ttyd" class="code">applyDiscount</span> (it was adding the discount instead of subtracting</div>
+        <div data-hf-id="hf-ks6h" class="term-line">it), and <span data-hf-id="hf-f4jd" class="code">npm test</span> still fails, now at the <span data-hf-id="hf-u31i" class="code">addTax</span> check (<span data-hf-id="hf-zqqi" class="code">test.js:5</span>,</div>
+        <div data-hf-id="hf-yii7" class="term-line">80 !== 1080); I recorded that in Continuum task</div>
+        <div data-hf-id="hf-qiya" class="term-line"><span data-hf-id="hf-0z5e" class="code carry-tok">fix-pricing-js-bugs-a7ca0f87<span data-hf-id="hf-gcxg" id="carry-taskid"></span></span> with the next action, change <span data-hf-id="hf-vecq" class="code">addTax</span> to</div>
+        <div data-hf-id="hf-uoie" class="term-line">return <span data-hf-id="hf-kv1w" class="code">cents + Math.round(cents * rate)</span> and rerun the tests.</div>
+      </div>
+    </div>
+
+    <!-- What Continuum recorded: the task as the dashboard shows it. -->
+    <div data-hf-id="hf-qh10" id="carry-card" class="card">
+      <div data-hf-id="hf-f8vk" class="carry-head">
+        <h3 data-hf-id="hf-pnwh">Fix pricing.js bugs</h3>
+        <span data-hf-id="hf-w1pg" class="chip"><svg data-hf-id="hf-h0hq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-l6xo" d="M12 8V4H8" /><rect data-hf-id="hf-7qxl" width="16" height="12" x="4" y="8" rx="2" /><path data-hf-id="hf-tx9d" d="M2 14h2M20 14h2M15 13v2M9 13v2" /></svg>agent-reported</span>
+        <span data-hf-id="hf-4wxr" class="chip">in progress</span>
+      </div>
+      <div data-hf-id="hf-90hv" class="carry-section" id="carry-done">
+        <div data-hf-id="hf-co3e" class="label">Done</div>
+        <div data-hf-id="hf-g9hy" class="carry-row">
+          <svg data-hf-id="hf-x4gx" id="carry-check" viewBox="0 0 24 24" fill="none" stroke="#12804c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle data-hf-id="hf-m1lh" cx="12" cy="12" r="10" /><path data-hf-id="hf-yfzu" d="m9 12 2 2 4-4" /></svg>
+          <span data-hf-id="hf-grvy">Fix applyDiscount: it adds the discount instead of subtracting it</span>
+        </div>
+      </div>
+      <div data-hf-id="hf-iozw" class="carry-section" id="carry-nextwrap">
+        <div data-hf-id="hf-75hj" class="label">Next action</div>
+        <div data-hf-id="hf-e8n1" id="carry-next">Fix addTax in src/pricing.js to return <span data-hf-id="hf-cabk" class="carry-mono">cents + Math.round(cents * rate)</span> (test.js:5 fails: 80 !== 1080), then rerun npm test.</div>
+      </div>
+    </div>
+
+    <!-- Codex starts, briefed: the real handoff Continuum gave it. -->
+    <div data-hf-id="hf-ipkk" id="carry-cam">
+      <div data-hf-id="hf-955z" id="carry-codex" class="term">
+        <div data-hf-id="hf-iuka" class="term-bar">
+          <div data-hf-id="hf-okyc" class="term-lights"><i data-hf-id="hf-ylp6"></i><i data-hf-id="hf-0l8b"></i><i data-hf-id="hf-0zjc"></i></div>
+          <img data-hf-id="hf-glhp" class="term-logo" src="assets/logos/codex-color.svg" alt="" />
+          <span data-hf-id="hf-298k" class="term-title" data-layout-ignore>codex — pricing</span>
+        </div>
+        <div data-hf-id="hf-u3s9" class="term-body" id="carry-brief">
+          <div data-hf-id="hf-xg98" class="term-line dim carry-b"><svg data-hf-id="hf-isiz" class="carry-mark" viewBox="0 0 32 32" fill="none"><path data-hf-id="hf-v2tq" d="M6 22C6 13 16 11 16 16s10 3 10-6" stroke="#f4f2ee" stroke-width="2.4" stroke-linecap="round" /><circle data-hf-id="hf-23bi" cx="6" cy="22" r="3" fill="#15141b" stroke="#f4f2ee" stroke-width="2" /><circle data-hf-id="hf-j7hj" cx="16" cy="16" r="1.9" fill="#f4f2ee" /><circle data-hf-id="hf-gs8c" cx="26" cy="10" r="3.4" fill="#8f7fff" /></svg>Briefing from Continuum, at session start</div>
+          <div data-hf-id="hf-5kud" class="term-line carry-b"><span data-hf-id="hf-i6j3" class="carry-h">## Current task</span></div>
+          <div data-hf-id="hf-3oow" class="term-line carry-b"><span data-hf-id="hf-hd74" class="dim">[agent-reported]</span> "Fix pricing.js bugs" <span data-hf-id="hf-c0iv" class="dim">(in-progress)</span></div>
+          <div data-hf-id="hf-evrl" class="term-line carry-b" id="carry-l-next"><span data-hf-id="hf-lsc3" class="carry-band" id="carry-band-next"></span>Next action: "Fix addTax in src/pricing.js to return cents + Math.round(cents * rate)</div>
+          <div data-hf-id="hf-v53x" class="term-line carry-b">             (test.js:5 fails: 80 !== 1080), then rerun npm test."</div>
+          <div data-hf-id="hf-uouf" class="term-line carry-b">Acceptance criteria:</div>
+          <div data-hf-id="hf-zell" class="term-line carry-b">  - [x] applyDiscount subtracts the rounded discount</div>
+          <div data-hf-id="hf-b1bu" class="term-line carry-b">  - [ ] addTax returns cents plus rounded tax</div>
+          <div data-hf-id="hf-so6i" class="term-line carry-b">  - [ ] npm test passes</div>
+          <div data-hf-id="hf-c46i" class="term-line carry-b" id="carry-l-done"><span data-hf-id="hf-g8nv" class="carry-band" id="carry-band-done" style="height: 84px"></span>Done:</div>
+          <div data-hf-id="hf-mdvh" class="term-line carry-b">  - Fix applyDiscount: it adds the discount instead of subtracting it</div>
+          <div data-hf-id="hf-svv5" class="term-line carry-b" id="carry-l-left"><span data-hf-id="hf-htt6" class="carry-band" id="carry-band-left" style="height: 84px"></span>Remaining:</div>
+          <div data-hf-id="hf-gzm2" class="term-line carry-b">  - Fix addTax: it returns cents * rate instead of cents plus rounded tax</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      gsap.set(["#carry-codex", ".carry-band", "#carry-taskid"], { opacity: 0 });
+      gsap.set("#carry-card", { opacity: 0 });
+      gsap.set(["#carry-done", "#carry-nextwrap"], { opacity: 0 });
+            gsap.set(".carry-b", { opacity: 0 });
+
+      // Whip in from the setup terminal.
+      tl.fromTo("#carry-claude", { x: 1000, filter: "blur(16px)" }, { x: 0, filter: "blur(0px)", duration: 0.45, ease: "power3.out" }, 0);
+
+      // "While Claude works, Continuum records...": the task it recorded is marked, and lifts out.
+      tl.to("#carry-taskid", { opacity: 1, duration: 0.2 }, 1.5);
+      tl.to("#carry-claude", { scale: 0.74, x: -520, y: 20, filter: "blur(3px)", duration: 0.8, ease: "power2.inOut" }, 1.6);
+      // "...the task,"
+      tl.fromTo("#carry-card", { opacity: 0, scale: 0.3, x: -560, y: 150, filter: "blur(8px)" }, { opacity: 1, scale: 1, x: 0, y: 0, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 2.25);
+      // "...what's done,"
+      tl.fromTo("#carry-done", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16 }, 3.3);
+      tl.fromTo("#carry-check", { scale: 0.5, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.35, ease: "back.out(1.8)" }, 3.36);
+      // "...and what comes next."
+      tl.fromTo("#carry-nextwrap", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16 }, 4.53);
+      tl.fromTo("#carry-next", { clipPath: "inset(0 100% 0 0 round 14px)" }, { clipPath: "inset(0 0% 0 0 round 14px)", duration: 0.5, ease: "expo.out" }, 4.55);
+
+      // The task is carried over: Claude Code leaves, Codex's window builds around the card.
+      tl.to("#carry-claude", { x: -2300, filter: "blur(16px)", duration: 0.45, ease: "power3.in" }, 5.45);
+      tl.to("#carry-card", { scale: 0.62, x: -300, y: -60, duration: 0.8, ease: "power3.inOut" }, 5.6);
+      tl.to("#carry-card", { filter: "blur(6px)", duration: 0.4, ease: "power3.in" }, 5.6);
+      tl.to("#carry-card", { filter: "blur(0px)", duration: 0.4, ease: "power3.out" }, 6.0);
+      tl.fromTo("#carry-codex", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6, ease: "expo.out" }, 5.85);
+      // ...and becomes the briefing Codex starts with.
+      tl.to("#carry-card", { opacity: 0, filter: "blur(10px)", duration: 0.22, ease: "power2.in" }, 6.5);
+      tl.fromTo(".carry-b", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, stagger: 0.05 }, 6.6);
+
+      // "What's done, what's left, and exactly what to do next."
+      tl.to("#carry-band-done", { opacity: 1, duration: 0.15 }, 9.34);
+      tl.to("#carry-band-done", { opacity: 0, duration: 0.2 }, 10.3);
+      tl.to("#carry-band-left", { opacity: 1, duration: 0.15 }, 10.31);
+      tl.to("#carry-band-left", { opacity: 0, duration: 0.2 }, 11.15);
+      tl.to("#carry-band-next", { opacity: 1, duration: 0.2 }, 11.15);
+      tl.to("#carry-cam", { scale: 1.24, y: 160, transformOrigin: "950px 362px", duration: 0.75, ease: "power2.inOut" }, 11.15);
+
+      window.__timelines["carry"] = tl;
+    })();
+  </script>
+</template>

@@ -19,7 +19,9 @@ npx getcontinuum serve               # the dashboard for every connected reposit
 
 Requires Node.js 22.13+ and git, on macOS or Linux. Windows is not supported yet: use WSL 2. [CHANGELOG.md](CHANGELOG.md) lists what is in each release.
 
-[![Demo: Claude Code starts a task, Codex finishes it from Continuum's briefing, and the dashboard shows who did what. Recorded from real sessions.](https://continuumgroup.dev/demo/continuum-demo.jpg)](https://continuumgroup.dev/demo/continuum-demo.mp4)
+[![Demo: Claude Code starts a task, Codex finishes it from Continuum's briefing, and the dashboard shows one task carried across both agents. Recorded from real sessions.](https://continuumgroup.dev/demo/continuum-demo.jpg)](https://continuumgroup.dev/demo/continuum-demo.mp4)
+
+*Watch the demo (1:05, with sound): Claude Code fixes one of two bugs and stops; Codex starts briefed by Continuum and fixes the second; the test run is verified; the dashboard shows one task carried from one agent to the next. Every terminal line and screen is from a real run. The film is a HyperFrames project in [`scripts/demo-video/film/`](scripts/demo-video/README.md).*
 
 ## Develop
 

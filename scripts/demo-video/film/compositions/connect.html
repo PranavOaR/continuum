@@ -1,0 +1,59 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #connect-term { left: 150px; top: 175px; width: 1620px; height: 730px; }
+    .connect-cmd { display: inline-block; }
+    .connect-agent { position: absolute; right: 0; top: -4px; width: 52px; height: 52px; border-radius: 14px; background: #f4f2ee; display: grid; place-items: center; }
+    .connect-agent img { width: 34px; height: 34px; }
+  </style>
+  <div data-hf-id="hf-yrmj" id="root" data-composition-id="connect" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-3ao5" id="connect-term" class="term">
+      <div data-hf-id="hf-vwwm" class="term-bar">
+        <div data-hf-id="hf-pwyk" class="term-lights"><i data-hf-id="hf-wt6k"></i><i data-hf-id="hf-zeb8"></i><i data-hf-id="hf-y7e5"></i></div>
+        <span data-hf-id="hf-ho3i" class="term-title" data-layout-ignore>zsh — pricing</span>
+      </div>
+      <div data-hf-id="hf-ty2f" class="term-body">
+        <div data-hf-id="hf-tyf9" class="term-line"><span data-hf-id="hf-zuq3" class="dim">$ </span><span data-hf-id="hf-qb88" class="connect-cmd" id="connect-c1">npx getcontinuum setup claude-code</span><span data-hf-id="hf-5uba" class="connect-agent" id="connect-a1"><img data-hf-id="hf-pb83" src="assets/logos/claude-color.svg" alt="" /></span></div>
+        <div data-hf-id="hf-gqax" class="term-line connect-o1">Connected Claude Code to Continuum in ~/code/pricing (and initialized Continuum):</div>
+        <div data-hf-id="hf-emsz" class="term-line connect-o1"><span data-hf-id="hf-9999" class="ok">  created</span>   .claude/settings.local.json</div>
+        <div data-hf-id="hf-atdm" class="term-line connect-o1"><span data-hf-id="hf-iss1" class="ok">  created</span>   .mcp.json</div>
+        <div data-hf-id="hf-vye1" class="term-line"></div>
+        <div data-hf-id="hf-dpm2" class="term-line" id="connect-l2"><span data-hf-id="hf-ctrf" class="dim">$ </span><span data-hf-id="hf-9d48" class="connect-cmd" id="connect-c2">npx getcontinuum setup codex</span><span data-hf-id="hf-1w79" class="connect-agent" id="connect-a2"><img data-hf-id="hf-ngb2" src="assets/logos/codex-color.svg" alt="" /></span></div>
+        <div data-hf-id="hf-yc22" class="term-line connect-o2">Connected Codex to Continuum in ~/code/pricing:</div>
+        <div data-hf-id="hf-qxtv" class="term-line connect-o2"><span data-hf-id="hf-jzp4" class="ok">  created</span>   .codex/hooks.json</div>
+        <div data-hf-id="hf-umtd" class="term-line connect-o2"><span data-hf-id="hf-jle3" class="ok">  created</span>   .codex/config.toml</div>
+        <div data-hf-id="hf-x5b4" class="term-line"></div>
+        <div data-hf-id="hf-hnq3" class="term-line" id="connect-l3"><span data-hf-id="hf-cfge" class="dim">$ </span><span data-hf-id="hf-s9z4" id="connect-caret" class="caret" style="left: 2ch"></span></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      gsap.set([".connect-o1", ".connect-o2", "#connect-l2", "#connect-l3", "#connect-a1", "#connect-a2"], { opacity: 0 });
+      gsap.set(".connect-cmd", { clipPath: "inset(0 100% 0 0)" });
+
+      // The handoff dot was ink; it opens out into this terminal.
+      tl.fromTo("#connect-term", { scale: 2.7 }, { scale: 1, duration: 0.65, ease: "expo.out" }, 0);
+
+      // "Connect each agent once": the real setup commands, typed, and their real output.
+      tl.to("#connect-c1", { clipPath: "inset(0 0% 0 0)", duration: 0.7, ease: "steps(34)" }, 0.5);
+      tl.to(".connect-o1", { opacity: 1, duration: 0.01, stagger: 0.06 }, 1.3);
+      tl.fromTo("#connect-a1", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.6)" }, 1.3);
+      // "One command each."
+      tl.set("#connect-l2", { opacity: 1 }, 1.95);
+      tl.to("#connect-c2", { clipPath: "inset(0 0% 0 0)", duration: 0.55, ease: "steps(28)" }, 2.0);
+      tl.to(".connect-o2", { opacity: 1, duration: 0.01, stagger: 0.06 }, 2.6);
+      tl.fromTo("#connect-a2", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.6)" }, 2.6);
+      tl.set("#connect-l3", { opacity: 1 }, 2.85);
+      [3.35, 3.85].forEach((t, i) => tl.set("#connect-caret", { opacity: i % 2 ? 1 : 0 }, t));
+
+      // Whip to Claude Code at work.
+      tl.to("#connect-term", { x: -1500, filter: "blur(16px)", duration: 0.45, ease: "power3.in" }, 3.95);
+
+      window.__timelines["connect"] = tl;
+    })();
+  </script>
+</template>
