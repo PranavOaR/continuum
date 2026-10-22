@@ -144,7 +144,8 @@ describe('the hooks setup writes', () => {
     const started = Date.now()
     execFileSync('sh', ['-c', command], { input: JSON.stringify({ hook_event_name: 'PostToolUse', session_id: 's', tool_name: 'create_file', tool_input: {} }) })
     expect(Date.now() - started).toBeLessThan(500)
-    expect(await run(root, 'true', {})).not.toBeNull()
+    // Only waits for the background recording; the command reads its input, or writing it can fail with EPIPE.
+    expect(await run(root, 'cat >/dev/null', {})).not.toBeNull()
   })
 
   it('does not start Continuum for reads, searches or terminal commands', async () => {
