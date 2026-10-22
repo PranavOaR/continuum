@@ -9,7 +9,7 @@ export const DEMO_VIDEO = {
   poster: '/demo/continuum-demo.jpg',
   captions: '/demo/continuum-demo.vtt',
   /** As the cover shows it (scripts/site/images.mjs reads it from the video). */
-  length: '1:17',
+  length: '1:05',
   caption: 'Claude Code fixes one of two bugs and stops. Codex starts with Continuum’s briefing, finishes the same task, and the dashboard shows who did what. Recorded from real sessions; voiceover by ElevenLabs.',
 } as const
 

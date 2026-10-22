@@ -245,7 +245,7 @@ test.describe('the demo video', () => {
     await page.goto('/')
     const video = page.locator('#demo video')
     await expect(video).not.toHaveAttribute('controls')
-    await page.getByRole('button', { name: /Play the demo video \(1:17, with sound\)/ }).click()
+    await page.getByRole('button', { name: /Play the demo video \(1:05, with sound\)/ }).click()
     await expect(video).toHaveAttribute('controls')
     await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0)
     await expect(page.getByRole('button', { name: /Play the demo video/ })).toHaveCount(0)

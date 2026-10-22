@@ -1,0 +1,142 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #gap-claude { left: 210px; top: 250px; width: 1500px; height: 590px; }
+    #gap-codex { left: 210px; top: 270px; width: 1500px; height: 520px; }
+    #gap-underline { position: absolute; left: 9ch; width: 20ch; bottom: 4px; height: 3px; background: var(--term-bad); transform-origin: left center; }
+    .gap-sel { position: absolute; inset: 2px -2px; background: rgb(143 127 255 / 0.36); border-radius: 3px; }
+    .gap-type { display: inline-block; position: relative; }
+    #gap-thread { position: absolute; left: -48px; top: -468px; width: 2016px; height: 2016px; overflow: visible; }
+    #gap-wordmark {
+      position: absolute; left: 700px; top: 452px; font-family: "Geist", sans-serif; font-weight: 500; font-size: 156px;
+      line-height: 176px; letter-spacing: -0.035em; color: var(--color-ink);
+    }
+    #gap-lockup { position: absolute; inset: 0; }
+    #gap-dive { position: absolute; left: 563px; top: 529px; width: 22px; height: 22px; border-radius: 50%; background: var(--color-ink); }
+  </style>
+  <div data-hf-id="hf-528g" id="root" data-composition-id="gap" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <!-- Claude Code, mid-run: the real prompt (shortened) and its real reply. -->
+    <div data-hf-id="hf-jyj3" id="gap-claude" class="term">
+      <div data-hf-id="hf-vwwm" class="term-bar">
+        <div data-hf-id="hf-pwyk" class="term-lights"><i data-hf-id="hf-wt6k"></i><i data-hf-id="hf-zeb8"></i><i data-hf-id="hf-y7e5"></i></div>
+        <img data-hf-id="hf-nrya" class="term-logo" src="assets/logos/claude-color.svg" alt="" />
+        <span data-hf-id="hf-ljuf" class="term-title" data-layout-ignore>claude — pricing</span>
+      </div>
+      <div data-hf-id="hf-ty2f" class="term-body">
+        <div data-hf-id="hf-xouj" class="term-line"><span data-hf-id="hf-zuq3" class="dim">$ </span>claude -p "src/pricing.js has two bugs. Track the fix as a Continuum…"</div>
+        <div data-hf-id="hf-tyf9" class="term-line"></div>
+        <div data-hf-id="hf-pju8" class="term-line gap-reply" id="gap-r0">I fixed <span data-hf-id="hf-ttyd" class="code">applyDiscount</span> (it was adding the discount instead of subtracting</div>
+        <div data-hf-id="hf-tahs" class="term-line gap-reply" id="gap-r1">it), and <span data-hf-id="hf-f4jd" class="code">npm test</span> still fails, now at the <span data-hf-id="hf-u31i" class="code">addTax</span> check (<span data-hf-id="hf-zqqi" class="code">test.js:5</span>,<div data-hf-id="hf-ssig" id="gap-underline"></div></div>
+        <div data-hf-id="hf-goiv" class="term-line gap-reply" id="gap-r2">80 !== 1080); I recorded that in Continuum task</div>
+        <div data-hf-id="hf-spsf" class="term-line gap-reply" id="gap-r3"><span data-hf-id="hf-9nd2" class="code">fix-pricing-js-bugs-a7ca0f87</span> with the next action, change <span data-hf-id="hf-vecq" class="code">addTax</span> to</div>
+        <div data-hf-id="hf-cxx8" class="term-line gap-reply" id="gap-r4">return <span data-hf-id="hf-kv1w" class="code">cents + Math.round(cents * rate)</span> and rerun the tests.</div>
+        <div data-hf-id="hf-vye1" class="term-line"></div>
+        <div data-hf-id="hf-uzq4" class="term-line" id="gap-prompt"><span data-hf-id="hf-ctrf" class="dim">$ </span><span data-hf-id="hf-nhp9" id="gap-prompt-caret" class="caret" style="left: 2ch"></span></div>
+      </div>
+    </div>
+
+    <!-- Codex, a fresh session: you start explaining it all again. -->
+    <div data-hf-id="hf-d9xi" id="gap-codex" class="term">
+      <div data-hf-id="hf-iuka" class="term-bar">
+        <div data-hf-id="hf-okyc" class="term-lights"><i data-hf-id="hf-ylp6"></i><i data-hf-id="hf-0l8b"></i><i data-hf-id="hf-0zjc"></i></div>
+        <img data-hf-id="hf-glhp" class="term-logo" src="assets/logos/codex-color.svg" alt="" />
+        <span data-hf-id="hf-298k" class="term-title" data-layout-ignore>codex — pricing</span>
+      </div>
+      <div data-hf-id="hf-foon" class="term-body">
+        <div data-hf-id="hf-6wbo" class="term-line"><span data-hf-id="hf-cfge" class="dim">$ </span>codex</div>
+        <div data-hf-id="hf-x5b4" class="term-line"></div>
+        <div data-hf-id="hf-wr03" class="term-line"><span data-hf-id="hf-vj2t" class="dim">› </span><span data-hf-id="hf-mv4f" class="caret gap-c" id="gap-c0" style="left: calc(2ch + var(--n, 0) * 1ch)"></span><span data-hf-id="hf-767p" class="gap-type" id="gap-t0"><span data-hf-id="hf-1jr0" class="gap-sel"></span>src/pricing.js has two bugs. Claude already fixed applyDiscount, it was</span></div>
+        <div data-hf-id="hf-urgy" class="term-line"><span data-hf-id="hf-3nf1" class="dim">  </span><span data-hf-id="hf-7gmy" class="caret gap-c" id="gap-c1" style="left: calc(2ch + var(--n, 0) * 1ch)"></span><span data-hf-id="hf-ykbe" class="gap-type" id="gap-t1"><span data-hf-id="hf-yxmc" class="gap-sel"></span>adding the discount instead of subtracting it. The tests still fail at</span></div>
+        <div data-hf-id="hf-ud5x" class="term-line"><span data-hf-id="hf-legx" class="dim">  </span><span data-hf-id="hf-bnhh" class="caret gap-c" id="gap-c2" style="left: calc(2ch + var(--n, 0) * 1ch)"></span><span data-hf-id="hf-ze9z" class="gap-type" id="gap-t2"><span data-hf-id="hf-xqp9" class="gap-sel"></span>addTax on line 5 of test.js, because it returns cents * rate instead of</span></div>
+        <div data-hf-id="hf-vk30" class="term-line"><span data-hf-id="hf-mle0" class="dim">  </span><span data-hf-id="hf-qcuw" class="caret gap-c" id="gap-c3" style="left: calc(2ch + var(--n, 0) * 1ch)"></span><span data-hf-id="hf-2tce" class="gap-type" id="gap-t3"><span data-hf-id="hf-y50a" class="gap-sel"></span>adding the tax, so what you need to do is change addTax to return cents</span></div>
+        <div data-hf-id="hf-v5rz" class="term-line"><span data-hf-id="hf-m72z" class="dim">  </span><span data-hf-id="hf-8laz" class="caret gap-c" id="gap-c4" style="left: calc(2ch + var(--n, 0) * 1ch)"></span><span data-hf-id="hf-e6u7" class="gap-type" id="gap-t4"><span data-hf-id="hf-04jf" class="gap-sel"></span>plus the rounded tax, then run npm test again, and also keep in mind</span></div>
+      </div>
+    </div>
+
+    <!-- The thread: Continuum's mark drawn large, from Claude's dot to Codex's, then shrunk into the logo. -->
+    <div data-hf-id="hf-fvgy" id="gap-lockup">
+      <svg data-hf-id="hf-3sxg" id="gap-thread" viewBox="0 0 32 32" fill="none">
+        <path data-hf-id="hf-4d1r" id="gap-path" d="M6 22C6 13 16 11 16 16s10 3 10-6" pathLength="1" stroke="#5b45ff" stroke-width="0.2" stroke-linecap="round" stroke-dasharray="1" stroke-dashoffset="1" />
+        <circle data-hf-id="hf-ysd1" id="gap-start" cx="6" cy="22" r="0.5" fill="#fafaf7" stroke="#141318" stroke-width="0.12" />
+        <circle data-hf-id="hf-mnih" id="gap-mid" cx="16" cy="16" r="0.38" fill="#141318" />
+        <circle data-hf-id="hf-56hg" id="gap-end" cx="26" cy="10" r="0.55" fill="#5b45ff" />
+      </svg>
+      <div data-hf-id="hf-a029" id="gap-wordmark">continuum</div>
+    </div>
+    <div data-hf-id="hf-3mq2" id="gap-dive"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const TYPED = [71, 70, 71, 71, 68];
+
+      // Frame 0: Claude Code's run is already on screen, its reply arriving line by line.
+      gsap.set("#gap-codex", { opacity: 0, scale: 0.02, x: 630, y: -368 });
+      gsap.set(["#gap-start", "#gap-mid", "#gap-end", "#gap-wordmark", "#gap-dive", "#gap-path"], { opacity: 0 });
+      gsap.set("#gap-underline", { scaleX: 0 });
+      gsap.set(".gap-sel", { opacity: 0 });
+      gsap.set(".gap-type", { clipPath: "inset(0 100% 0 0)" });
+      gsap.set("#gap-prompt", { opacity: 0 });
+      ["#gap-r1", "#gap-r2", "#gap-r3", "#gap-r4"].forEach((id, i) => {
+        tl.fromTo(id, { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, ease: "power2.out" }, 0.3 + i * 0.4);
+      });
+      // "...and stopped": the prompt comes back. "There's still one left": the failing test is underlined.
+      tl.set("#gap-prompt", { opacity: 1 }, 3.31);
+      [3.81, 4.31, 4.81].forEach((t, i) => tl.set("#gap-prompt-caret", { opacity: i % 2 ? 1 : 0 }, t));
+      tl.to("#gap-underline", { scaleX: 1, duration: 0.35, ease: "power3.out" }, 4.4);
+
+      // The session ends: Claude's window collapses into the thread's first dot.
+      tl.to("#gap-claude", { scale: 0.02, x: -630, y: 373, filter: "blur(10px)", duration: 0.45, ease: "power3.in" }, 5.0);
+      tl.set("#gap-claude", { opacity: 0 }, 5.45);
+      tl.fromTo("#gap-start", { opacity: 0, scale: 0.4, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, 5.42);
+
+      // A new agent opens from the other end: empty.
+      tl.fromTo("#gap-codex", { opacity: 0, scale: 0.02, x: 630, y: -368, filter: "blur(10px)" }, { opacity: 1, scale: 1, x: 0, y: 0, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 5.5);
+      gsap.set(".gap-c", { opacity: 0 });
+      [5.9, 6.1].forEach((t, i) => tl.set("#gap-c0", { opacity: i ? 1 : 0 }, t));
+
+      // You type the whole story out again, faster and faster. Each line has its own caret, stepped one character at a time.
+      let t = 6.3;
+      [0.95, 0.75, 0.62, 0.55, 0.45].forEach((d, i) => {
+        if (i > 0) tl.set(`#gap-c${i - 1}`, { opacity: 0 }, t);
+        tl.set(`#gap-c${i}`, { opacity: 1 }, t);
+        tl.to(`#gap-t${i}`, { clipPath: "inset(0 0% 0 0)", duration: d, ease: `steps(${TYPED[i]})` }, t);
+        tl.fromTo(`#gap-c${i}`, { "--n": 0 }, { "--n": TYPED[i], duration: d, ease: `steps(${TYPED[i]})` }, t);
+        t += d;
+      });
+      [9.95, 10.2].forEach((s, i) => tl.set("#gap-c4", { opacity: i ? 1 : 0 }, s));
+      // "...everything": select it all. "...again": delete it, and the caret goes back to the start.
+      tl.set(".gap-sel", { opacity: 1 }, 10.21);
+      tl.set(".gap-type", { opacity: 0 }, 10.87);
+      tl.set("#gap-c4", { opacity: 0 }, 10.87);
+      tl.set("#gap-c0", { opacity: 1, "--n": 0 }, 10.87);
+
+      // Codex's window folds into the far dot, in the accent.
+      tl.to("#gap-codex", { scale: 0.02, x: 630, y: -368, filter: "blur(10px)", duration: 0.42, ease: "power3.in" }, 11.05);
+      tl.set("#gap-codex", { opacity: 0 }, 11.47);
+      tl.fromTo("#gap-end", { opacity: 0, scale: 0.4, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, 11.44);
+
+      // The thread draws from Claude's dot to Codex's; the handoff point lands in the middle.
+      tl.set("#gap-path", { opacity: 1 }, 11.55);
+      tl.to("#gap-path", { attr: { "stroke-dashoffset": 0 }, duration: 1.05, ease: "power2.inOut" }, 11.55);
+      tl.fromTo("#gap-mid", { opacity: 0, scale: 0.3, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.6)" }, 12.05);
+
+      // The thread becomes the logo, and the name arrives with the voice.
+      tl.to("#gap-thread", { scale: 0.0893, x: -386, duration: 0.7, ease: "power3.inOut" }, 12.6);
+      tl.to("#gap-path", { attr: { "stroke-width": 2.4 }, stroke: "#141318", duration: 0.7, ease: "power3.inOut" }, 12.6);
+      tl.to("#gap-start", { attr: { r: 3, "stroke-width": 2 }, duration: 0.7, ease: "power3.inOut" }, 12.6);
+      tl.to("#gap-mid", { attr: { r: 1.9 }, duration: 0.7, ease: "power3.inOut" }, 12.6);
+      tl.to("#gap-end", { attr: { r: 3.4 }, duration: 0.7, ease: "power3.inOut" }, 12.6);
+      tl.fromTo("#gap-wordmark", { opacity: 1, clipPath: "inset(0 100% 0 0)" }, { opacity: 1, clipPath: "inset(0 0% 0 0)", duration: 0.55, ease: "expo.out" }, 12.92);
+
+      // Into the handoff point: the dot grows until it is the next terminal.
+      tl.to("#gap-lockup", { scale: 2.4, filter: "blur(6px)", transformOrigin: "574px 540px", duration: 0.6, ease: "power3.in" }, 15.55);
+      tl.set("#gap-dive", { opacity: 1 }, 15.55);
+      tl.fromTo("#gap-dive", { scale: 1 }, { scale: 190, duration: 0.6, ease: "power3.in" }, 15.55);
+
+      window.__timelines["gap"] = tl;
+    })();
+  </script>
+</template>

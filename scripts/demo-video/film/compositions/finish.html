@@ -1,0 +1,118 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #finish-codex { left: 180px; top: 250px; width: 1560px; height: 520px; }
+    #finish-task { position: absolute; right: 26px; top: 13px; display: flex; align-items: center; gap: 10px; padding: 6px 16px; border-radius: 10px; background: #f4f2ee; color: #141318; font-family: "Geist", sans-serif; font-size: 22px; font-weight: 500; }
+    #finish-task svg { width: 22px; height: 22px; }
+    .finish-file { color: var(--term-dim); margin-bottom: 10px; }
+    .finish-diff { background: #0e0d12; border-radius: 14px; padding: 14px 22px; margin: 6px 0 30px; }
+    .finish-del { position: relative; background: rgb(240 106 106 / 0.13); color: #f6b4b4; border-radius: 6px; padding: 0 10px; }
+    .finish-add { color: #a6f0c9; margin-top: 6px; }
+    #finish-plus { background: rgb(60 207 138 / 0.13); border-radius: 6px; padding: 0 10px; width: 100%; }
+    #finish-strike { position: absolute; left: 10px; right: 10px; top: 22px; height: 2px; background: #f6b4b4; transform-origin: left center; }
+    .finish-type { display: inline-block; }
+
+    #finish-run { left: 180px; top: 200px; width: 1560px; height: 520px; }
+    #finish-zoom { position: absolute; inset: 0; }
+    #finish-card { left: 400px; top: 470px; width: 1120px; padding: 40px 46px 42px; font-family: "Geist", sans-serif; }
+    .finish-head { display: flex; align-items: center; justify-content: space-between; }
+    .finish-head h3 { font-weight: 500; font-size: 46px; letter-spacing: -0.02em; }
+    .finish-cmd { font-family: "Geist Mono", monospace; font-size: 27px; color: var(--muted); margin-top: 10px; }
+    .finish-line { position: relative; display: inline-block; font-size: 32px; line-height: 44px; margin-top: 18px; }
+    #finish-underline { position: absolute; left: 0; right: 0; bottom: -2px; height: 3px; background: var(--success); transform-origin: left center; }
+    .finish-foot { display: flex; align-items: center; gap: 22px; margin-top: 26px; font-size: 26px; color: var(--muted); }
+    #finish-verified { font-size: 26px; padding: 8px 18px; }
+    #finish-verified svg { width: 26px; height: 26px; }
+  </style>
+  <div data-hf-id="hf-ugwp" id="root" data-composition-id="finish" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <!-- Codex finishes the same task: the real change and its real reply. -->
+    <div data-hf-id="hf-qo5r" id="finish-codex" class="term">
+      <div data-hf-id="hf-vwwm" class="term-bar">
+        <div data-hf-id="hf-pwyk" class="term-lights"><i data-hf-id="hf-wt6k"></i><i data-hf-id="hf-zeb8"></i><i data-hf-id="hf-y7e5"></i></div>
+        <img data-hf-id="hf-glhp" class="term-logo" src="assets/logos/codex-color.svg" alt="" />
+        <span data-hf-id="hf-298k" class="term-title" data-layout-ignore>codex — pricing</span>
+        <span data-hf-id="hf-0b3o" id="finish-task"><svg data-hf-id="hf-zf3a" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path data-hf-id="hf-qqwf" d="M10 6h11M10 12h11M10 18h11M3 6l1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2" /></svg>Fix pricing.js bugs</span>
+      </div>
+      <div data-hf-id="hf-ty2f" class="term-body">
+        <div data-hf-id="hf-laa0" class="finish-file">src/pricing.js</div>
+        <div data-hf-id="hf-xbjz" class="finish-diff">
+          <div data-hf-id="hf-sjsn" class="term-line finish-del">- exports.addTax = (cents, rate) =&gt; cents * rate<span data-hf-id="hf-ui0u" id="finish-strike"></span></div>
+          <div data-hf-id="hf-b8yc" class="term-line finish-add"><span data-hf-id="hf-m05f" class="finish-type" id="finish-plus">+ exports.addTax = (cents, rate) =&gt; cents + Math.round(cents * rate)</span></div>
+        </div>
+        <div data-hf-id="hf-o4ut" class="term-line finish-reply">Fixed both pricing bugs, <span data-hf-id="hf-f4jd" class="code">npm test</span> passes with 2 tests, and the Continuum</div>
+        <div data-hf-id="hf-066x" class="term-line finish-reply">task is marked completed.</div>
+      </div>
+    </div>
+
+    <!-- You record the test run through Continuum: a verified result. -->
+    <div data-hf-id="hf-coxs" id="finish-zoom">
+      <div data-hf-id="hf-it2h" id="finish-run" class="term">
+        <div data-hf-id="hf-iuka" class="term-bar">
+          <div data-hf-id="hf-okyc" class="term-lights"><i data-hf-id="hf-ylp6"></i><i data-hf-id="hf-0l8b"></i><i data-hf-id="hf-0zjc"></i></div>
+          <span data-hf-id="hf-ho3i" class="term-title" data-layout-ignore>zsh — pricing</span>
+        </div>
+        <div data-hf-id="hf-foon" class="term-body">
+          <div data-hf-id="hf-tyf9" class="term-line"><span data-hf-id="hf-zuq3" class="dim">$ </span><span data-hf-id="hf-s3mj" class="finish-type" id="finish-cmd">npx getcontinuum run -- npm test</span></div>
+          <div data-hf-id="hf-vye1" class="term-line"></div>
+          <div data-hf-id="hf-cekx" class="term-line dim finish-out">&gt; test</div>
+          <div data-hf-id="hf-m57k" class="term-line dim finish-out">&gt; node test.js</div>
+          <div data-hf-id="hf-x5b4" class="term-line"></div>
+          <div data-hf-id="hf-e2ey" class="term-line ok finish-out" id="finish-passed">2 tests passed</div>
+        </div>
+      </div>
+
+      <!-- The dashboard's check card, rebuilt at video size, with its real wording. -->
+      <div data-hf-id="hf-9xbo" id="finish-card" class="card">
+        <div data-hf-id="hf-xsog" class="finish-head">
+          <h3 data-hf-id="hf-zvnv">npm test</h3>
+          <span data-hf-id="hf-evhq" class="chip chip-ok"><svg data-hf-id="hf-n58i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle data-hf-id="hf-m1lh" cx="12" cy="12" r="10" /><path data-hf-id="hf-yfzu" d="m9 12 2 2 4-4" /></svg>passed</span>
+        </div>
+        <div data-hf-id="hf-yyo1" class="finish-cmd">npm test</div>
+        <div data-hf-id="hf-zjmn" class="finish-line">Exited 0 against the current content of all 6 files it covered.<span data-hf-id="hf-041o" id="finish-underline"></span></div>
+        <div data-hf-id="hf-6xx6" class="finish-foot">
+          <span data-hf-id="hf-ljq6" class="chip chip-ok" id="finish-verified"><svg data-hf-id="hf-tmee" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path data-hf-id="hf-49ze" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path data-hf-id="hf-b76m" d="m9 12 2 2 4-4" /></svg>verified</span>
+          <span data-hf-id="hf-4qhm">Last run just now</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      gsap.set(["#finish-run", "#finish-card", ".finish-out", ".finish-reply", "#finish-task"], { opacity: 0 });
+      gsap.set(".finish-type", { clipPath: "inset(0 100% 0 0)" });
+      gsap.set(["#finish-strike", "#finish-underline"], { scaleX: 0 });
+
+      // A punch cut: Codex, already working on the same task.
+      tl.fromTo("#finish-codex", { scale: 1.06 }, { scale: 1, duration: 0.4, ease: "expo.out" }, 0);
+      // "Codex picks up the same task..."
+      tl.fromTo("#finish-task", { opacity: 0, x: -40, filter: "blur(6px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.4, ease: "expo.out" }, 1.45);
+      // "...and fixes the second bug."
+      tl.to("#finish-strike", { scaleX: 1, duration: 0.3, ease: "power3.out" }, 2.95);
+      tl.to(".finish-del", { opacity: 0.55, duration: 0.3 }, 2.95);
+      tl.to("#finish-plus", { clipPath: "inset(0 0% 0 0)", duration: 0.55, ease: "steps(68)" }, 3.05);
+      tl.to(".finish-reply", { opacity: 1, duration: 0.01, stagger: 0.12 }, 3.8);
+
+      // Blur swap to the test run, on the same ground.
+      tl.to("#finish-codex", { opacity: 0, filter: "blur(8px)", duration: 0.18, ease: "power2.in" }, 4.7);
+      tl.fromTo("#finish-run", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power2.out" }, 4.86);
+      // "Run the tests through Continuum..."
+      tl.to("#finish-cmd", { clipPath: "inset(0 0% 0 0)", duration: 0.65, ease: "steps(32)" }, 5.15);
+      tl.to(".finish-out", { opacity: 1, duration: 0.01, stagger: 0.14 }, 6.0);
+
+      // "...and the result is verified": the check card springs out of the passing line.
+      tl.to("#finish-run", { scale: 0.86, y: -150, filter: "blur(3px)", duration: 0.6, ease: "power2.inOut" }, 8.3);
+      tl.fromTo("#finish-card", { opacity: 0, scale: 0.4, y: -80, filter: "blur(8px)" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px)", duration: 0.55, ease: "expo.out" }, 8.4);
+      tl.fromTo("#finish-verified", { scale: 0.55, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.45, ease: "back.out(1.7)" }, 8.57);
+      // "...against the exact code it ran on."
+      tl.to("#finish-underline", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 10.0);
+
+            // Push in on the Verified badge until it sits where, and as large as, the dashboard's real one: the cut is a match.
+      tl.to("#finish-zoom", { scale: 2.4, x: 406, y: -165, transformOrigin: "554px 730px", duration: 0.65, ease: "power3.inOut" }, 11.7);
+
+      window.__timelines["finish"] = tl;
+    })();
+  </script>
+</template>
