@@ -22,6 +22,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      # Every workspace's unit tests, with the coverage floors in vitest.config.ts.
+      - run: npm run test:coverage
       # Briefings may not lose information a fresh agent needs (scripts/eval/baseline.json).
       - run: npm run eval
       # check:website loads the built site in Chromium.

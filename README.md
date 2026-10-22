@@ -47,6 +47,7 @@ npm run dev        # web app on http://localhost:5173
 | `npm run lint` | oxlint |
 | `npm run typecheck` | Type-check every workspace |
 | `npm test` | Unit tests in every workspace |
+| `npm run test:coverage` | The same tests in one run, failing below the coverage floors in `vitest.config.ts` |
 | `npm run test:e2e` | Playwright journeys, console-error and mobile-overflow checks |
 
 CI runs all of the above on every pull request. `main` is kept releasable: work happens on feature branches.
