@@ -41,10 +41,5 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],
-    coverage: {
-      provider: 'v8',
-      include: ['src/utils/**', 'src/services/**', 'src/state/handoffStore.ts', 'src/data/**'],
-      exclude: ['**/*.test.ts', 'src/services/index.ts'],
-    },
   },
 })

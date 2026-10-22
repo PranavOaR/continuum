@@ -24,7 +24,7 @@ Writes `.codex/hooks.json` and a marked block in `.codex/config.toml`, never `~/
 - Its patches are recorded as changes, and its last message as an agent-reported note.
 - It can use the same MCP tools: `start_task`, `update_task`, `get_context`, `record_decision`.
 
-Codex does not tell hooks a command's exit code, so its test runs are not recorded as checks. Run them with `continuum run -- <command>` for verified results.
+Codex does not tell hooks a command's exit code, so its own test runs are not recorded as checks. Its briefing asks it to run them as `continuum run -- <command>` instead, which records a verified result; you can do the same.
 
 ## GitHub Copilot in VS Code
 
@@ -42,7 +42,7 @@ Open the repository in VS Code, **trust the workspace**, and start the `continuu
 - Copilot's file edits are recorded as changes. Reads, searches and terminal commands don't start Continuum at all, so they cost nothing.
 - It can use the same MCP tools: `start_task`, `update_task`, `get_context`, `record_decision`.
 
-Agent hooks are a preview in VS Code (1.109 or newer, `chat.useHooks` on), and an organization can turn them off. Without them, the instructions ask Copilot to call `get_handoff` itself. VS Code does not tell hooks a command's exit code, and it has no end-of-session event, so Copilot's test runs are not recorded as checks and its sessions stay open. Run tests with `continuum run -- <command>` for verified results.
+Agent hooks are a preview in VS Code (1.109 or newer, `chat.useHooks` on), and an organization can turn them off. Without them, the instructions ask Copilot to call `get_handoff` itself. VS Code does not tell hooks a command's exit code, and it has no end-of-session event, so Copilot's own test runs are not recorded as checks and its sessions stay open. Its briefing and instructions ask it to run them as `continuum run -- <command>` instead, which records a verified result.
 
 ## Cursor
 

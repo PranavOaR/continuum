@@ -1,7 +1,6 @@
 import { CircleAlert, CircleCheck, Info, X } from 'lucide-react'
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
-
-export type ToastTone = 'success' | 'info' | 'error'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ToastContext, type ToastTone } from './toasts'
 
 interface Toast {
   id: number
@@ -10,8 +9,6 @@ interface Toast {
 }
 
 const TOAST_DURATION_MS = 4500
-
-const ToastContext = createContext<((message: string, tone?: ToastTone) => void) | null>(null)
 
 const TONE_ICON = { success: CircleCheck, info: Info, error: CircleAlert }
 const TONE_CLASS = { success: 'text-success', info: 'text-accent', error: 'text-danger' }
@@ -55,10 +52,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   )
-}
-
-export function useToast() {
-  const context = useContext(ToastContext)
-  if (!context) throw new Error('useToast must be used inside ToastProvider')
-  return context
 }

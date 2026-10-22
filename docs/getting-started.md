@@ -1,6 +1,6 @@
 # Getting started with Continuum
 
-About ten minutes. You need Node.js 22.13 or newer, git, and Claude Code (Codex, Cursor and GitHub Copilot in VS Code work too; see the end).
+About ten minutes. You need macOS or Linux (on Windows, WSL 2), Node.js 22.13 or newer, git, and Claude Code (Codex, Cursor and GitHub Copilot in VS Code work too; see the end).
 
 ## 1. Connect a repository
 

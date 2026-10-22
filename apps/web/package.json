@@ -10,7 +10,6 @@
     "lint": "oxlint -c ../../.oxlintrc.json src e2e",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test"
   },
   "dependencies": {

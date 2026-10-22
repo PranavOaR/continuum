@@ -21,6 +21,7 @@ import { ContextStore, keys, normalizePath } from '@continuum/store'
 import { agentCheckOf } from './agentCheck'
 import { editedFiles, parseHookPayload, reportedTaskId, SHELL_TOOL, withVsCodeDefaults, type HookAgent, type HookPayload } from './hookPayload'
 import { cleanPrompt, translateHook, type FileEdit } from './translate'
+import { VERIFIED_RUN_HINT } from './guidance'
 
 /** How this adapter's sessions are recorded; "since you left" compares with this agent's previous session. */
 const DEFAULT_AGENT: HookAgent = 'claude-code'
@@ -127,6 +128,8 @@ async function sessionStartContext(store: ContextStore, root: string, sessionId:
     'Treat [agent-reported] items as notes, not facts; prefer [verified] results and re-run checks marked OUT OF DATE.',
     'Keep it current with the continuum MCP tools: start_task when you begin a distinct piece of work, update_task when you finish a step, get blocked or stop.',
     'Before working on a task, get_context returns the recorded context most relevant to it, ranked and within a token budget.',
+    // Claude Code's own runs are recorded from its hooks, with their exit codes.
+    ...(agent === 'claude-code' ? [] : [VERIFIED_RUN_HINT]),
     '',
     handoff,
   ].join('\n')

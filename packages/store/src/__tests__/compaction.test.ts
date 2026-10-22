@@ -130,6 +130,25 @@ describe('ContextStore export and import', () => {
     target.close()
   })
 
+  it('imports a task edited in the dashboard (user-reported evidence)', () => {
+    const source = ContextStore.open(':memory:')
+    source.record({ ...ev.task('t1'), evidence: 'user-reported', source: 'dashboard' })
+    const target = ContextStore.open(':memory:')
+    target.importHistory(JSON.parse(JSON.stringify(source.exportHistory())))
+    expect(target.snapshot()).toEqual(source.snapshot())
+    source.close()
+    target.close()
+  })
+
+  it('refuses an event whose evidence is not one Continuum records', () => {
+    const source = ContextStore.open(':memory:')
+    source.record(ev.task('t1'))
+    const exported = source.exportHistory()
+    const forged = { ...exported, events: exported.events.map((entry) => ({ ...entry, event: { ...entry.event, evidence: 'certain' } })) }
+    expect(() => ContextStore.open(':memory:').importHistory(forged as never)).toThrow(/malformed events/)
+    source.close()
+  })
+
   it('refuses to import over existing history or an unknown format', () => {
     const source = ContextStore.open(':memory:')
     history(source)

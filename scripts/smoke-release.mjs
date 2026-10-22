@@ -3,7 +3,7 @@
 // tarball into a scratch project, then drive the installed `continuum` binary
 // against a fresh git repository. Run after `npm run bundle`.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -102,6 +102,27 @@ function serveDashboard(bin, repo) {
   })
 }
 
+/**
+ * The Claude Code plugin's hooks start its own copy of the bundle with node, as
+ * scripts/sync-plugin-repo.mjs assembles it. An npx that fails comes first on
+ * PATH, so a hook that fell back to npx would fail.
+ */
+function pluginHooksRunTheBundle(repo) {
+  const pluginRoot = join(scratch, 'plugin')
+  mkdirSync(join(pluginRoot, 'bin'), { recursive: true })
+  copyFileSync(join(RELEASE, 'continuum.js'), join(pluginRoot, 'bin/continuum.js'))
+  const noNpx = join(scratch, 'no-npx')
+  mkdirSync(noNpx)
+  writeFileSync(join(noNpx, 'npx'), '#!/bin/sh\necho "npx was started" >&2\nexit 1\n')
+  chmodSync(join(noNpx, 'npx'), 0o755)
+  const [handler] = JSON.parse(readFileSync(join(ROOT, 'plugin/hooks/hooks.json'), 'utf8')).hooks.SessionStart[0].hooks
+  const env = { ...ENV, CLAUDE_PROJECT_DIR: repo, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: `${noNpx}:${process.env.PATH}` }
+  const started = performance.now()
+  const result = spawnSync(handler.command, handler.args, { cwd: repo, env, encoding: 'utf8', input: JSON.stringify({ hook_event_name: 'SessionStart', session_id: 'plugin-1', cwd: repo, source: 'startup' }) })
+  const elapsed = Math.round(performance.now() - started)
+  check(`the plugin's SessionStart hook runs its own bundle, not npx (${elapsed} ms)`, result.status === 0 && result.stdout.includes('Continuum (local project memory)'), result.stderr || result.stdout.slice(0, 300))
+}
+
 try {
   if (!existsSync(join(RELEASE, 'continuum.js'))) throw new Error('dist/release is missing: run `npm run build && npm run bundle` first.')
   const bin = packAndInstall()
@@ -131,6 +152,8 @@ try {
 
   const tools = await mcpTools(bin, repo)
   check('MCP server lists its tools', ['get_handoff', 'start_task', 'record_decision'].every((tool) => tools.includes(tool)), tools.join(', '))
+
+  pluginHooksRunTheBundle(repo)
 
   const dashboard = await serveDashboard(bin, repo)
   check('serve opens the bundled dashboard', dashboard.status === 200 && dashboard.html.includes('continuum-data'), `HTTP ${dashboard.status}`)

@@ -12,7 +12,8 @@ import {
   type Invocation,
   type SetupResult,
 } from '@continuum/claude-code'
-import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
+import { UNSUPPORTED_PLATFORM, WINDOWS_FIX } from '../doctor'
+import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 interface Target {
   name: string
@@ -79,7 +80,12 @@ function report(io: Io, result: SetupResult): void {
 }
 
 /** Connects (or disconnects) an agent to Continuum for this repository only. */
-export async function setupCommand(io: Io, args: readonly string[], invocation: Invocation): Promise<number> {
+export async function setupCommand(io: Io, args: readonly string[], invocation: Invocation, platform: NodeJS.Platform = process.platform): Promise<number> {
+  if (platform === UNSUPPORTED_PLATFORM) {
+    io.err('continuum: Windows is not supported yet: the hooks agents run need a POSIX shell.')
+    io.err(WINDOWS_FIX)
+    return EXIT_FAILURE
+  }
   const [targetName, ...flags] = args
   const remove = flags.length === 1 && flags[0] === '--remove'
   const target = targetName && Object.hasOwn(TARGETS, targetName) ? TARGETS[targetName] : undefined

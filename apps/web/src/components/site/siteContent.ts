@@ -2,7 +2,6 @@
 
 export const PACKAGE_NAME = 'getcontinuum'
 export const DASHBOARD_COMMAND = `npx ${PACKAGE_NAME} serve`
-export const NPM_URL = `https://www.npmjs.com/package/${PACKAGE_NAME}`
 
 export const DEMO_VIDEO = {
   src: '/demo/continuum-demo.mp4',

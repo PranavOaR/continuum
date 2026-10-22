@@ -24,6 +24,10 @@ import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@conti
 export const MIN_NODE_VERSION: readonly [number, number] = [22, 13]
 const SETUP_FIX = 'Run `continuum setup claude-code` in this repository.'
 
+/** The hooks run through `sh`, and the store and watcher are tested on macOS and Linux only. */
+export const UNSUPPORTED_PLATFORM = 'win32'
+export const WINDOWS_FIX = 'Use WSL 2: install Node.js and git inside your WSL distribution, and run Continuum and your agents there.'
+
 export type FindingStatus = 'ok' | 'warn' | 'fail'
 
 export interface Finding {
@@ -36,6 +40,7 @@ export interface Finding {
 export interface DoctorEnvironment {
   cwd: string
   nodeVersion: string
+  platform: NodeJS.Platform
   /** How this CLI would configure Claude Code now, to spot hooks left pointing at another install. */
   invocation: Invocation
   webDist: string
@@ -63,6 +68,12 @@ export function checkNode(version: string): Finding {
   return supported
     ? { status: 'ok', label: `Node.js ${version}` }
     : { status: 'fail', label: `Node.js ${version} is too old`, fix: `Install Node.js ${needMajor}.${needMinor} or newer; Continuum's store needs node:sqlite.` }
+}
+
+export function checkPlatform(platform: NodeJS.Platform): Finding {
+  return platform === UNSUPPORTED_PLATFORM
+    ? { status: 'fail', label: 'Windows is not supported yet', detail: 'the hooks need a POSIX shell', fix: WINDOWS_FIX }
+    : { status: 'ok', label: `Platform: ${platform}` }
 }
 
 async function checkGit(): Promise<Finding> {
@@ -196,7 +207,7 @@ function checkDashboard(webDist: string): Finding {
 
 /** Every check, in the order a user would fix them. Stops at the first missing prerequisite. */
 export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
-  const findings: Finding[] = [checkNode(env.nodeVersion), await checkGit()]
+  const findings: Finding[] = [checkPlatform(env.platform), checkNode(env.nodeVersion), await checkGit()]
   if (findings.some((finding) => finding.status === 'fail')) return findings
   try {
     await findRepoRoot(env.cwd)

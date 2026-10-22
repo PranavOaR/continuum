@@ -13,6 +13,7 @@
     "lint": "oxlint apps packages",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "npm run test:e2e -w @continuum/web",
     "bundle": "node scripts/bundle.mjs",
     "smoke:release": "node scripts/smoke-release.mjs",

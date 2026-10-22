@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn'
 import { useIsLive } from '../../state/dataMode'
 import { MEMORY_KIND_LABEL } from '@continuum/core'
 import { Dialog } from '../shared/Dialog'
+import { hasLineDetail } from './fileDetail'
 import { ChangeTypeBadge, EvidenceBadge, FileStatusBadge } from '../shared/StatusBadge'
 
 interface FileDetailDrawerProps {
@@ -13,11 +14,6 @@ interface FileDetailDrawerProps {
   decisions: MemoryRecord[]
   onClose: () => void
   onSelectTask: (taskId: string) => void
-}
-
-/** Whether there are line counts to show: demo data, or a live uncommitted change. */
-export function hasLineDetail(file: ProjectFile): boolean {
-  return file.diffSource !== 'none' && (file.additions > 0 || file.deletions > 0 || file.diff.length > 0)
 }
 
 const DIFF_TITLE: Record<ProjectFile['diffSource'], string> = {

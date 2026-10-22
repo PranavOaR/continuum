@@ -1,6 +1,6 @@
 # Getting started
 
-About ten minutes. You need **Node.js 22.13 or newer**, **git**, and Claude Code, Codex, Cursor or GitHub Copilot in VS Code. Continuum is tested on macOS and Linux.
+About ten minutes. You need **Node.js 22.13 or newer**, **git**, and Claude Code, Codex, Cursor or GitHub Copilot in VS Code. It runs on macOS and Linux; on Windows, use WSL 2.
 
 ## 1. Connect a repository
 

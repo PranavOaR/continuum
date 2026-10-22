@@ -1,11 +1,10 @@
 {
   "mcpServers": {
     "continuum": {
-      "command": "npx",
+      "command": "sh",
       "args": [
-        "-y",
-        "getcontinuum@0.1.2",
-        "mcp"
+        "-c",
+        "if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'mcp'; fi; exec 'npx' '-y' 'getcontinuum@0.2.0' 'mcp'"
       ]
     }
   }

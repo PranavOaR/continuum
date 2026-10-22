@@ -2,7 +2,7 @@ import { ArrowRight, Menu, X } from 'lucide-react'
 import { useEffect, useId, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from '../../utils/cn'
-import { buttonClass } from '../shared/Button'
+import { buttonClass } from '../shared/buttonClass'
 import { Logo } from '../shared/Logo'
 import { HOME_SECTIONS, sectionHref } from './siteNav'
 
