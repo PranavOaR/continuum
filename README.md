@@ -12,7 +12,7 @@ Every claim is labelled **verified**, **observed**, **agent-reported** or **set 
 
 ## Install
 
-Requires Node.js 22.13+ and git.
+Requires Node.js 22.13+ and git, on macOS or Linux. Windows is not supported yet: use WSL 2.
 
 ```bash
 cd your-project

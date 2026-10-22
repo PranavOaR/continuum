@@ -26,7 +26,7 @@ const readSettings = (root: string) => JSON.parse(readFileSync(join(root, SETTIN
 const writeSettings = (root: string, value: unknown) => writeFileSync(join(root, SETTINGS), JSON.stringify(value))
 
 const doctor = (cwd: string, overrides: Partial<Parameters<typeof runDoctor>[0]> = {}) =>
-  runDoctor({ cwd, nodeVersion: '24.1.0', invocation: selfInvocation(), webDist: '/nowhere', configDir: TEST_CONFIG_DIR, ...overrides })
+  runDoctor({ cwd, nodeVersion: '24.1.0', platform: 'linux', invocation: selfInvocation(), webDist: '/nowhere', configDir: TEST_CONFIG_DIR, ...overrides })
 
 const find = (findings: Finding[], label: RegExp) => findings.find((finding) => label.test(finding.label))
 

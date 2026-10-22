@@ -17,7 +17,7 @@ export const FAQ = [
   },
   {
     question: 'What do I need?',
-    answer: 'Node.js 22.13 or newer, git, and a git repository. It is tested on macOS and Linux; Windows is not tested yet.',
+    answer: 'Node.js 22.13 or newer, git, and a git repository. It runs on macOS and Linux. Windows is not supported yet: run Continuum and your agents inside WSL 2.',
   },
   {
     question: 'What exactly does it record?',

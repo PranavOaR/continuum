@@ -20,7 +20,7 @@ Then, in each repository you want Continuum to remember:
 npx getcontinuum setup claude-code
 ```
 
-The plugin's hooks do nothing in repositories that don't use Continuum. It also adds a `/continuum:handoff` command. Requires Node.js 22.13+ and git.
+The plugin's hooks do nothing in repositories that don't use Continuum. It also adds a `/continuum:handoff` command. Requires Node.js 22.13+ and git, on macOS or Linux (on Windows, use WSL 2).
 
 Other agents connect with `npx getcontinuum setup codex`, `setup cursor` or `setup vscode`. The [documentation](https://continuumgroup.dev/docs) covers each one.
 
