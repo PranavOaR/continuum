@@ -1,9 +1,9 @@
 import { RouterProvider } from 'react-router-dom'
-import { DataModeProvider } from '../state/dataMode'
-import { HandoffsProvider } from '../state/handoffs'
-import { PreferencesProvider } from '../state/preferences'
-import { ToastProvider } from '../state/toasts'
-import { UIProvider } from '../state/ui'
+import { DataModeProvider } from '../state/DataModeProvider'
+import { HandoffsProvider } from '../state/HandoffsProvider'
+import { PreferencesProvider } from '../state/PreferencesProvider'
+import { ToastProvider } from '../state/ToastProvider'
+import { UIProvider } from '../state/UIProvider'
 import { router } from './router'
 
 export function App() {

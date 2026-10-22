@@ -1,28 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Link, type LinkProps } from 'react-router-dom'
 import { cn } from '../../utils/cn'
-
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
-type Size = 'sm' | 'md'
-
-const BASE =
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium tracking-[-0.005em] transition-[background-color,border-color,color,transform] active:translate-y-px disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-4 [&_svg]:shrink-0'
-
-const VARIANTS: Record<Variant, string> = {
-  primary: 'border border-accent-strong bg-accent-strong text-accent-fg shadow-[inset_0_1px_0_rgb(255_255_255/0.2)] hover:border-accent-hover hover:bg-accent-hover',
-  secondary: 'border border-line bg-surface text-fg shadow-card hover:border-line-strong hover:bg-surface-2',
-  ghost: 'border border-transparent text-muted hover:bg-surface-2 hover:text-fg',
-  danger: 'border border-danger/40 bg-danger/5 text-danger hover:bg-danger/10',
-}
-
-const SIZES: Record<Size, string> = {
-  sm: 'h-8 px-3 text-[13px]',
-  md: 'h-10 px-4 text-[14px]',
-}
-
-export function buttonClass(variant: Variant = 'secondary', size: Size = 'md', extra?: string): string {
-  return cn(BASE, VARIANTS[variant], SIZES[size], extra)
-}
+import { buttonClass, type Size, type Variant } from './buttonClass'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant

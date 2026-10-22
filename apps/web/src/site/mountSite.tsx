@@ -1,7 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import { PreferencesProvider } from '../state/preferences'
+import { PreferencesProvider } from '../state/PreferencesProvider'
 import { SITE_ROUTES } from './siteRoutes'
 
 /** continuumgroup.dev: the landing page, without the dashboard, its data services or the demo dataset. */

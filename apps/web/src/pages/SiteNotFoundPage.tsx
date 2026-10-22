@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { buttonClass } from '../components/shared/Button'
+import { buttonClass } from '../components/shared/buttonClass'
 import { SitePage } from '../components/site/SitePage'
 
 /** The website's 404, in the site's own design. */
