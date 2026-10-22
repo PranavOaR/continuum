@@ -2,10 +2,16 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-22
+
 ### Changed
 - **Continuum is now proprietary software, free to use** for personal and commercial work, under the Continuum Software License (LICENSE). It is no longer open source; versions up to 0.1.2 remain available under the MIT License.
 - The package ships `THIRD_PARTY_NOTICES.md`, the licenses of the open-source packages it bundles, and its own README for users.
 - The Claude Code plugin installs from a new public repository: `/plugin install continuum --marketplace PranavOaR/continuum-plugin`. Report bugs there.
+- **Faster plugin hooks.** The plugin carries its own copy of the CLI and starts it with `node` instead of `npx`, which added about half a second to every hook. Session start and the end of each turn, which Claude Code waits for, now take about 0.1 s.
+- Codex and Copilot sessions, the Cursor rule and the Copilot instructions ask the agent to run tests, lint and builds through `continuum run`, so their results are recorded as verified. These agents report no exit codes, so their own runs are not recorded.
+- `setup` refuses to run on Windows, and `doctor` reports it, with a pointer to WSL 2: the hooks need a POSIX shell. Before, setup succeeded and the hooks never ran.
+- Dashboard: <kbd>⌘K</kbd> opens a command palette (pages, projects and actions, then search results); dialogs open centred, with focus in their first field; surfaces gain elevation, and the common "observed" label is quieter so the stronger labels stand out.
 
 ### Added
 - **GitHub Copilot in VS Code** (`setup vscode`): Copilot's agent mode gets the MCP server (`.vscode/mcp.json`), agent hooks (`.github/hooks/continuum.json`) and instructions for every chat (`.github/instructions/continuum.instructions.md`).
@@ -17,6 +23,7 @@
 
 ### Fixed
 - `uninstall` without `--purge` said only Claude Code was disconnected; it disconnects every agent.
+- `continuum import` refused any history holding a task edited in the dashboard ("malformed events"), so moving such a repository's history to another machine failed.
 
 ## [0.1.2] - 2026-10-19
 
