@@ -4,7 +4,7 @@
 
 [Continuum](https://continuumgroup.dev) is local project memory for AI coding agents. Every Claude Code, Codex, Cursor or GitHub Copilot session starts briefed on where the work left off: the current task and its next step, which test results still hold for the code as it is now, what another agent or a hand edit changed, and which decisions apply. Nothing leaves your machine.
 
-This repository holds the Claude Code plugin only: its hooks and MCP server run the published [`getcontinuum`](https://www.npmjs.com/package/getcontinuum) package through `npx`.
+This repository holds the Claude Code plugin only. It carries the same CLI as the `getcontinuum` npm package, which its hooks and MCP server start directly, so a hook takes milliseconds, not the half a second `npx` would add.
 
 ## Install
 
@@ -20,7 +20,7 @@ Then, in each repository you want Continuum to remember:
 npx getcontinuum setup claude-code
 ```
 
-The plugin's hooks do nothing in repositories that don't use Continuum. It also adds a `/continuum:handoff` command. Requires Node.js 22.13+ and git.
+The plugin's hooks do nothing in repositories that don't use Continuum. It also adds a `/continuum:handoff` command. Requires Node.js 22.13+ and git, on macOS or Linux (on Windows, use WSL 2).
 
 Other agents connect with `npx getcontinuum setup codex`, `setup cursor` or `setup vscode`. The [documentation](https://continuumgroup.dev/docs) covers each one.
 

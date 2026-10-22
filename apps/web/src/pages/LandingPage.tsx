@@ -9,11 +9,11 @@ import { Eyebrow, SectionTitle } from '../components/site/SectionHeading'
 import { SiteFooter } from '../components/site/SiteFooter'
 import { SiteHeader } from '../components/site/SiteHeader'
 import { SPY_IDS } from '../components/site/siteNav'
-import { buttonClass } from '../components/shared/Button'
+import { buttonClass } from '../components/shared/buttonClass'
 import { AgentPicker } from '../components/site/AgentPicker'
 import { DemoVideo } from '../components/site/DemoVideo'
 import { InstallCommand } from '../components/site/InstallCommand'
-import { GET_STARTED, NPM_URL, PACKAGE_NAME } from '../components/site/siteContent'
+import { GET_STARTED } from '../components/site/siteContent'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 
@@ -41,19 +41,8 @@ function Hero() {
       <div aria-hidden className="cn-dots cn-dots-fade absolute inset-0 opacity-70" />
       <div className="relative mx-auto grid max-w-[1160px] items-center gap-12 px-4 pt-16 pb-20 sm:px-8 lg:grid-cols-[1fr_1.05fr] lg:pt-24 lg:pb-28">
         <div>
-          <a
-            href={NPM_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1 pr-3 pl-1 text-[13px] text-muted hover:border-line-strong"
-          >
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent">v0.1.2</span>
-            Now on npm: {PACKAGE_NAME}
-            <ArrowRight className="size-3.5" aria-hidden />
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
 
-          <h1 className="mt-7 text-[42px] leading-[1.05] font-normal tracking-display text-fg sm:text-[56px]">
+          <h1 className="text-[42px] leading-[1.05] font-normal tracking-display text-fg sm:text-[56px]">
             Your work{' '}
             <span className="relative inline-block whitespace-nowrap">
               continues.

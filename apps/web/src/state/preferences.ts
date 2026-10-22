@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext } from 'react'
 import { AGENTS } from '@continuum/core'
 import { createPersistentStore, isRecord } from '../services/storage'
 import type { AgentType, ContextCategory } from '@continuum/core'
@@ -45,51 +45,16 @@ function isPreferences(value: unknown): value is Preferences {
   )
 }
 
-const store = createPersistentStore<Preferences>('preferences', DEFAULT_PREFERENCES, isPreferences)
+/** Where the preferences persist between visits. */
+export const preferencesStore = createPersistentStore<Preferences>('preferences', DEFAULT_PREFERENCES, isPreferences)
 
-interface PreferencesContextValue {
+export interface PreferencesContextValue {
   preferences: Preferences
   updatePreferences: (changes: Partial<Preferences>) => void
   resetPreferences: () => void
 }
 
-const PreferencesContext = createContext<PreferencesContextValue | null>(null)
-
-function resolveTheme(theme: ThemePreference): 'dark' | 'light' {
-  if (theme !== 'system') return theme
-  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
-}
-
-export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [preferences, setPreferences] = useState<Preferences>(() => store.load())
-
-  useEffect(() => {
-    const root = document.documentElement
-    const apply = () => root.setAttribute('data-theme', resolveTheme(preferences.theme))
-    apply()
-    root.setAttribute('data-reduce-motion', String(preferences.reduceMotion))
-    if (preferences.theme !== 'system') return
-    const media = window.matchMedia('(prefers-color-scheme: light)')
-    media.addEventListener('change', apply)
-    return () => media.removeEventListener('change', apply)
-  }, [preferences.theme, preferences.reduceMotion])
-
-  const updatePreferences = useCallback((changes: Partial<Preferences>) => {
-    setPreferences((current) => {
-      const next = { ...current, ...changes }
-      store.save(next)
-      return next
-    })
-  }, [])
-
-  const resetPreferences = useCallback(() => {
-    store.clear()
-    setPreferences(DEFAULT_PREFERENCES)
-  }, [])
-
-  const value = useMemo(() => ({ preferences, updatePreferences, resetPreferences }), [preferences, updatePreferences, resetPreferences])
-  return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>
-}
+export const PreferencesContext = createContext<PreferencesContextValue | null>(null)
 
 export function usePreferences(): PreferencesContextValue {
   const context = useContext(PreferencesContext)

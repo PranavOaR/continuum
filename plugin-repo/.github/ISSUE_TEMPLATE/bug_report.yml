@@ -1,0 +1,32 @@
+name: Bug report
+description: Something in Continuum does not work as described.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      multiple: true
+      options: [Claude Code (plugin), Claude Code (setup claude-code), Codex, Cursor, GitHub Copilot in VS Code, Other or none]
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `npx getcontinuum doctor`
+      description: Run it in the repository where the problem happens. It shows paths and versions, not your code; remove anything you would rather not share.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and Node.js version
+      placeholder: macOS 15.4, Node 24.1

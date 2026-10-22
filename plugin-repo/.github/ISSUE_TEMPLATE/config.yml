@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://continuumgroup.dev/docs
+    about: Setup for each agent, every command, and what gets recorded.
+  - name: Report a security vulnerability
+    url: https://github.com/PranavOaR/continuum-plugin/security/advisories/new
+    about: Privately, never in a public issue.

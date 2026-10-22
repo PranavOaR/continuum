@@ -13,6 +13,7 @@ import {
 } from '@continuum/core'
 import { EXPORT_FORMAT, EXPORT_VERSION, mergeFirstEvents, type Checkpoint, type CompactionResult, type FirstEvent, type GraphState, type HistoryExport, type HistoryRewrite, type RewriteResult, type VacuumResult } from './checkpoint'
 import { GraphIndex, type EdgeType, type GraphNode, type UpsertInput } from './graphIndex'
+import { assertValidExport } from './exportFormat'
 import { canonicalJson, hashRecord } from './hash'
 import { keys, kindOf } from './keys'
 import { COVERAGE_KIND, project, type Mutations } from './projector'
@@ -293,13 +294,13 @@ export class ContextStore implements Mutations {
     })
   }
 
-  /** The latest compaction checkpoint, if the log was ever compacted. */
   /** Just the first events kept by compaction, without unpacking the graph state. */
   private compactedFirstEvents(): FirstEvent[] {
     const row = this.db.prepare('SELECT first_events FROM checkpoints WHERE id = 1').get() as { first_events: string } | undefined
     return row ? JSON.parse(row.first_events) : []
   }
 
+  /** The latest compaction checkpoint, if the log was ever compacted. */
   checkpoint(): Checkpoint | undefined {
     const row = this.db.prepare('SELECT seq, created_at, state, first_events FROM checkpoints WHERE id = 1').get() as
       | { seq: number; created_at: string; state: Uint8Array; first_events: string }
@@ -579,41 +580,6 @@ export class ContextStore implements Mutations {
     }
     this.graphIndex = graph
     this.loadedSeq = this.maxSeq()
-  }
-}
-
-const EVIDENCE = new Set(['verified', 'observed', 'agent-reported'])
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
-
-function isExportedEvent(entry: unknown): entry is FirstEvent {
-  if (!isRecord(entry) || !Number.isSafeInteger(entry.seq) || (entry.seq as number) < 1 || !isRecord(entry.event)) return false
-  const { type, payload, evidence, source, occurredAt } = entry.event
-  return typeof type === 'string' && isRecord(payload) && typeof evidence === 'string' && EVIDENCE.has(evidence) && typeof source === 'string' && typeof occurredAt === 'string'
-}
-
-function isGraphState(state: unknown): state is GraphState {
-  if (!isRecord(state) || !Array.isArray(state.nodes) || !Array.isArray(state.edges)) return false
-  const nodesOk = state.nodes.every(
-    (node) => isRecord(node) && typeof node.key === 'string' && typeof node.kind === 'string' && Array.isArray(node.history) && isRecord(node.props) && typeof node.updatedAt === 'string',
-  )
-  return nodesOk && state.edges.every((edge) => isRecord(edge) && typeof edge.from === 'string' && typeof edge.type === 'string' && typeof edge.to === 'string')
-}
-
-/** Rejects anything that is not a well-formed export, before any of it is written. */
-function assertValidExport(history: unknown): asserts history is HistoryExport {
-  const invalid = (reason: string) => new Error(`This file is not a valid Continuum history export: ${reason}.`)
-  if (!isRecord(history) || history.format !== EXPORT_FORMAT) throw invalid('unknown format')
-  if (history.version !== EXPORT_VERSION) throw invalid(`version ${String(history.version)} is not supported`)
-  if (!Array.isArray(history.events) || !history.events.every(isExportedEvent)) throw invalid('malformed events')
-  const checkpoint = history.checkpoint
-  if (checkpoint !== null) {
-    if (!isRecord(checkpoint) || !Number.isSafeInteger(checkpoint.seq) || typeof checkpoint.createdAt !== 'string') throw invalid('malformed checkpoint')
-    if (!isGraphState(checkpoint.state) || !Array.isArray(checkpoint.firstEvents) || !checkpoint.firstEvents.every(isExportedEvent)) throw invalid('malformed checkpoint')
-  }
-  let previous = checkpoint === null ? 0 : (checkpoint.seq as number)
-  for (const { seq } of history.events) {
-    if (seq <= previous) throw invalid('event sequence numbers must increase and follow the checkpoint')
-    previous = seq
   }
 }
 

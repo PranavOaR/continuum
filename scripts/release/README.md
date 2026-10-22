@@ -14,7 +14,7 @@ Website and documentation: [continuumgroup.dev](https://continuumgroup.dev)
 
 ## Install
 
-Requires Node.js 22.13+ and git. In your project:
+Requires Node.js 22.13+ and git, on macOS or Linux (on Windows, use WSL 2). In your project:
 
 ```bash
 npx getcontinuum setup claude-code   # or: setup codex, setup cursor, setup vscode

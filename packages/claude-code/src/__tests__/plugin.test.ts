@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createSandbox } from '@continuum/capture/testing'
 import { describe, expect, it } from 'vitest'
-import { guardedPluginHooks } from '../plugin'
+import { guardedPluginHooks, PLUGIN_BUNDLE, pluginMcpServers } from '../plugin'
 import { setupClaudeCode } from '../setup'
 
 const ROOT = join(__dirname, '../../../..')
@@ -16,7 +16,7 @@ describe('the Claude Code plugin', () => {
       await setupClaudeCode(sandbox.root, { command: 'npx', args: ['-y', `getcontinuum@${version}`], portable: true })
       const settings = JSON.parse(readFileSync(join(sandbox.root, '.claude/settings.local.json'), 'utf8'))
       expect(read('plugin/hooks/hooks.json')).toEqual({ hooks: guardedPluginHooks(settings.hooks) })
-      expect(read('plugin/.mcp.json')).toEqual(JSON.parse(readFileSync(join(sandbox.root, '.mcp.json'), 'utf8')))
+      expect(read('plugin/.mcp.json')).toEqual(pluginMcpServers(JSON.parse(readFileSync(join(sandbox.root, '.mcp.json'), 'utf8'))))
       expect(read('plugin/.claude-plugin/plugin.json').version).toBe(version)
     } finally {
       sandbox.cleanup()
@@ -68,6 +68,51 @@ describe('plugin hooks outside Continuum repositories', () => {
     } finally {
       repo.cleanup()
       rmSync(bin, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("the plugin's own copy of the CLI", () => {
+  /** A stand-in bundle that echoes its arguments and the payload, in a plugin directory. */
+  async function pluginWithBundle() {
+    const { mkdirSync, mkdtempSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const root = mkdtempSync(join(tmpdir(), 'continuum-plugin-root-'))
+    mkdirSync(join(root, 'bin'))
+    writeFileSync(join(root, PLUGIN_BUNDLE), "process.stdout.write('bundle: ' + process.argv.slice(2).join(' ') + '\\n'); process.stdin.pipe(process.stdout)\n")
+    return root
+  }
+
+  it('runs hooks with node, never npx, when the plugin carries it', async () => {
+    const { execFileSync } = await import('node:child_process')
+    const { mkdirSync, rmSync } = await import('node:fs')
+    const { dirname } = await import('node:path')
+    const [handler] = read('plugin/hooks/hooks.json').hooks.SessionStart[0].hooks
+    const repo = createSandbox({ 'a.txt': 'a' })
+    mkdirSync(join(repo.root, '.continuum'))
+    const pluginRoot = await pluginWithBundle()
+    try {
+      // The stand-in prints "bundle:"; npx, had the hook fallen back to it, would not.
+      const env = { ...process.env, CLAUDE_PROJECT_DIR: repo.root, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` }
+      const output = execFileSync(handler.command, handler.args, { cwd: repo.root, env, input: '{"hook_event_name":"SessionStart"}', encoding: 'utf8' })
+      expect(output).toBe('bundle: ingest\n{"hook_event_name":"SessionStart"}')
+    } finally {
+      repo.cleanup()
+      rmSync(pluginRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('starts the MCP server with node too', async () => {
+    const { execFileSync } = await import('node:child_process')
+    const { rmSync } = await import('node:fs')
+    const { dirname } = await import('node:path')
+    const server = read('plugin/.mcp.json').mcpServers.continuum
+    const pluginRoot = await pluginWithBundle()
+    try {
+      const env = { ...process.env, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` }
+      expect(execFileSync(server.command, server.args, { env, input: '', encoding: 'utf8' })).toBe('bundle: mcp\n')
+    } finally {
+      rmSync(pluginRoot, { recursive: true, force: true })
     }
   })
 })
