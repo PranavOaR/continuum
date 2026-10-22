@@ -108,6 +108,19 @@ describe('ingestHook', () => {
     expect(context.length).toBeLessThan(10_000)
   })
 
+  it('tells agents that do not report exit codes to run checks through continuum run', async () => {
+    const briefing = async (agent: 'claude-code' | 'codex') => {
+      const { repo } = await initialized()
+      await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'first'), { now: () => NOW, agent })
+      await ingestHook(hook(repo, { hook_event_name: 'Stop', last_assistant_message: 'Half done.' }, 'first'), { now: () => NOW, agent })
+      const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'second'), { now: () => NOW, agent })
+      return next.status === 'recorded' ? (next.additionalContext ?? '') : ''
+    }
+    expect(await briefing('codex')).toContain('npx getcontinuum run --name tests -- npm test')
+    // Claude Code's own test runs are recorded from its hooks.
+    expect(await briefing('claude-code')).not.toContain('getcontinuum run')
+  })
+
   it('links edits to the current task and briefs the next session on it', async () => {
     const { repo, storePath } = await initialized()
     withStore(storePath, (store) =>
