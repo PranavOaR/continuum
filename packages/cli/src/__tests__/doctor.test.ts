@@ -83,6 +83,22 @@ describe('continuum doctor', () => {
     expect(find(await doctor(repo.root, { invocation: other }), /different Continuum install/)?.status).toBe('warn')
   })
 
+  it('fails on a config it cannot read, since nothing is recorded until it is fixed', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    writeFileSync(join(repo.root, '.continuum/config.json'), '{ "redactPatterns": ["CUST-[0-9]+"], }')
+    expect(find(await doctor(repo.root), /Settings cannot be read/)).toMatchObject({ status: 'fail', detail: expect.stringContaining('not valid JSON') })
+  })
+
+  it('warns about redaction patterns it cannot use, and names them', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]+', '(unclosed'] }))
+    expect(find(await doctor(repo.root), /redaction pattern/)).toMatchObject({ status: 'warn', label: '1 redaction pattern is not used', detail: '(unclosed' })
+    writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]+'] }))
+    expect(find(await doctor(repo.root), /Settings/)).toMatchObject({ status: 'ok', detail: expect.stringContaining('1 redaction pattern') })
+  })
+
   it('reports a damaged store without suggesting deletion for other errors', async () => {
     const repo = sandbox()
     await cli(repo.root, ['init'])

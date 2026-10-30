@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import type { DiffLine } from '@continuum/core'
 import { loadContinuumIgnore, type IgnorePredicate } from './continuumIgnore'
 import { gitOutput, isRegularFileInRepo } from './git'
-import { redactSecrets } from './redact'
+import { repositoryRedactor } from './config'
+import type { Redactor } from './redact'
 
 /** Lines of patch kept per file: enough to recognize the change, bounded for the dashboard. */
 export const MAX_EXCERPT_LINES = 80
@@ -43,7 +44,7 @@ function parseNumstat(output: string): Map<string, UncommittedDiff> {
 }
 
 /** Splits `git diff` output into per-file excerpts, keyed by the post-image path (pre-image for deletions). */
-function parsePatch(patch: string): Map<string, { excerpt: DiffLine[]; truncated: boolean }> {
+function parsePatch(patch: string, redactor: Redactor): Map<string, { excerpt: DiffLine[]; truncated: boolean }> {
   const files = new Map<string, { excerpt: DiffLine[]; truncated: boolean }>()
   let current: { excerpt: DiffLine[]; truncated: boolean } | null = null
   let oldPath: string | null = null
@@ -63,13 +64,13 @@ function parsePatch(patch: string): Map<string, { excerpt: DiffLine[]; truncated
       inHunk = true
     } else if (current && inHunk && /^[ +-]/.test(line)) {
       if (current.excerpt.length >= MAX_EXCERPT_LINES) current.truncated = true
-      else current.excerpt.push({ kind: line[0] === '+' ? 'add' : line[0] === '-' ? 'remove' : 'context', text: redactSecrets(line.slice(1)) })
+      else current.excerpt.push({ kind: line[0] === '+' ? 'add' : line[0] === '-' ? 'remove' : 'context', text: redactor.redact(line.slice(1)) })
     }
   }
   return files
 }
 
-async function untrackedDiffs(root: string, isContinuumIgnored: IgnorePredicate): Promise<Map<string, UncommittedDiff>> {
+async function untrackedDiffs(root: string, isContinuumIgnored: IgnorePredicate, redactor: Redactor): Promise<Map<string, UncommittedDiff>> {
   const paths = (await gitOutput(root, ['ls-files', '-z', '--others', '--exclude-standard'])).split('\0').filter((path) => path !== '' && !isContinuumIgnored(path)).slice(0, MAX_UNTRACKED_FILES)
   const entries = await Promise.all(
     paths.map(async (path): Promise<[string, UncommittedDiff] | null> => {
@@ -80,7 +81,7 @@ async function untrackedDiffs(root: string, isContinuumIgnored: IgnorePredicate)
         if (content.length > MAX_UNTRACKED_BYTES || content.includes(0)) return [path, { additions: null, deletions: null, excerpt: [], truncated: false }]
         const lines = content.toString('utf8').split('\n')
         if (lines.at(-1) === '') lines.pop()
-        return [path, { additions: lines.length, deletions: 0, excerpt: lines.slice(0, MAX_EXCERPT_LINES).map((text) => ({ kind: 'add', text: redactSecrets(text) })), truncated: lines.length > MAX_EXCERPT_LINES }]
+        return [path, { additions: lines.length, deletions: 0, excerpt: lines.slice(0, MAX_EXCERPT_LINES).map((text) => ({ kind: 'add', text: redactor.redact(text) })), truncated: lines.length > MAX_EXCERPT_LINES }]
       } catch {
         return null // removed since it was listed
       }
@@ -95,15 +96,15 @@ async function untrackedDiffs(root: string, isContinuumIgnored: IgnorePredicate)
  * Continuum never stores file contents, so this is read live from the repository.
  */
 export async function uncommittedChanges(root: string): Promise<Map<string, UncommittedDiff>> {
-  const [against, isContinuumIgnored] = await Promise.all([base(root), loadContinuumIgnore(root)])
+  const [against, isContinuumIgnored, redactor] = await Promise.all([base(root), loadContinuumIgnore(root), repositoryRedactor(root)])
   const options = ['-c', 'core.quotePath=false', 'diff', '--no-color', '--no-ext-diff', '--no-renames']
   const tracked = parseNumstat(await gitOutput(root, [...options, '--numstat', '-z', against]))
   const changedLines = [...tracked.values()].reduce((total, diff) => total + (diff.additions ?? 0) + (diff.deletions ?? 0), 0)
   if (tracked.size > 0 && changedLines <= MAX_PATCH_LINES) {
-    for (const [path, excerpt] of parsePatch(await gitOutput(root, [...options, '-U3', against]))) {
+    for (const [path, excerpt] of parsePatch(await gitOutput(root, [...options, '-U3', against]), redactor)) {
       const counts = tracked.get(path)
       if (counts) tracked.set(path, { ...counts, ...excerpt })
     }
   }
-  return new Map([...[...tracked].filter(([path]) => !isContinuumIgnored(path)), ...(await untrackedDiffs(root, isContinuumIgnored))])
+  return new Map([...[...tracked].filter(([path]) => !isContinuumIgnored(path)), ...(await untrackedDiffs(root, isContinuumIgnored, redactor))])
 }

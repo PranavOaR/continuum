@@ -1,6 +1,6 @@
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { applyRepositoryRedactions, initWorkspace, loadContinuumIgnore, openWorkspace, redactSecrets, scanRepository } from '@continuum/capture'
+import { initWorkspace, loadContinuumIgnore, openWorkspace, repositoryRedactor, scanRepository, type Redactor } from '@continuum/capture'
 import { composeRewrites, forgetPath, rewriteText, type ContextStore, type HistoryExport } from '@continuum/store'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -54,13 +54,15 @@ export async function importCommand(io: Io, args: readonly string[]): Promise<nu
   }
   const { workspace, store } = await initWorkspace(io.cwd)
   try {
+    // Before anything is imported: a config that cannot be read stops the import.
+    const redactor = await repositoryRedactor(workspace.root)
     try {
       store.importHistory(history)
     } catch (error) {
       io.err(`continuum: ${error instanceof Error ? error.message : String(error)} Nothing was changed.`)
       return EXIT_FAILURE
     }
-    await applyThisRepositoryRules(store, workspace.root, history)
+    await applyThisRepositoryRules(store, workspace.root, history, redactor)
     const { changes } = await scanRepository(store, workspace.root, { now: io.now })
     io.out(`Imported ${history.events.length} events into ${workspace.root}; recorded ${changes.length} change${changes.length === 1 ? '' : 's'} since the export.`)
     return EXIT_OK
@@ -74,14 +76,13 @@ export async function importCommand(io: Io, args: readonly string[]): Promise<nu
  * repository's rules. Paths in .continuumignore are forgotten and every free
  * text is redacted with this repository's patterns.
  */
-async function applyThisRepositoryRules(store: ContextStore, root: string, history: HistoryExport): Promise<void> {
-  await applyRepositoryRedactions(root)
+async function applyThisRepositoryRules(store: ContextStore, root: string, history: HistoryExport, redactor: Redactor): Promise<void> {
   const isIgnored = await loadContinuumIgnore(root)
   const paths = new Set<string>()
   for (const { event } of [...history.events, ...(history.checkpoint?.firstEvents ?? [])]) if (event.type === 'file.changed') paths.add(event.payload.path)
   for (const node of history.checkpoint?.state.nodes ?? []) if (node.key.startsWith('file:')) paths.add(node.key.slice('file:'.length))
   const ignored = [...paths].filter(isIgnored)
-  store.rewriteHistory(composeRewrites([...ignored.map((path) => forgetPath(path, { scrubText: false })), rewriteText(redactSecrets)]))
+  store.rewriteHistory(composeRewrites([...ignored.map((path) => forgetPath(path, { scrubText: false })), rewriteText(redactor.redact)]))
   // The file as imported must not linger in freed pages or the write-ahead log.
   store.vacuum()
 }

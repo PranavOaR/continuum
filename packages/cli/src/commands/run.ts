@@ -1,7 +1,7 @@
 import { CheckInterruptedError, runCheck } from '@continuum/capture'
 import { CHECK_LABELS, formatDuration } from '../format'
 import { EXIT_USAGE, type Io } from '../io'
-import { applyRepositoryRedactions, openWorkspace } from '@continuum/capture'
+import { openWorkspace } from '@continuum/capture'
 
 export const RUN_USAGE = 'Usage: continuum run [--name <check>] -- <command> [args...]'
 
@@ -54,7 +54,6 @@ export async function runCommand(io: Io, argv: readonly string[]): Promise<numbe
   }
   const { workspace, store } = await openWorkspace(io.cwd)
   try {
-    await applyRepositoryRedactions(workspace.root)
     const result = await runCheck(store, { root: workspace.root, ...parsed, stdout: io.stdout, stderr: io.stderr, now: io.now, signal: io.signal, attributeToActiveSession: true })
     io.err(`continuum: recorded "${result.name}" · ${CHECK_LABELS[result.status]} · exit ${result.exitCode} · ${formatDuration(result.durationMs)}`)
     if (result.redactions > 0) io.err(`continuum: masked ${result.redactions} secret${result.redactions === 1 ? '' : 's'} in the command and output before storing them`)

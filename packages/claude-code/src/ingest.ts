@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { realpathSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
+  createRedactor,
   hashFiles,
   headRevision,
   isIgnored,
@@ -9,7 +10,6 @@ import {
   isRegularFileInRepo,
   locateWorkspace,
   NotAGitRepositoryError,
-  applyRepositoryRedactions,
   readConfig,
   readWorkingTreeWithSymbols,
   scanRepository,
@@ -148,17 +148,19 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
   if (!payload) return { status: 'ignored', reason: 'hook event not used by Continuum' }
   const workspace = await findWorkspace(payload.cwd)
   if (!workspace) return { status: 'ignored', reason: 'Continuum is not set up in this repository' }
-  await applyRepositoryRedactions(workspace.root)
+  // First: a config that cannot be read stops the hook before anything is recorded.
+  const config = await readConfig(workspace.root)
+  const { redact } = createRedactor(config.redactPatterns)
 
   if ('tool_name' in payload && payload.tool_name === SHELL_TOOL) {
     // Only Claude Code reports a command's exit code; without it a run is not evidence of anything.
-    return agent === 'claude-code' ? recordAgentCheck(payload, workspace, now) : { status: 'ignored', reason: `${agent} does not report exit codes` }
+    return agent === 'claude-code' ? recordAgentCheck(payload, workspace, now, config.agentChecks, redact) : { status: 'ignored', reason: `${agent} does not report exit codes` }
   }
   if (payload.hook_event_name === 'PostToolUseFailure') return { status: 'ignored', reason: 'only failed Bash checks are recorded' }
 
   const edits = await resolveEdits(workspace.root, payload)
   if (editedFiles(payload).length > 0 && edits.length === 0) return { status: 'ignored', reason: 'edited files are outside what Continuum captures' }
-  const prompt = payload.hook_event_name === 'UserPromptSubmit' && (await readConfig(workspace.root)).capturePrompts ? cleanPrompt(payload.prompt) : ''
+  const prompt = payload.hook_event_name === 'UserPromptSubmit' && config.capturePrompts ? cleanPrompt(payload.prompt, redact) : ''
   if (payload.hook_event_name === 'UserPromptSubmit' && prompt === '') return { status: 'ignored', reason: 'prompt capture is off for this repository' }
   const sessionTaskId = reportedTaskId(payload)
   const revision = await headRevision(workspace.root)
@@ -168,6 +170,7 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
     const recorded = store.transact(() =>
       translateHook(payload, {
         now,
+        redact,
         revision,
         knownSession: store.graph.has(keys.session(payload.session_id)),
         agent,
@@ -190,10 +193,10 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
  * recorded against the working tree as it is now, with the exit code Claude
  * Code observed. Turned off with `continuum config agent-checks off`.
  */
-async function recordAgentCheck(payload: HookPayload, workspace: Workspace, now: Date): Promise<IngestOutcome> {
-  const check = agentCheckOf(payload)
+async function recordAgentCheck(payload: HookPayload, workspace: Workspace, now: Date, isEnabled: boolean, redact: (text: string) => string): Promise<IngestOutcome> {
+  const check = agentCheckOf(payload, redact)
   if (!check) return { status: 'ignored', reason: 'not a recognized check command' }
-  if (!(await readConfig(workspace.root)).agentChecks) return { status: 'ignored', reason: 'agent checks are turned off for this repository' }
+  if (!isEnabled) return { status: 'ignored', reason: 'agent checks are turned off for this repository' }
   const revision = await headRevision(workspace.root)
   const store = ContextStore.open(workspace.storePath)
   try {
@@ -202,6 +205,7 @@ async function recordAgentCheck(payload: HookPayload, workspace: Workspace, now:
     const recorded = store.transact(() =>
       translateHook(payload, {
         now,
+        redact,
         revision,
         knownSession: store.graph.has(keys.session(payload.session_id)),
         check: { ...check, coverage: store.putCoverage(coverage(tree.files)) },

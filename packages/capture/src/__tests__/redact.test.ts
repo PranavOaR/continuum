@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REDACTED, redactSecrets, redactWithCount, setCustomRedactions } from '../redact'
+import { createRedactor, REDACTED, redactSecrets, redactWithCount } from '../redact'
 
 // Fake credentials are assembled at runtime so secret scanners never see a literal one in the repo.
 const fake = (...parts: string[]) => parts.join('')
@@ -75,10 +75,17 @@ describe('redactSecrets, stronger rules', () => {
     expect(redactSecrets(ordinary)).toBe(ordinary)
   })
 
-  it('applies custom patterns from the repository config, skipping invalid ones', () => {
-    expect(setCustomRedactions(['ACME-[0-9]{6}', '(unclosed'])).toBe(1)
-    expect(redactSecrets('ticket ACME-123456 opened')).toBe('ticket [redacted] opened')
-    setCustomRedactions([])
+  it('applies custom patterns, and names the ones it cannot use', () => {
+    const redactor = createRedactor(['ACME-[0-9]{6}', '(unclosed'])
+    expect(redactor.redact('ticket ACME-123456 opened')).toBe('ticket [redacted] opened')
+    expect(redactor.redactWithCount('ACME-123456 and ACME-654321').count).toBe(2)
+    expect(redactor.rejectedPatterns).toEqual(['(unclosed'])
+  })
+
+  it('keeps one repository\'s patterns out of every other redactor', () => {
+    createRedactor(['ACME-[0-9]{6}'])
+    expect(redactSecrets('ticket ACME-123456 opened')).toBe('ticket ACME-123456 opened')
+    expect(createRedactor([]).redact('ticket ACME-123456 opened')).toBe('ticket ACME-123456 opened')
   })
 })
 
@@ -131,6 +138,6 @@ describe('redactSecrets robustness', () => {
   })
 
   it('refuses overly long custom patterns', () => {
-    expect(setCustomRedactions(['a'.repeat(500)])).toBe(0)
+    expect(createRedactor(['a'.repeat(500)]).rejectedPatterns).toHaveLength(1)
   })
 })

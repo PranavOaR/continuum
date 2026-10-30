@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { applyRepositoryRedactions, extractSymbols, hashFiles, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, redactSecrets } from '@continuum/capture'
+import { extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
 import { currentTaskId, DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, projectState, rankContext, renderContext, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
@@ -38,11 +38,10 @@ export class ToolInputError extends Error {
 }
 
 /** Opens the store for one call and always closes it, so the server never holds the database between calls. */
-async function withStore<T>(cwd: string, work: (store: ContextStore, root: string) => Promise<T>): Promise<T> {
+async function withStore<T>(cwd: string, work: (store: ContextStore, root: string, redactor: Redactor) => Promise<T>): Promise<T> {
   const { workspace, store } = await openWorkspace(cwd)
   try {
-    await applyRepositoryRedactions(workspace.root)
-    return await work(store, workspace.root)
+    return await work(store, workspace.root, await repositoryRedactor(workspace.root))
   } finally {
     store.close()
   }
@@ -53,7 +52,7 @@ async function guarded(run: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
     return await run()
   } catch (error) {
-    if (error instanceof ToolInputError || error instanceof TaskToolError || error instanceof NotInitializedError || error instanceof NotAGitRepositoryError) {
+    if (error instanceof ToolInputError || error instanceof TaskToolError || error instanceof NotInitializedError || error instanceof NotAGitRepositoryError || error instanceof InvalidConfigError) {
       return failure(error.message)
     }
     throw error
@@ -203,7 +202,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
     },
     async ({ title, body, kind, files }) =>
       guarded(() =>
-        withStore(options.cwd, async (store, root) => {
+        withStore(options.cwd, async (store, root, { redact }) => {
           const anchors = await anchorsFor(root, options.cwd, files)
           const id = randomUUID()
           // Decisions belong to the task being worked on, read under the same lock that records them.
@@ -211,7 +210,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
             const taskId = currentTaskId(store, now())
             const event: MemoryRecordedEvent = {
               type: 'memory.recorded',
-              payload: { id, kind, title: redactSecrets(title), body: redactSecrets(body), anchors, ...(taskId ? { taskId } : {}) },
+              payload: { id, kind, title: redact(title), body: redact(body), anchors, ...(taskId ? { taskId } : {}) },
               evidence: 'agent-reported',
               source: MCP_SOURCE,
               occurredAt: now().toISOString(),
@@ -224,7 +223,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
       ),
   )
 
-  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store) => ok(await work(store)))), now)
+  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, _root, { redact }) => ok(await work(store, redact)))), now)
 
   return server
 }

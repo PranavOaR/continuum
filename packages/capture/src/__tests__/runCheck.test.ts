@@ -114,6 +114,15 @@ describe('runCheck', () => {
     expect(stored).toContain('API_KEY=[redacted] and done')
   })
 
+  it('masks the repository’s own patterns in the command, name and output', async () => {
+    const { repo, store } = setup({ 'a.ts': 'a', '.continuum/config.json': JSON.stringify({ redactPatterns: ['CUST-[0-9]{5}'] }) })
+    const result = await runCheck(store, { root: repo.root, command: NODE, args: ['-e', 'console.log("customer CUST-12345 ok")'], ...quiet() })
+    expect(result.name).not.toContain('CUST-12345')
+    // Once in the command line, once in its output.
+    expect(result.redactions).toBe(2)
+    expect(JSON.stringify([...store.events()])).not.toContain('CUST-12345')
+  })
+
   it('stops the command on abort and records nothing', async () => {
     const { repo, store } = setup()
     const controller = new AbortController()

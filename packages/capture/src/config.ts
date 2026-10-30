@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CONTINUUM_DIR } from './git'
-import { setCustomRedactions } from './redact'
+import { createRedactor, type Redactor } from './redact'
 
 export const CONFIG_FILE = 'config.json'
 
@@ -20,31 +20,66 @@ export const DEFAULT_CONFIG: Readonly<ContinuumConfig> = { agentChecks: true, ca
 
 const configPath = (root: string) => join(root, CONTINUUM_DIR, CONFIG_FILE)
 
-/** Unknown or malformed values fall back to the defaults: a bad config must never break a hook. */
-export async function readConfig(root: string): Promise<ContinuumConfig> {
-  const path = configPath(root)
-  if (!existsSync(path)) return { ...DEFAULT_CONFIG }
-  try {
-    const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
-    const values = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {}
-    const flag = (key: 'agentChecks' | 'capturePrompts') => (typeof values[key] === 'boolean' ? (values[key] as boolean) : DEFAULT_CONFIG[key])
-    const patterns = Array.isArray(values.redactPatterns) ? values.redactPatterns.filter((pattern): pattern is string => typeof pattern === 'string') : []
-    return { agentChecks: flag('agentChecks'), capturePrompts: flag('capturePrompts'), redactPatterns: patterns }
-  } catch {
-    return { ...DEFAULT_CONFIG }
+/**
+ * The config exists but cannot be read. Nothing is captured until it is fixed:
+ * guessing would store what its redactPatterns were meant to mask.
+ */
+export class InvalidConfigError extends Error {
+  constructor(path: string, reason: string) {
+    super(`${path} is not valid: ${reason}. Fix it, or delete it to use the defaults; until then Continuum records nothing in this repository.`)
+    this.name = 'InvalidConfigError'
   }
 }
 
-/** Applies the repository's own redaction patterns to everything this process stores from now on. */
-export async function applyRepositoryRedactions(root: string): Promise<void> {
-  setCustomRedactions((await readConfig(root)).redactPatterns)
+type RawConfig = Record<string, unknown>
+
+/** The file as written, validated; unknown keys are kept so a rewrite never loses them. */
+async function readRawConfig(root: string): Promise<RawConfig> {
+  const path = configPath(root)
+  if (!existsSync(path)) return {}
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await readFile(path, 'utf8'))
+  } catch (error) {
+    throw new InvalidConfigError(path, error instanceof SyntaxError ? `not valid JSON (${error.message})` : String(error))
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new InvalidConfigError(path, 'expected a JSON object')
+  const values = parsed as RawConfig
+  for (const key of ['agentChecks', 'capturePrompts'] as const) {
+    if (key in values && typeof values[key] !== 'boolean') throw new InvalidConfigError(path, `${key} must be true or false`)
+  }
+  const patterns = values.redactPatterns
+  if (patterns !== undefined && !(Array.isArray(patterns) && patterns.every((pattern) => typeof pattern === 'string'))) {
+    throw new InvalidConfigError(path, 'redactPatterns must be a list of strings')
+  }
+  return values
 }
 
+function withDefaults(values: RawConfig): ContinuumConfig {
+  return {
+    agentChecks: (values.agentChecks as boolean | undefined) ?? DEFAULT_CONFIG.agentChecks,
+    capturePrompts: (values.capturePrompts as boolean | undefined) ?? DEFAULT_CONFIG.capturePrompts,
+    redactPatterns: (values.redactPatterns as string[] | undefined) ?? [...DEFAULT_CONFIG.redactPatterns],
+  }
+}
+
+/** Missing settings take the defaults; a config that cannot be read throws InvalidConfigError. */
+export async function readConfig(root: string): Promise<ContinuumConfig> {
+  return withDefaults(await readRawConfig(root))
+}
+
+/** The built-in rules plus this repository's own patterns. Everything stored from the repository goes through it. */
+export async function repositoryRedactor(root: string): Promise<Redactor> {
+  return createRedactor((await readConfig(root)).redactPatterns)
+}
+
+/** Changes settings, keeping everything else in the file. Refuses to write over a config it cannot read. */
 export async function updateConfig(root: string, change: Partial<ContinuumConfig>): Promise<ContinuumConfig> {
-  const next = { ...(await readConfig(root)), ...change }
+  const raw = await readRawConfig(root)
+  const next = { ...raw, ...withDefaults(raw), ...change }
   const path = configPath(root)
   const temporary = `${path}.${process.pid}.tmp`
   await writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
   await rename(temporary, path)
-  return next
+  return withDefaults(next)
 }

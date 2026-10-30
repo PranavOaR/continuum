@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError, readRegistry } from '@continuum/capture'
+import { createRedactor, findRepoRoot, InvalidConfigError, isInitialized, isTracked, locateWorkspace, MAX_CUSTOM_PATTERN_CHARS, NotAGitRepositoryError, readConfig, readRegistry, type ContinuumConfig } from '@continuum/capture'
 import {
   CODEX_HOOKS_FILE,
   CURSOR_MCP_FILE,
@@ -101,6 +101,33 @@ function checkStore(storePath: string): Finding {
       return { status: 'fail', label: 'Store is damaged', detail: message, fix: 'Run `continuum uninstall --purge`, then set up again. This deletes the recorded history.' }
     }
     return { status: 'fail', label: 'Store cannot be read', detail: message, fix: `Check that you can read ${storePath}, then try again.` }
+  }
+}
+
+/** The repository's settings: a config that cannot be read stops all capture, and an unusable pattern masks nothing. */
+async function checkSettings(root: string): Promise<Finding> {
+  let config: ContinuumConfig
+  try {
+    config = await readConfig(root)
+  } catch (error) {
+    if (!(error instanceof InvalidConfigError)) throw error
+    return { status: 'fail', label: 'Settings cannot be read, so nothing is recorded', detail: error.message, fix: 'Fix .continuum/config.json, or delete it to use the defaults.' }
+  }
+  const { rejectedPatterns } = createRedactor(config.redactPatterns)
+  if (rejectedPatterns.length > 0) {
+    const count = rejectedPatterns.length
+    return {
+      status: 'warn',
+      label: `${count} redaction pattern${count === 1 ? ' is' : 's are'} not used`,
+      detail: rejectedPatterns.join(', '),
+      fix: `In .continuum/config.json, make each one a valid regular expression of at most ${MAX_CUSTOM_PATTERN_CHARS} characters.`,
+    }
+  }
+  const patterns = config.redactPatterns.length
+  return {
+    status: 'ok',
+    label: 'Settings',
+    detail: `agent checks ${config.agentChecks ? 'on' : 'off'}, prompts ${config.capturePrompts ? 'on' : 'off'}, ${patterns} redaction pattern${patterns === 1 ? '' : 's'} of your own`,
   }
 }
 
@@ -218,7 +245,7 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   const workspace = await locateWorkspace(env.cwd)
   findings.push({ status: 'ok', label: 'Git repository', detail: workspace.root })
   if (!isInitialized(workspace)) return [...findings, { status: 'fail', label: 'Continuum is not set up here', fix: SETUP_FIX }]
-  findings.push(checkStore(workspace.storePath))
+  findings.push(checkStore(workspace.storePath), await checkSettings(workspace.root))
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
   const others = [await checkCodex(workspace.root), await checkCursor(workspace.root), ...(await checkVsCode(workspace.root))].filter((finding): finding is Finding => finding !== null)
   const claudeHooks = checkHooks(settings, env.invocation)

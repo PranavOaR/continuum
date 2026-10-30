@@ -49,7 +49,5 @@ describe('continuum export and import', () => {
       .join('')
     expect(stored).not.toContain('private/notes.md')
     expect(stored).not.toContain('CUST-12345')
-    const { setCustomRedactions } = await import('@continuum/capture')
-    setCustomRedactions([])
   })
 })

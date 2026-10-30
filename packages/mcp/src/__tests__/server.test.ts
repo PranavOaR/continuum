@@ -113,6 +113,28 @@ describe('Continuum MCP server', () => {
     expect(handoff).not.toContain(value)
   })
 
+  it("masks the repository's own patterns in decisions and tasks", async () => {
+    const repo = await initializedRepo()
+    repo.write('.continuum/config.json', JSON.stringify({ redactPatterns: ['CUST-[0-9]{5}'] }))
+    const client = await connect(repo.root)
+    await client.callTool({ name: 'record_decision', arguments: { title: 'Refund CUST-12345', body: 'Only CUST-12345 is affected', kind: 'known-issue' } })
+    await client.callTool({ name: 'start_task', arguments: { title: 'Fix CUST-54321 import', steps: ['Reproduce with CUST-54321'] } })
+    await client.callTool({ name: 'update_task', arguments: { next_action: 'Email CUST-54321' } })
+    const handoff = text(await client.callTool({ name: 'get_handoff', arguments: {} }))
+    expect(handoff).toContain('Refund [redacted]')
+    expect(handoff).toContain('Fix [redacted] import')
+    expect(handoff).not.toMatch(/CUST-\d/)
+  })
+
+  it('tells the agent to fix a config it cannot read, and records nothing', async () => {
+    const repo = await initializedRepo()
+    repo.write('.continuum/config.json', '{ "redactPatterns": [')
+    const client = await connect(repo.root)
+    const result = await client.callTool({ name: 'record_decision', arguments: { title: 'anything' } })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toMatch(/config\.json is not valid/)
+  })
+
   it('rejects anchors outside the repository, ignored by git, or missing', async () => {
     const repo = await initializedRepo()
     repo.write('dist/out.js', 'built')

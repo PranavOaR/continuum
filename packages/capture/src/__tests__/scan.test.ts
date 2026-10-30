@@ -84,6 +84,21 @@ describe('scanRepository', () => {
     ])
   })
 
+  it('masks the repository’s own patterns in commit messages', async () => {
+    const { repo, store } = setup({ 'a.ts': 'a', '.continuum/config.json': JSON.stringify({ redactPatterns: ['CUST-[0-9]{5}'] }) })
+    repo.commit('fix the import for CUST-12345')
+    await scanRepository(store, repo.root)
+    const [commit] = [...store.events()].filter((event) => event.type === 'commit.recorded').map((event) => event.payload)
+    expect(commit).toMatchObject({ message: 'fix the import for [redacted]' })
+  })
+
+  it('records nothing while the config cannot be read', async () => {
+    const { repo, store } = setup({ 'a.ts': 'a', '.continuum/config.json': '{ "redactPatterns": [' })
+    repo.commit('initial')
+    await expect(scanRepository(store, repo.root)).rejects.toThrow(/config\.json is not valid/)
+    expect(store.eventCount()).toBe(0)
+  })
+
   it('lists the files a merge brought in', async () => {
     const { repo, store } = setup({ 'a.ts': 'a' })
     repo.commit('initial')

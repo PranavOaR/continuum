@@ -1,4 +1,3 @@
-import { redactSecrets } from '@continuum/capture'
 import type { ChangeType, ContentHash, ContinuumEvent } from '@continuum/core'
 import type { AgentCheck } from './agentCheck'
 import type { HookAgent, HookPayload } from './hookPayload'
@@ -23,6 +22,8 @@ export interface FileEdit {
 
 export interface TranslateContext {
   now: Date
+  /** The repository's redactor: agent text is masked with its own patterns as well as the built-in rules. */
+  redact: (text: string) => string
   revision: string | null
   /** Whether the store already knows this session (resume and compact reuse the id). */
   knownSession: boolean
@@ -72,7 +73,7 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
     case 'SessionEnd':
       return [{ ...base, type: 'session.ended', evidence: 'observed', payload: { sessionId } }]
     case 'Stop': {
-      const note = redactSecrets(payload.last_assistant_message ?? '').trim()
+      const note = context.redact(payload.last_assistant_message ?? '').trim()
       if (note === '') return []
       return [{ ...base, type: 'session.progress', evidence: 'agent-reported', payload: { sessionId, note: note.slice(0, MAX_NOTE_CHARS) } }]
     }
@@ -97,7 +98,7 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
  * A prompt as Continuum keeps it: redacted, with pasted blocks (logs, files,
  * credentials) replaced by a marker, and bounded.
  */
-export function cleanPrompt(prompt: string): string {
+export function cleanPrompt(prompt: string, redact: (text: string) => string): string {
   const withoutPastes = prompt.replace(/<pasted_content id="[^"]*">[\s\S]*?<\/pasted_content id="[^"]*">/g, '[pasted content]')
-  return redactSecrets(withoutPastes).trim().slice(0, MAX_PROMPT_CHARS)
+  return redact(withoutPastes).trim().slice(0, MAX_PROMPT_CHARS)
 }
