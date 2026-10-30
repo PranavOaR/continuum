@@ -8,7 +8,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 |---|---|
 | `setup claude-code` | Connects Claude Code to this repository. `setup codex`, `setup cursor` and `setup vscode` (GitHub Copilot in VS Code) connect those agents. `--remove` undoes it. |
 | `init` | Sets up Continuum in this git repository and records its files, without connecting an agent. |
-| `doctor` | Checks the install and this repository's setup, and says how to fix each problem. |
+| `doctor` | Checks the install and this repository's setup, including hooks that never arrive or fail, and says how to fix each problem. |
 | `uninstall` | Disconnects every agent. `--purge` also deletes `.continuum/`. |
 
 ## While you work
@@ -18,7 +18,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 | `run -- <command>` | Runs a check (tests, lint, build) and records it as **verified**. `--name <check>` names it. |
 | `start` | Watches the repository and records changes until Ctrl-C. |
 | `scan` | Records the changes since the last scan, once. |
-| `status` | Shows tracked files, unrecorded changes and check results. |
+| `status` | Shows tracked files, unrecorded changes, when each agent's hooks last arrived, and check results. |
 | `session start` · `note` · `end` | Records a session for an agent without hooks, or a chat. |
 
 ## Hand off and review

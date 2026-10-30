@@ -31,7 +31,7 @@ Handoffs also list **changes no agent session made**, so the next agent asks abo
 |---|---|
 | `.continuumignore` | Paths, in gitignore syntax, that are never hashed, recorded, diffed or put in a handoff. |
 | `continuum config` | `agent-checks off` stops recording agent-run checks. `prompts on` records what you type to agents, redacted, with pasted blocks dropped. |
-| `redactPatterns` | Extra regular expressions to mask, in `.continuum/config.json`, on top of built-in rules for common token formats and long random-looking strings. |
+| `redactPatterns` | Extra regular expressions to mask, in `.continuum/config.json`, on top of built-in rules for common token formats and long random-looking strings. They apply to everything recorded from the repository, including what you type in the dashboard. If the config or `.continuumignore` cannot be read, Continuum records nothing until it is fixed; `doctor` says what is wrong. |
 | `continuum forget` | Permanently removes data by `--path`, `--session` or `--before`. The database is rewritten, so the text is gone from the file itself. |
 | `continuum export` · `import` | Moves the history between machines as JSON. |
 | `continuum uninstall --purge` | Disconnects every agent and deletes `.continuum/`. |

@@ -1,6 +1,6 @@
 # Continuum roadmap
 
-Status, 22 October 2026. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan (install, scale, capture, smarter briefings, more agents, privacy, an actionable dashboard, a public launch) has shipped, apart from the items under [Next](#next).
+Status, 30 October 2026. Continuum 0.2.0 is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan (install, scale, capture, smarter briefings, more agents, privacy, an actionable dashboard, a public launch) has shipped, apart from the items under [Next](#next).
 
 ## Guiding principles
 
@@ -22,17 +22,16 @@ Status, 22 October 2026. Continuum is published on npm as `getcontinuum` and as 
 | **Agents** | `setup claude-code`, `setup codex`, `setup cursor` and `setup vscode` (Copilot agent mode). `continuum session` for agents without hooks. A cross-agent test (`npm run test:cross-agent`). Agents that report no exit codes are asked to run checks through `continuum run`. |
 | **Privacy** | `forget` (rewrites and vacuums the database), `.continuumignore`, built-in redaction with user patterns, and `export` / `import`. |
 | **Dashboard** | Task editing ("set by you"), behind the access token and a CSRF token. Every connected repository in one dashboard. A live getting-started checklist. A command palette. axe checks on live screens in both themes. |
-| **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo video recorded from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); later versions are proprietary and free to use. |
+| **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use. |
 
 ## Next
 
 | # | Item | Why | Done when |
 |---|---|---|---|
-| 1 | **Release 0.2.0** | VS Code support, the faster plugin and the import fix are on `main` but not on npm, and the plugin is still pinned to 0.1.2. | `npx getcontinuum setup vscode` works, and the plugin repository carries the 0.2.0 bundle. |
-| 2 | **A new demo video** | The current one is plain, and its voice sounds synthetic. | A re-recorded video with motion design and a natural voice is on the website. |
-| 3 | **Windows** | The hooks run through `sh`, so Windows is refused with a pointer to WSL 2. | Decide between WSL-only (documented, tested in CI) and native support (PowerShell or Node hooks, a Windows CI job). |
-| 4 | **Semantic search over memory** | Finding decisions by meaning, with local embeddings and no network. | Only if users ask for it: it is optional, and `get_context` covers most needs. |
-| 5 | **Turn on private vulnerability reporting** in the public plugin repository | Its `SECURITY.md` points there, and its bug-report template asks for `doctor` output. | The repository's Security tab accepts reports. |
-| 6 | **Usage feedback** | Real use should order everything after this list. | Issues and notes from people other than the author. |
+| 1 | **Release 0.2.1** | On `main`, not yet on npm: every capture path masks the repository's own `redactPatterns`, a broken config or `.continuumignore` stops capture instead of being ignored, dashboard edits are redacted, and `doctor` and `status` report hooks that never arrive or fail. | `npx getcontinuum@0.2.1 doctor` reports hook health, and the plugin repository carries the 0.2.1 bundle. |
+| 2 | **Windows** | The hooks run through `sh`, so Windows is refused with a pointer to WSL 2. | Decide between WSL-only (documented, tested in CI) and native support (PowerShell or Node hooks, a Windows CI job). |
+| 3 | **Semantic search over memory** | Finding decisions by meaning, with local embeddings and no network. | Only if users ask for it: it is optional, and `get_context` covers most needs. |
+| 4 | **Turn on private vulnerability reporting** in the public plugin repository | Its `SECURITY.md` points there, and its bug-report template asks for `doctor` output. | The repository's Security tab accepts reports. |
+| 5 | **Usage feedback** | Real use should order everything after this list. | Issues and notes from people other than the author. |
 
-The demo video's pipeline is described in [`scripts/demo-video/README.md`](../scripts/demo-video/README.md).
+The demo film's pipeline is described in [`scripts/demo-video/README.md`](../scripts/demo-video/README.md).
