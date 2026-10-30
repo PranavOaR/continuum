@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Your own `redactPatterns` now apply everywhere.** `continuum start`, `scan`, `session`, `init` and `setup` recorded diff excerpts, commit messages and session notes with only the built-in rules, so a pattern you added (a customer or ticket id, say) could still be stored. Every path now masks with the repository's own patterns, and one repository's patterns never apply to another's.
+- A `.continuum/config.json` that cannot be read (a trailing comma, say) silently fell back to the defaults, dropping your redaction patterns, and the next `continuum config` overwrote it. Continuum now records nothing until the config is fixed, `config` refuses to overwrite it, settings it does not know are kept, and `doctor` names the problem and any pattern that is not a valid regular expression.
+- A `.continuumignore` that exists but cannot be read meant nothing was ignored. Continuum now records nothing until it can read it.
+- A next action typed in the dashboard was stored as typed; it is now redacted like everything an agent records.
+
+### Added
+- **Hook health.** Hooks stay quiet so they never disturb the agent, which also hid a broken one. Each hook that reaches Continuum now notes its arrival, and any failure with its reason. `doctor` fails when an agent's last hook failed and warns when a connected agent has sent none; `status` shows when each agent's hooks last arrived.
+  - git that cannot run in a Continuum repository (on macOS, before the Xcode license is accepted) is reported instead of the repository being skipped, and the plugin's hooks still start Continuum so it can say so.
+
+### Changed
+- The dashboard served by `continuum serve` no longer downloads the sample dataset.
+
 ## [0.2.0] - 2026-10-22
 
 ### Changed
