@@ -91,19 +91,17 @@ describe('redactSecrets, stronger rules', () => {
 
 describe('false positives on real code', () => {
   it('redacts nothing in this repository’s own source files', async () => {
-    const { readdirSync, readFileSync, statSync } = await import('node:fs')
-    const { join } = await import('node:path')
+    const { execFileSync } = await import('node:child_process')
+    const { readFileSync } = await import('node:fs')
+    const { basename, join } = await import('node:path')
     const root = join(__dirname, '../../../..')
-    const files: string[] = []
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir)) {
-        const path = join(dir, name)
-        if (['node_modules', 'dist', '__tests__', 'coverage', 'e2e', 'test-results'].includes(name)) continue
-        if (statSync(path).isDirectory()) walk(path)
-        else if (/\.(ts|tsx|md|json)$/.test(name) && !name.endsWith('redact.ts') && name !== 'package-lock.json') files.push(path)
-      }
-    }
-    for (const dir of ['packages', 'apps', 'docs', 'scripts']) walk(join(root, dir))
+    // Only committed files: local scratch output (renders, voice-over takes) is not source.
+    const tracked = execFileSync('git', ['ls-files', '-z', '--', 'packages', 'apps', 'docs', 'scripts'], { cwd: root, encoding: 'utf8' }).split('\0')
+    const skipped = new Set(['__tests__', 'e2e'])
+    const files = tracked
+      .filter((path) => /\.(ts|tsx|md|json)$/.test(path) && !path.split('/').some((part) => skipped.has(part)))
+      .filter((path) => !basename(path).endsWith('redact.ts') && basename(path) !== 'package-lock.json')
+      .map((path) => join(root, path))
     const hits = files.flatMap((file) => {
       const { count } = redactWithCount(readFileSync(file, 'utf8'))
       return count > 0 ? [`${file.slice(root.length + 1)}: ${count}`] : []
