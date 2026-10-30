@@ -1,7 +1,7 @@
 import type { ContextStore } from '@continuum/store'
 import { REPOSITORY_NODE } from '@continuum/store'
 import { loadContinuumIgnore } from './continuumIgnore'
-import { gitOutput } from './git'
+import { GitCommandError, gitOutput } from './git'
 
 /** Commits recorded per scan at most; a large pull or rebase is summarized by its newest commits. */
 export const MAX_COMMITS_PER_SCAN = 20
@@ -40,13 +40,15 @@ function parseLog(output: string): CommitInfo[] {
  */
 export async function commitsSince(root: string, head: string, since: string | null): Promise<CommitInfo[]> {
   const range = since ? [head, `^${since}`] : [head, '--max-count=1']
+  const isContinuumIgnored = await loadContinuumIgnore(root)
+  let output: string
   try {
     // -m --first-parent: a merge lists the files it brought into this branch instead of none.
-    const output = await gitOutput(root, ['-c', 'core.quotePath=false', 'log', `--max-count=${MAX_COMMITS_PER_SCAN}`, '--no-renames', '-m', '--first-parent', `--format=${RECORD}%H${FIELD}%cI${FIELD}%s`, '--name-only', ...range, '--'])
-    const isContinuumIgnored = await loadContinuumIgnore(root)
-    return parseLog(output).map((commit) => ({ ...commit, files: commit.files.filter((file) => !isContinuumIgnored(file)) }))
-  } catch {
+    output = await gitOutput(root, ['-c', 'core.quotePath=false', 'log', `--max-count=${MAX_COMMITS_PER_SCAN}`, '--no-renames', '-m', '--first-parent', `--format=${RECORD}%H${FIELD}%cI${FIELD}%s`, '--name-only', ...range, '--'])
+  } catch (error) {
+    if (!(error instanceof GitCommandError)) throw error
     // `since` no longer exists (garbage-collected after a rebase): record just HEAD.
     return since ? commitsSince(root, head, null) : []
   }
+  return parseLog(output).map((commit) => ({ ...commit, files: commit.files.filter((file) => !isContinuumIgnored(file)) }))
 }

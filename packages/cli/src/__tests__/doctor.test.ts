@@ -90,6 +90,14 @@ describe('continuum doctor', () => {
     expect(find(await doctor(repo.root), /Settings cannot be read/)).toMatchObject({ status: 'fail', detail: expect.stringContaining('not valid JSON') })
   })
 
+  it('fails on a .continuumignore it cannot read', async () => {
+    const { mkdirSync } = await import('node:fs')
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    mkdirSync(join(repo.root, '.continuumignore'))
+    expect(find(await doctor(repo.root), /continuumignore/)).toMatchObject({ status: 'fail' })
+  })
+
   it('warns about redaction patterns it cannot use, and names them', async () => {
     const repo = sandbox()
     await cli(repo.root, ['setup', 'claude-code'])

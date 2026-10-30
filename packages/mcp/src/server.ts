@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
+import { extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, UnreadableIgnoreFileError, type Redactor } from '@continuum/capture'
 import { currentTaskId, DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, projectState, rankContext, renderContext, renderHandoff, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
@@ -47,14 +47,14 @@ async function withStore<T>(cwd: string, work: (store: ContextStore, root: strin
   }
 }
 
+const EXPECTED_ERRORS = [ToolInputError, TaskToolError, NotInitializedError, NotAGitRepositoryError, InvalidConfigError, UnreadableIgnoreFileError]
+
 /** Expected failures become tool errors the agent can read; anything else is a bug and propagates. */
 async function guarded(run: () => Promise<ToolResult>): Promise<ToolResult> {
   try {
     return await run()
   } catch (error) {
-    if (error instanceof ToolInputError || error instanceof TaskToolError || error instanceof NotInitializedError || error instanceof NotAGitRepositoryError || error instanceof InvalidConfigError) {
-      return failure(error.message)
-    }
+    if (EXPECTED_ERRORS.some((type) => error instanceof type)) return failure((error as Error).message)
     throw error
   }
 }

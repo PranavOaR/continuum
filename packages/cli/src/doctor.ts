@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { createRedactor, findRepoRoot, InvalidConfigError, isInitialized, isTracked, locateWorkspace, MAX_CUSTOM_PATTERN_CHARS, NotAGitRepositoryError, readConfig, readRegistry, type ContinuumConfig } from '@continuum/capture'
+import { createRedactor, findRepoRoot, InvalidConfigError, isInitialized, isTracked, loadContinuumIgnore, locateWorkspace, MAX_CUSTOM_PATTERN_CHARS, NotAGitRepositoryError, readConfig, readRegistry, UnreadableIgnoreFileError, type ContinuumConfig } from '@continuum/capture'
 import {
   CODEX_HOOKS_FILE,
   CURSOR_MCP_FILE,
@@ -131,6 +131,16 @@ async function checkSettings(root: string): Promise<Finding> {
   }
 }
 
+async function checkIgnoreFile(root: string): Promise<Finding | null> {
+  try {
+    await loadContinuumIgnore(root)
+    return null
+  } catch (error) {
+    if (!(error instanceof UnreadableIgnoreFileError)) throw error
+    return { status: 'fail', label: '.continuumignore cannot be read, so nothing is recorded', detail: error.message, fix: 'Make .continuumignore a readable file, or delete it.' }
+  }
+}
+
 /** Absolute paths a hook or server command depends on, including file: URLs such as the tsx loader. */
 function referencedPaths(entry: { command?: unknown; args?: unknown }): string[] {
   const parts = [entry.command, ...(Array.isArray(entry.args) ? entry.args : [])].filter((part): part is string => typeof part === 'string')
@@ -246,6 +256,8 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   findings.push({ status: 'ok', label: 'Git repository', detail: workspace.root })
   if (!isInitialized(workspace)) return [...findings, { status: 'fail', label: 'Continuum is not set up here', fix: SETUP_FIX }]
   findings.push(checkStore(workspace.storePath), await checkSettings(workspace.root))
+  const ignoreFile = await checkIgnoreFile(workspace.root)
+  if (ignoreFile) findings.push(ignoreFile)
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
   const others = [await checkCodex(workspace.root), await checkCursor(workspace.root), ...(await checkVsCode(workspace.root))].filter((finding): finding is Finding => finding !== null)
   const claudeHooks = checkHooks(settings, env.invocation)

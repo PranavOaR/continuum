@@ -1,5 +1,5 @@
 import { resolve } from 'node:path'
-import { CommandNotFoundError, InvalidConfigError, NotAGitRepositoryError, WatchUnavailableError } from '@continuum/capture'
+import { CommandNotFoundError, InvalidConfigError, NotAGitRepositoryError, UnreadableIgnoreFileError, WatchUnavailableError } from '@continuum/capture'
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
 import { PortInUseError } from '@continuum/daemon'
 import { compactCommand } from './commands/compact'
@@ -142,7 +142,8 @@ function isExpected(error: unknown): error is Error {
     error instanceof PortInUseError ||
     error instanceof InvalidHookPayloadError ||
     error instanceof StoreVersionError ||
-    error instanceof InvalidConfigError
+    error instanceof InvalidConfigError ||
+    error instanceof UnreadableIgnoreFileError
   )
 }
 
