@@ -265,6 +265,38 @@ describe('ingestHook prompts', () => {
     expect(stored).not.toMatch(/CUST-\d/)
   })
 
+  it('notes each hook that arrives, and each that fails, for doctor and status', async () => {
+    const { repo } = await initialized()
+    const { readHookHealth } = await import('@continuum/capture')
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW, agent: 'codex' })
+    expect(await readHookHealth(repo.root, 'codex')).toMatchObject({ lastArrivalAt: NOW.toISOString(), isFailing: false })
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(join(repo.root, '.continuum/config.json'), '{')
+    await expect(ingestHook(hook(repo, { hook_event_name: 'Stop' }), { now: () => NOW, agent: 'codex' })).rejects.toThrow()
+    expect(await readHookHealth(repo.root, 'codex')).toMatchObject({ isFailing: true, lastFailure: { message: expect.stringContaining('config.json is not valid') } })
+  })
+
+  it('reports git that cannot run in a Continuum repository instead of skipping it', async () => {
+    const { repo } = await initialized()
+    const { chmodSync, writeFileSync } = await import('node:fs')
+    const { readHookHealth } = await import('@continuum/capture')
+    // Like macOS's /usr/bin/git before the Xcode license is accepted.
+    const bin = mkdtempSync(join(tmpdir(), 'continuum-broken-git-'))
+    dirs.push(bin)
+    writeFileSync(join(bin, 'git'), '#!/bin/sh\necho "You have not agreed to the Xcode license agreements." >&2\nexit 69\n')
+    chmodSync(join(bin, 'git'), 0o755)
+    const path = process.env.PATH
+    process.env.PATH = `${bin}:${path}`
+    try {
+      expect((await ingestHook(hook(repo, { hook_event_name: 'Stop', last_assistant_message: 'done' }), { now: () => NOW })).status).toBe('ignored')
+    } finally {
+      process.env.PATH = path
+    }
+    const health = await readHookHealth(repo.root, 'claude-code')
+    expect(health.isFailing).toBe(true)
+    expect(health.lastFailure?.message).toContain('Xcode license')
+  })
+
   it('records nothing while the config cannot be read', async () => {
     const { repo, storePath } = await initialized()
     const { writeFileSync } = await import('node:fs')

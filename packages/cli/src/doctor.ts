@@ -18,7 +18,9 @@ import {
   VSCODE_MCP_FILE,
   type Invocation,
 } from '@continuum/claude-code'
+import { formatAgo } from '@continuum/context'
 import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@continuum/store'
+import { hookStatuses, notArrivingFix, type HookStatus } from './hookStatus'
 
 /** node:sqlite works without a flag from this version on. */
 export const MIN_NODE_VERSION: readonly [number, number] = [22, 13]
@@ -46,6 +48,7 @@ export interface DoctorEnvironment {
   webDist: string
   /** Holds the registry of connected repositories that `continuum serve` shows. */
   configDir: string
+  now?: Date
 }
 
 type Json = Record<string, unknown>
@@ -236,6 +239,22 @@ async function checkVsCode(root: string): Promise<Finding[]> {
   return [hooksFound, { status: 'ok', label: `VS Code MCP server registered in ${VSCODE_MCP_FILE}`, detail: 'start it when VS Code asks, or from "MCP: List Servers"' }]
 }
 
+/** Hooks exit quietly so they never disturb the agent: this is where a broken one shows. */
+function checkHookHealth({ agent, name, health }: HookStatus, now: Date): Finding {
+  if (health.isFailing) {
+    return { status: 'fail', label: `The last ${name} hook failed`, detail: health.lastFailure?.message, fix: 'Fix what it describes; the next hook that works clears this.' }
+  }
+  if (health.lastArrivalAt === null) {
+    return {
+      status: 'warn',
+      label: `No ${name} hook has reached Continuum yet`,
+      detail: `if you have used ${name} in this repository since setup, its hooks are not running`,
+      fix: notArrivingFix(agent),
+    }
+  }
+  return { status: 'ok', label: `${name} hooks reach Continuum`, detail: `last one ${formatAgo(new Date(health.lastArrivalAt), now)}` }
+}
+
 function checkDashboard(webDist: string): Finding {
   return existsSync(join(webDist, 'index.html'))
     ? { status: 'ok', label: 'Dashboard available', detail: 'continuum serve' }
@@ -268,6 +287,8 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   } else {
     findings.push(claudeHooks, ...(await checkMcp(workspace.root, mcpConfig, settings)), ...others)
   }
+  const now = env.now ?? new Date()
+  findings.push(...(await hookStatuses(workspace.root)).map((status) => checkHookHealth(status, now)))
   findings.push(checkDashboard(env.webDist))
   const listed = (await readRegistry(env.configDir)).some((entry) => entry.root === workspace.root)
   findings.push(

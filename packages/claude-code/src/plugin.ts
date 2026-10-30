@@ -39,8 +39,12 @@ const quote = (part: string) => `'${part.replaceAll("'", `'\\''`)}'`
 /** Skips the hook, reading the payload first: exiting with it unread breaks Claude Code's write to the hook (EPIPE). */
 const SKIP = '{ cat >/dev/null; exit 0; }'
 
+/**
+ * When git fails, the project directory itself is checked: if Continuum is set up there, the CLI
+ * runs anyway and records why the hook could not work, rather than every hook skipping silently.
+ */
 function repositoryGuard(): string[] {
-  return [`root=$(git -C "\${CLAUDE_PROJECT_DIR:-.}" rev-parse --show-toplevel 2>/dev/null) || ${SKIP}`, `[ -d "$root/.continuum" ] || ${SKIP}`]
+  return [`root=$(git -C "\${CLAUDE_PROJECT_DIR:-.}" rev-parse --show-toplevel 2>/dev/null) || root="\${CLAUDE_PROJECT_DIR:-.}"`, `[ -d "$root/.continuum" ] || ${SKIP}`]
 }
 
 /** `fallback` is the npx command; its last part is the CLI subcommand. */

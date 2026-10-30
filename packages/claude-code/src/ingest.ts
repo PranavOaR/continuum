@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
   createRedactor,
@@ -12,6 +12,10 @@ import {
   NotAGitRepositoryError,
   readConfig,
   readWorkingTreeWithSymbols,
+  recordHookArrival,
+  recordHookFailure,
+  STORE_FILE,
+  CONTINUUM_DIR,
   scanRepository,
   coverage,
   type Workspace,
@@ -57,11 +61,28 @@ export type IngestOutcome =
   | { status: 'ignored'; reason: string }
   | { status: 'recorded'; events: number; additionalContext?: string }
 
-async function findWorkspace(cwd: string): Promise<Workspace | null> {
+/** The nearest directory at or above `cwd` holding a Continuum store, found without git. */
+function storeRootAbove(cwd: string): string | null {
+  for (let dir = resolve(cwd); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, CONTINUUM_DIR, STORE_FILE))) return dir
+    if (dir === dirname(dir)) return null
+  }
+}
+
+const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+async function findWorkspace(cwd: string, agent: HookAgent, now: Date): Promise<Workspace | null> {
   try {
     const workspace = await locateWorkspace(cwd)
     return isInitialized(workspace) ? workspace : null
   } catch (error) {
+    // git failed. Where Continuum is set up, that is a broken hook to report, not a repository to skip.
+    const root = storeRootAbove(cwd)
+    if (root) {
+      const reason = error instanceof NotAGitRepositoryError && error.cause !== undefined ? error.cause : error
+      await recordHookFailure(root, agent, now, `git could not run, so nothing was recorded: ${messageOf(reason)}`)
+      return null
+    }
     if (error instanceof NotAGitRepositoryError) return null
     throw error
   }
@@ -146,8 +167,18 @@ export async function ingestHook(raw: string, options: IngestOptions = {}): Prom
   if (prepare && !hasSessionId(raw, prepare)) return { status: 'ignored', reason: 'VS Code sent no session id or transcript path' }
   const payload = parseHookPayload(raw, prepare)
   if (!payload) return { status: 'ignored', reason: 'hook event not used by Continuum' }
-  const workspace = await findWorkspace(payload.cwd)
+  const workspace = await findWorkspace(payload.cwd, agent, now)
   if (!workspace) return { status: 'ignored', reason: 'Continuum is not set up in this repository' }
+  await recordHookArrival(workspace.root, agent, now)
+  try {
+    return await ingestInto(workspace, payload, agent, now)
+  } catch (error) {
+    await recordHookFailure(workspace.root, agent, now, messageOf(error))
+    throw error
+  }
+}
+
+async function ingestInto(workspace: Workspace, payload: HookPayload, agent: HookAgent, now: Date): Promise<IngestOutcome> {
   // First: a config that cannot be read stops the hook before anything is recorded.
   const config = await readConfig(workspace.root)
   const { redact } = createRedactor(config.redactPatterns)

@@ -113,6 +113,26 @@ describe("the plugin's own copy of the CLI", () => {
     }
   })
 
+  it('still hands the payload on when git cannot run, so the CLI can report it', async () => {
+    const { chmodSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
+    const [handler] = read('plugin/hooks/hooks.json').hooks.SessionStart[0].hooks
+    const repo = createSandbox({ 'a.txt': 'a' })
+    mkdirSync(join(repo.root, '.continuum'))
+    const pluginRoot = await pluginWithBundle()
+    const brokenGit = mkdtempSync(join(tmpdir(), 'continuum-broken-git-'))
+    writeFileSync(join(brokenGit, 'git'), '#!/bin/sh\nexit 69\n')
+    chmodSync(join(brokenGit, 'git'), 0o755)
+    try {
+      const env = { ...process.env, CLAUDE_PROJECT_DIR: repo.root, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: minimalPath(brokenGit, dirname(process.execPath)) }
+      const output = execFileSync(handler.command, handler.args, { cwd: repo.root, env, input: '{"hook_event_name":"SessionStart"}', encoding: 'utf8' })
+      expect(output).toBe('bundle: ingest\n{"hook_event_name":"SessionStart"}')
+    } finally {
+      repo.cleanup()
+      rmSync(pluginRoot, { recursive: true, force: true })
+      rmSync(brokenGit, { recursive: true, force: true })
+    }
+  })
+
   it('starts the MCP server with node too', async () => {
     const { execFileSync } = await import('node:child_process')
     const { rmSync } = await import('node:fs')

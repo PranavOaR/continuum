@@ -135,6 +135,26 @@ describe('continuum doctor', () => {
   })
 })
 
+describe('continuum doctor on hooks that never arrive or fail', () => {
+  it('warns when a connected agent has sent no hook yet, and passes once one arrives', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    expect(find(await doctor(repo.root), /hook has reached Continuum/)).toMatchObject({ status: 'warn', label: 'No Claude Code hook has reached Continuum yet' })
+    const { recordHookArrival } = await import('@continuum/capture')
+    await recordHookArrival(repo.root, 'claude-code', new Date())
+    expect(find(await doctor(repo.root), /hooks reach Continuum/)).toMatchObject({ status: 'ok', label: 'Claude Code hooks reach Continuum', detail: expect.stringContaining('just now') })
+  })
+
+  it('fails with the reason when the last hook failed, even for an agent set up by a plugin', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const { recordHookArrival, recordHookFailure } = await import('@continuum/capture')
+    await recordHookArrival(repo.root, 'claude-code', new Date())
+    await recordHookFailure(repo.root, 'claude-code', new Date(), 'git could not run, so nothing was recorded: Xcode license')
+    expect(find(await doctor(repo.root), /last Claude Code hook failed/)).toMatchObject({ status: 'fail', detail: expect.stringContaining('Xcode license') })
+  })
+})
+
 describe('continuum doctor with Codex', () => {
   it('passes a repository connected only to Codex', async () => {
     const repo = sandbox()

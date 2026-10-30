@@ -12,3 +12,4 @@ export { defaultConfigDir, readRegistry, registerRepository, REGISTRY_FILE, unre
 export { ACTIVE_SESSION_FILE, claimActiveSession, clearActiveSession, readActiveSession, type ActiveSession } from './activeSession'
 export { extractSymbols, parseSymbolRef, type SourceSymbol, type SymbolKind } from './symbols'
 export { readSymbolHashes, readWorkingTreeWithSymbols } from './symbolHashes'
+export { readHookHealth, recordHookArrival, recordHookFailure, type HookHealth } from './hookHealth'
