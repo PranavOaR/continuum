@@ -251,6 +251,60 @@ describe('ingestHook prompts', () => {
     const next = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }, 'sess-2'), { now: () => NOW })
     expect(next.status === 'recorded' && next.additionalContext).toContain('Last request [said by you]: "Fix login')
   })
+
+  it("masks the repository's own patterns in the agent's notes and checks", async () => {
+    const { repo, storePath } = await initialized()
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]{5}'] }))
+    await ingestHook(hook(repo, { hook_event_name: 'Stop', last_assistant_message: 'Fixed the import for CUST-12345.' }), { now: () => NOW })
+    const bash = { tool_name: 'Bash', tool_input: { command: 'CUSTOMER=CUST-12345 npm test' }, tool_response: { stdout: 'ok for CUST-54321', stderr: '' } }
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', ...bash }), { now: () => NOW })
+    const stored = withStore(storePath, (store) => JSON.stringify([...store.events()]))
+    expect(stored).toContain('Fixed the import for [redacted].')
+    expect(stored).toContain('ok for [redacted]')
+    expect(stored).not.toMatch(/CUST-\d/)
+  })
+
+  it('notes each hook that arrives, and each that fails, for doctor and status', async () => {
+    const { repo } = await initialized()
+    const { readHookHealth } = await import('@continuum/capture')
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW, agent: 'codex' })
+    expect(await readHookHealth(repo.root, 'codex')).toMatchObject({ lastArrivalAt: NOW.toISOString(), isFailing: false })
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(join(repo.root, '.continuum/config.json'), '{')
+    await expect(ingestHook(hook(repo, { hook_event_name: 'Stop' }), { now: () => NOW, agent: 'codex' })).rejects.toThrow()
+    expect(await readHookHealth(repo.root, 'codex')).toMatchObject({ isFailing: true, lastFailure: { message: expect.stringContaining('config.json is not valid') } })
+  })
+
+  it('reports git that cannot run in a Continuum repository instead of skipping it', async () => {
+    const { repo } = await initialized()
+    const { chmodSync, writeFileSync } = await import('node:fs')
+    const { readHookHealth } = await import('@continuum/capture')
+    // Like macOS's /usr/bin/git before the Xcode license is accepted.
+    const bin = mkdtempSync(join(tmpdir(), 'continuum-broken-git-'))
+    dirs.push(bin)
+    writeFileSync(join(bin, 'git'), '#!/bin/sh\necho "You have not agreed to the Xcode license agreements." >&2\nexit 69\n')
+    chmodSync(join(bin, 'git'), 0o755)
+    const path = process.env.PATH
+    process.env.PATH = `${bin}:${path}`
+    try {
+      expect((await ingestHook(hook(repo, { hook_event_name: 'Stop', last_assistant_message: 'done' }), { now: () => NOW })).status).toBe('ignored')
+    } finally {
+      process.env.PATH = path
+    }
+    const health = await readHookHealth(repo.root, 'claude-code')
+    expect(health.isFailing).toBe(true)
+    expect(health.lastFailure?.message).toContain('Xcode license')
+  })
+
+  it('records nothing while the config cannot be read', async () => {
+    const { repo, storePath } = await initialized()
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(join(repo.root, '.continuum/config.json'), '{ "redactPatterns": [')
+    const before = withStore(storePath, (store) => store.eventCount())
+    await expect(ingestHook(hook(repo, { hook_event_name: 'Stop', last_assistant_message: 'done' }), { now: () => NOW })).rejects.toThrow(/config\.json is not valid/)
+    expect(withStore(storePath, (store) => store.eventCount())).toBe(before)
+  })
 })
 
 describe('changes outside agent sessions', () => {

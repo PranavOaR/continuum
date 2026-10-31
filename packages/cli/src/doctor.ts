@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { findRepoRoot, isInitialized, isTracked, locateWorkspace, NotAGitRepositoryError, readRegistry } from '@continuum/capture'
+import { createRedactor, findRepoRoot, InvalidConfigError, isInitialized, isTracked, loadContinuumIgnore, locateWorkspace, MAX_CUSTOM_PATTERN_CHARS, NotAGitRepositoryError, readConfig, readRegistry, UnreadableIgnoreFileError, type ContinuumConfig } from '@continuum/capture'
 import {
   CODEX_HOOKS_FILE,
   CURSOR_MCP_FILE,
@@ -18,7 +18,9 @@ import {
   VSCODE_MCP_FILE,
   type Invocation,
 } from '@continuum/claude-code'
+import { formatAgo } from '@continuum/context'
 import { inspectStore, isCorruptStoreError, LATEST_SCHEMA_VERSION } from '@continuum/store'
+import { hookStatuses, notArrivingFix, type HookStatus } from './hookStatus'
 
 /** node:sqlite works without a flag from this version on. */
 export const MIN_NODE_VERSION: readonly [number, number] = [22, 13]
@@ -46,6 +48,7 @@ export interface DoctorEnvironment {
   webDist: string
   /** Holds the registry of connected repositories that `continuum serve` shows. */
   configDir: string
+  now?: Date
 }
 
 type Json = Record<string, unknown>
@@ -101,6 +104,43 @@ function checkStore(storePath: string): Finding {
       return { status: 'fail', label: 'Store is damaged', detail: message, fix: 'Run `continuum uninstall --purge`, then set up again. This deletes the recorded history.' }
     }
     return { status: 'fail', label: 'Store cannot be read', detail: message, fix: `Check that you can read ${storePath}, then try again.` }
+  }
+}
+
+/** The repository's settings: a config that cannot be read stops all capture, and an unusable pattern masks nothing. */
+async function checkSettings(root: string): Promise<Finding> {
+  let config: ContinuumConfig
+  try {
+    config = await readConfig(root)
+  } catch (error) {
+    if (!(error instanceof InvalidConfigError)) throw error
+    return { status: 'fail', label: 'Settings cannot be read, so nothing is recorded', detail: error.message, fix: 'Fix .continuum/config.json, or delete it to use the defaults.' }
+  }
+  const { rejectedPatterns } = createRedactor(config.redactPatterns)
+  if (rejectedPatterns.length > 0) {
+    const count = rejectedPatterns.length
+    return {
+      status: 'warn',
+      label: `${count} redaction pattern${count === 1 ? ' is' : 's are'} not used`,
+      detail: rejectedPatterns.join(', '),
+      fix: `In .continuum/config.json, make each one a valid regular expression of at most ${MAX_CUSTOM_PATTERN_CHARS} characters.`,
+    }
+  }
+  const patterns = config.redactPatterns.length
+  return {
+    status: 'ok',
+    label: 'Settings',
+    detail: `agent checks ${config.agentChecks ? 'on' : 'off'}, prompts ${config.capturePrompts ? 'on' : 'off'}, ${patterns} redaction pattern${patterns === 1 ? '' : 's'} of your own`,
+  }
+}
+
+async function checkIgnoreFile(root: string): Promise<Finding | null> {
+  try {
+    await loadContinuumIgnore(root)
+    return null
+  } catch (error) {
+    if (!(error instanceof UnreadableIgnoreFileError)) throw error
+    return { status: 'fail', label: '.continuumignore cannot be read, so nothing is recorded', detail: error.message, fix: 'Make .continuumignore a readable file, or delete it.' }
   }
 }
 
@@ -199,6 +239,22 @@ async function checkVsCode(root: string): Promise<Finding[]> {
   return [hooksFound, { status: 'ok', label: `VS Code MCP server registered in ${VSCODE_MCP_FILE}`, detail: 'start it when VS Code asks, or from "MCP: List Servers"' }]
 }
 
+/** Hooks exit quietly so they never disturb the agent: this is where a broken one shows. */
+function checkHookHealth({ agent, name, health }: HookStatus, now: Date): Finding {
+  if (health.isFailing) {
+    return { status: 'fail', label: `The last ${name} hook failed`, detail: health.lastFailure?.message, fix: 'Fix what it describes; the next hook that works clears this.' }
+  }
+  if (health.lastArrivalAt === null) {
+    return {
+      status: 'warn',
+      label: `No ${name} hook has reached Continuum yet`,
+      detail: `if you have used ${name} in this repository since setup, its hooks are not running`,
+      fix: notArrivingFix(agent),
+    }
+  }
+  return { status: 'ok', label: `${name} hooks reach Continuum`, detail: `last one ${formatAgo(new Date(health.lastArrivalAt), now)}` }
+}
+
 function checkDashboard(webDist: string): Finding {
   return existsSync(join(webDist, 'index.html'))
     ? { status: 'ok', label: 'Dashboard available', detail: 'continuum serve' }
@@ -218,7 +274,9 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   const workspace = await locateWorkspace(env.cwd)
   findings.push({ status: 'ok', label: 'Git repository', detail: workspace.root })
   if (!isInitialized(workspace)) return [...findings, { status: 'fail', label: 'Continuum is not set up here', fix: SETUP_FIX }]
-  findings.push(checkStore(workspace.storePath))
+  findings.push(checkStore(workspace.storePath), await checkSettings(workspace.root))
+  const ignoreFile = await checkIgnoreFile(workspace.root)
+  if (ignoreFile) findings.push(ignoreFile)
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
   const others = [await checkCodex(workspace.root), await checkCursor(workspace.root), ...(await checkVsCode(workspace.root))].filter((finding): finding is Finding => finding !== null)
   const claudeHooks = checkHooks(settings, env.invocation)
@@ -229,6 +287,8 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   } else {
     findings.push(claudeHooks, ...(await checkMcp(workspace.root, mcpConfig, settings)), ...others)
   }
+  const now = env.now ?? new Date()
+  findings.push(...(await hookStatuses(workspace.root)).map((status) => checkHookHealth(status, now)))
   findings.push(checkDashboard(env.webDist))
   const listed = (await readRegistry(env.configDir)).some((entry) => entry.root === workspace.root)
   findings.push(

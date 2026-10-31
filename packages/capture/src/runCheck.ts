@@ -4,7 +4,8 @@ import type { Writable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
 import type { CheckRecordedEvent, CheckStatus, ContentHash, IdentityKey } from '@continuum/core'
 import { keys, type ContextStore } from '@continuum/store'
-import { redactSecrets, redactWithCount } from './redact'
+import { repositoryRedactor } from './config'
+import { BUILT_IN_REDACTOR, type Redactor } from './redact'
 import { scanRepository } from './scan'
 
 export const RUN_SOURCE = 'cli:run'
@@ -73,12 +74,12 @@ function keep(text: string, limit: number): string {
 }
 
 /** Clean, redacted, bounded tail; never starts with half a surrogate pair. */
-export function finalizeTail(raw: string): string {
-  return finalizeTailCounted(raw).text
+export function finalizeTail(raw: string, redactor: Redactor = BUILT_IN_REDACTOR): string {
+  return finalizeTailCounted(raw, redactor).text
 }
 
-function finalizeTailCounted(raw: string): { text: string; count: number } {
-  const { text, count } = redactWithCount(raw.replace(ANSI_ESCAPE, ''))
+function finalizeTailCounted(raw: string, redactor: Redactor): { text: string; count: number } {
+  const { text, count } = redactor.redactWithCount(raw.replace(ANSI_ESCAPE, ''))
   return { text: keep(text.trim(), MAX_OUTPUT_TAIL_CHARS).replace(LOW_SURROGATE, ''), count }
 }
 
@@ -104,7 +105,7 @@ function exitCodeOf(code: number | null, signal: NodeJS.Signals | null): number 
 }
 
 /** Runs the command without a shell, teeing its output to the given streams and keeping a bounded tail. */
-function execute(options: RunCheckOptions): Promise<ProcessOutcome> {
+function execute(options: RunCheckOptions, redactor: Redactor): Promise<ProcessOutcome> {
   return new Promise((resolve, reject) => {
     const child = spawn(options.command, options.args, { cwd: options.root, stdio: ['inherit', 'pipe', 'pipe'] })
     let tail = ''
@@ -131,7 +132,7 @@ function execute(options: RunCheckOptions): Promise<ProcessOutcome> {
     })
     child.on('close', (code, signal) => {
       options.signal?.removeEventListener('abort', stop)
-      const output = finalizeTailCounted(tail)
+      const output = finalizeTailCounted(tail, redactor)
       resolve({ exitCode: exitCodeOf(code, signal), output: output.text, redactions: output.count, interrupted })
     })
   })
@@ -149,12 +150,13 @@ export function coverage(files: ReadonlyMap<string, ContentHash>): Record<Identi
  */
 export async function runCheck(store: ContextStore, options: RunCheckOptions): Promise<RunCheckResult> {
   const now = options.now ?? (() => new Date())
-  const { text: commandLine, count: commandRedactions } = redactWithCount([options.command, ...options.args].join(' '))
-  const name = redactSecrets(options.name ?? commandLine)
+  const redactor = await repositoryRedactor(options.root)
+  const { text: commandLine, count: commandRedactions } = redactor.redactWithCount([options.command, ...options.args].join(' '))
+  const name = redactor.redact(options.name ?? commandLine)
   const attribution = { attributeToActiveSession: options.attributeToActiveSession ?? false }
   const { tree } = await scanRepository(store, options.root, { now, ...attribution })
   const startedAt = now()
-  const outcome = await execute(options)
+  const outcome = await execute(options, redactor)
   if (outcome.interrupted) throw new CheckInterruptedError(outcome.exitCode)
   const durationMs = Math.max(0, now().getTime() - startedAt.getTime())
   const event: CheckRecordedEvent = {

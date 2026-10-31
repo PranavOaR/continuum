@@ -9,8 +9,9 @@ import { loadContinuumIgnore } from './continuumIgnore'
 export const CONTINUUM_DIR = '.continuum'
 
 export class NotAGitRepositoryError extends Error {
-  constructor(cwd: string) {
-    super(`Not inside a git repository: ${cwd}. Continuum tracks git repositories; run \`git init\` first.`)
+  /** `cause` is git's own failure, which says whether git ran at all. */
+  constructor(cwd: string, options?: ErrorOptions) {
+    super(`Not inside a git repository: ${cwd}. Continuum tracks git repositories; run \`git init\` first.`, options)
     this.name = 'NotAGitRepositoryError'
   }
 }
@@ -62,7 +63,7 @@ export async function findRepoRoot(cwd: string): Promise<string> {
   try {
     return (await git(cwd, ['rev-parse', '--show-toplevel'])).trim()
   } catch (error) {
-    if (error instanceof GitCommandError) throw new NotAGitRepositoryError(cwd)
+    if (error instanceof GitCommandError) throw new NotAGitRepositoryError(cwd, { cause: error })
     throw error
   }
 }

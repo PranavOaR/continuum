@@ -299,6 +299,33 @@ describe('LocalContinuumService task edits', () => {
     expect(briefing).toContain('[set by you] Changed in the dashboard: acceptance criteria met, next action, status, steps done')
   })
 
+  it('masks secrets and the repository’s own patterns in a next action you type', async () => {
+    const { storePath, local } = await withTask()
+    const { writeFileSync } = await import('node:fs')
+    const { dirname, join } = await import('node:path')
+    writeFileSync(join(dirname(storePath), 'config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]{5}'] }))
+    const value = ['not', 'real', 'value'].join('-')
+    const task = await local.updateTask('acme', 'auth-1', { kind: 'next-action', nextAction: `Call CUST-12345 with API_KEY=${value}` })
+    expect(task.nextAction).toBe('Call [redacted] with API_KEY=[redacted]')
+    const store = openStore(storePath)
+    const stored = JSON.stringify(store.recentEvents(1))
+    store.close()
+    expect(stored).not.toContain('CUST-12345')
+    expect(stored).not.toContain(value)
+  })
+
+  it('shows nothing from a repository whose config cannot be read, and says why', async () => {
+    const { storePath, local } = await withTask()
+    const { writeFileSync } = await import('node:fs')
+    const { dirname, join } = await import('node:path')
+    writeFileSync(join(dirname(storePath), 'config.json'), '{ "redactPatterns": [')
+    local.invalidate()
+    await expect(local.getWorkspace('acme')).rejects.toThrow(/config\.json is not valid/)
+    const edit = local.updateTask('acme', 'auth-1', { kind: 'next-action', nextAction: 'Ship it' })
+    await expect(edit).rejects.toBeInstanceOf(ProjectUnavailableError)
+    await expect(edit).rejects.toThrow(/config\.json is not valid/)
+  })
+
   it("forgets your edits' label once the agent reports the task again", async () => {
     const { storePath, local } = await withTask()
     await local.updateTask('acme', 'auth-1', { kind: 'status', status: 'blocked' })

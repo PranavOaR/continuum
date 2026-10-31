@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { REDACTED, redactSecrets, redactWithCount, setCustomRedactions } from '../redact'
+import { createRedactor, REDACTED, redactSecrets, redactWithCount } from '../redact'
 
 // Fake credentials are assembled at runtime so secret scanners never see a literal one in the repo.
 const fake = (...parts: string[]) => parts.join('')
@@ -75,28 +75,33 @@ describe('redactSecrets, stronger rules', () => {
     expect(redactSecrets(ordinary)).toBe(ordinary)
   })
 
-  it('applies custom patterns from the repository config, skipping invalid ones', () => {
-    expect(setCustomRedactions(['ACME-[0-9]{6}', '(unclosed'])).toBe(1)
-    expect(redactSecrets('ticket ACME-123456 opened')).toBe('ticket [redacted] opened')
-    setCustomRedactions([])
+  it('applies custom patterns, and names the ones it cannot use', () => {
+    const redactor = createRedactor(['ACME-[0-9]{6}', '(unclosed'])
+    expect(redactor.redact('ticket ACME-123456 opened')).toBe('ticket [redacted] opened')
+    expect(redactor.redactWithCount('ACME-123456 and ACME-654321').count).toBe(2)
+    expect(redactor.rejectedPatterns).toEqual(['(unclosed'])
+  })
+
+  it('keeps one repository\'s patterns out of every other redactor', () => {
+    createRedactor(['ACME-[0-9]{6}'])
+    expect(redactSecrets('ticket ACME-123456 opened')).toBe('ticket ACME-123456 opened')
+    expect(createRedactor([]).redact('ticket ACME-123456 opened')).toBe('ticket ACME-123456 opened')
   })
 })
 
 describe('false positives on real code', () => {
   it('redacts nothing in this repository’s own source files', async () => {
-    const { readdirSync, readFileSync, statSync } = await import('node:fs')
-    const { join } = await import('node:path')
+    const { execFileSync } = await import('node:child_process')
+    const { readFileSync } = await import('node:fs')
+    const { basename, join } = await import('node:path')
     const root = join(__dirname, '../../../..')
-    const files: string[] = []
-    const walk = (dir: string) => {
-      for (const name of readdirSync(dir)) {
-        const path = join(dir, name)
-        if (['node_modules', 'dist', '__tests__', 'coverage', 'e2e', 'test-results'].includes(name)) continue
-        if (statSync(path).isDirectory()) walk(path)
-        else if (/\.(ts|tsx|md|json)$/.test(name) && !name.endsWith('redact.ts') && name !== 'package-lock.json') files.push(path)
-      }
-    }
-    for (const dir of ['packages', 'apps', 'docs', 'scripts']) walk(join(root, dir))
+    // Only committed files: local scratch output (renders, voice-over takes) is not source.
+    const tracked = execFileSync('git', ['ls-files', '-z', '--', 'packages', 'apps', 'docs', 'scripts'], { cwd: root, encoding: 'utf8' }).split('\0')
+    const skipped = new Set(['__tests__', 'e2e'])
+    const files = tracked
+      .filter((path) => /\.(ts|tsx|md|json)$/.test(path) && !path.split('/').some((part) => skipped.has(part)))
+      .filter((path) => !basename(path).endsWith('redact.ts') && basename(path) !== 'package-lock.json')
+      .map((path) => join(root, path))
     const hits = files.flatMap((file) => {
       const { count } = redactWithCount(readFileSync(file, 'utf8'))
       return count > 0 ? [`${file.slice(root.length + 1)}: ${count}`] : []
@@ -131,6 +136,6 @@ describe('redactSecrets robustness', () => {
   })
 
   it('refuses overly long custom patterns', () => {
-    expect(setCustomRedactions(['a'.repeat(500)])).toBe(0)
+    expect(createRedactor(['a'.repeat(500)]).rejectedPatterns).toHaveLength(1)
   })
 })

@@ -18,6 +18,7 @@
     "bundle": "node scripts/bundle.mjs",
     "smoke:release": "node scripts/smoke-release.mjs",
     "bench:scan": "tsx scripts/bench-scan.ts",
+    "bench:store": "tsx scripts/bench-store.ts",
     "test:cross-agent": "node scripts/cross-agent.mjs",
     "plugin": "tsx scripts/plugin.ts",
     "eval": "tsx scripts/eval/run.ts",

@@ -1,7 +1,9 @@
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { execFileSync } from 'node:child_process'
+import { dirname, join } from 'node:path'
 import { createSandbox } from '@continuum/capture/testing'
-import { describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it } from 'vitest'
 import { guardedPluginHooks, PLUGIN_BUNDLE, pluginMcpServers } from '../plugin'
 import { setupClaudeCode } from '../setup'
 
@@ -24,6 +26,16 @@ describe('the Claude Code plugin', () => {
   })
 })
 
+/**
+ * A minimal PATH for running a hook: the git in use (and nothing else from its directory, which may
+ * hold npx), then the system's. On macOS /usr/bin/git is a stub that fails until the Xcode license
+ * is accepted, so it cannot stand in for git.
+ */
+const gitOnly = mkdtempSync(join(tmpdir(), 'continuum-git-only-'))
+symlinkSync(execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim(), join(gitOnly, 'git'))
+afterAll(() => rmSync(gitOnly, { recursive: true, force: true }))
+const minimalPath = (...first: string[]) => [...first, gitOnly, '/usr/bin', '/bin'].join(':')
+
 const LARGE_PAYLOAD = JSON.stringify({ hook_event_name: 'PostToolUse', tool_response: 'x'.repeat(1_000_000) })
 
 describe('plugin hooks outside Continuum repositories', () => {
@@ -39,7 +51,7 @@ describe('plugin hooks outside Continuum repositories', () => {
       for (const dir of [plain.root, notGit]) {
         // Claude Code writes every hook its payload, which can be large (it carries tool output). A payload
         // bigger than a pipe's buffer fails with EPIPE unless the hook reads it before exiting.
-        const output = execFileSync(handler.command, handler.args, { cwd: dir, env: { ...process.env, CLAUDE_PROJECT_DIR: dir, PATH: '/usr/bin:/bin' }, input: LARGE_PAYLOAD, encoding: 'utf8' })
+        const output = execFileSync(handler.command, handler.args, { cwd: dir, env: { ...process.env, CLAUDE_PROJECT_DIR: dir, PATH: minimalPath() }, input: LARGE_PAYLOAD, encoding: 'utf8' })
         expect(output).toBe('')
         // npx is not on that PATH, so had the guard tried to start it, the hook would have failed: success proves it skipped.
         // (No timing assertion: a wall-clock limit failed on a slow CI runner without saying anything about the guard.)
@@ -63,7 +75,7 @@ describe('plugin hooks outside Continuum repositories', () => {
     writeFileSync(join(bin, 'npx'), '#!/bin/sh\necho "args: $*"\ncat\n')
     chmodSync(join(bin, 'npx'), 0o755)
     try {
-      const output = execFileSync(handler.command, handler.args, { cwd: repo.root, env: { ...process.env, CLAUDE_PROJECT_DIR: repo.root, PATH: `${bin}:/usr/bin:/bin` }, input: '{"hook_event_name":"SessionStart"}', encoding: 'utf8' })
+      const output = execFileSync(handler.command, handler.args, { cwd: repo.root, env: { ...process.env, CLAUDE_PROJECT_DIR: repo.root, PATH: minimalPath(bin) }, input: '{"hook_event_name":"SessionStart"}', encoding: 'utf8' })
       expect(output).toBe(`args: -y getcontinuum@${read('packages/cli/package.json').version} ingest\n{"hook_event_name":"SessionStart"}`)
     } finally {
       repo.cleanup()
@@ -86,14 +98,13 @@ describe("the plugin's own copy of the CLI", () => {
   it('runs hooks with node, never npx, when the plugin carries it', async () => {
     const { execFileSync } = await import('node:child_process')
     const { mkdirSync, rmSync } = await import('node:fs')
-    const { dirname } = await import('node:path')
     const [handler] = read('plugin/hooks/hooks.json').hooks.SessionStart[0].hooks
     const repo = createSandbox({ 'a.txt': 'a' })
     mkdirSync(join(repo.root, '.continuum'))
     const pluginRoot = await pluginWithBundle()
     try {
       // The stand-in prints "bundle:"; npx, had the hook fallen back to it, would not.
-      const env = { ...process.env, CLAUDE_PROJECT_DIR: repo.root, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` }
+      const env = { ...process.env, CLAUDE_PROJECT_DIR: repo.root, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: minimalPath(dirname(process.execPath)) }
       const output = execFileSync(handler.command, handler.args, { cwd: repo.root, env, input: '{"hook_event_name":"SessionStart"}', encoding: 'utf8' })
       expect(output).toBe('bundle: ingest\n{"hook_event_name":"SessionStart"}')
     } finally {
@@ -102,14 +113,33 @@ describe("the plugin's own copy of the CLI", () => {
     }
   })
 
+  it('still hands the payload on when git cannot run, so the CLI can report it', async () => {
+    const { chmodSync, mkdirSync, rmSync, writeFileSync } = await import('node:fs')
+    const [handler] = read('plugin/hooks/hooks.json').hooks.SessionStart[0].hooks
+    const repo = createSandbox({ 'a.txt': 'a' })
+    mkdirSync(join(repo.root, '.continuum'))
+    const pluginRoot = await pluginWithBundle()
+    const brokenGit = mkdtempSync(join(tmpdir(), 'continuum-broken-git-'))
+    writeFileSync(join(brokenGit, 'git'), '#!/bin/sh\nexit 69\n')
+    chmodSync(join(brokenGit, 'git'), 0o755)
+    try {
+      const env = { ...process.env, CLAUDE_PROJECT_DIR: repo.root, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: minimalPath(brokenGit, dirname(process.execPath)) }
+      const output = execFileSync(handler.command, handler.args, { cwd: repo.root, env, input: '{"hook_event_name":"SessionStart"}', encoding: 'utf8' })
+      expect(output).toBe('bundle: ingest\n{"hook_event_name":"SessionStart"}')
+    } finally {
+      repo.cleanup()
+      rmSync(pluginRoot, { recursive: true, force: true })
+      rmSync(brokenGit, { recursive: true, force: true })
+    }
+  })
+
   it('starts the MCP server with node too', async () => {
     const { execFileSync } = await import('node:child_process')
     const { rmSync } = await import('node:fs')
-    const { dirname } = await import('node:path')
     const server = read('plugin/.mcp.json').mcpServers.continuum
     const pluginRoot = await pluginWithBundle()
     try {
-      const env = { ...process.env, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` }
+      const env = { ...process.env, CLAUDE_PLUGIN_ROOT: pluginRoot, PATH: minimalPath(dirname(process.execPath)) }
       expect(execFileSync(server.command, server.args, { env, input: '', encoding: 'utf8' })).toBe('bundle: mcp\n')
     } finally {
       rmSync(pluginRoot, { recursive: true, force: true })

@@ -1,6 +1,13 @@
 # Continuum — Product Architecture
 
-**Status:** proposal for review · **Companion to:** [`BUILD_PLAN.md`](./BUILD_PLAN.md) (phases, testing, risks)
+**Status:** built. This was the design written before building started; it is kept current where the build differs. · **See also:** [`ROADMAP.md`](./ROADMAP.md) (what shipped, what is next), [`BUILD_PLAN.md`](./BUILD_PLAN.md) (the original phases, historical)
+
+**As built, in short:**
+- Agents connect through hooks and a local stdio MCP server: Claude Code (hooks, MCP, or the plugin), Codex (hooks and MCP), GitHub Copilot in VS Code (hooks and MCP) and Cursor (MCP, with `continuum session` and the watcher for capture).
+- The MCP tools are `get_handoff`, `get_project_state`, `get_context`, `record_decision`, `start_task` and `update_task`.
+- Change detection takes clean files' hashes from the git index and hashes only dirty and untracked files; there is no separate Merkle tree.
+- Symbols come from a small, dependency-free scanner of top-level declarations (TypeScript, JavaScript, Python), not tree-sitter. A file it cannot read with confidence falls back to file-level anchors.
+- Everything stored passes through redaction: built-in rules plus the repository's own `redactPatterns`.
 
 This document answers two questions before building starts:
 
@@ -23,7 +30,7 @@ These are not alternatives; they are two layers.
 │       │                                   ▼                   │
 │       └──MCP (stdio)──▶ continuum mcp ──▶ Context Store       │
 │                                           ▲    (local file)   │
-│  Codex / Cursor ──MCP──▶ continuum mcp ───┤                   │
+│  Codex/Cursor/Copilot ─▶ continuum mcp ───┤                   │
 │                                           │                   │
 │  git + file watcher + test wrapper ───────┘                   │
 │                                                               │
@@ -37,11 +44,11 @@ Three mechanisms, packaged together so it is one install. Each is confirmed in a
 
 | Mechanism | Direction | What it does |
 | --- | --- | --- |
-| **MCP server** (`continuum mcp`, stdio) | Claude pulls | Tools such as `get_project_state`, `get_handoff`, `search_context`, `record_decision`, `record_progress`. Claude asks for context when it needs it. |
+| **MCP server** (`continuum mcp`, stdio) | Claude pulls | `get_handoff`, `get_project_state`, `get_context`, `record_decision`, `start_task`, `update_task`. Claude asks for context when it needs it. |
 | **Hooks** | Continuum listens | Session start/end and file-edit/tool events are posted to `continuum ingest`, so capture is passive. A session-start hook can also inject a short "where we left off" summary. |
 | **Plugin bundle** | Install | Packages the MCP server, hooks and slash commands (e.g. `/handoff`) so setup is a single step. |
 
-Other agents get the MCP server (Codex, Cursor) or copy-paste (ChatGPT, until a better path is confirmed). Git, file watching and the test wrapper work for every agent, even with no integration at all.
+Codex and GitHub Copilot in VS Code get hooks and the MCP server; Cursor gets the MCP server, with `continuum session` and the watcher for capture. Git, file watching and the test wrapper work for every agent, even with no integration at all.
 
 ---
 
@@ -76,13 +83,13 @@ Your idea, made concrete: **a hash map keyed by hashes, whose values are nodes i
 
 - **Layer 1** is append-only. Same content means same hash, so nothing is stored twice.
 - **Layer 2** is the hash map: O(1) lookup from any identity to its node, its current version, and its adjacency lists. This is "the graph as the value of the hash map".
-- **Layer 3** is simply what you get by following the edges stored in Layer 2 values. Typed edges: `touches`, `defines`, `imports`, `constrains`, `verified_by`, `worked_on`, `supersedes`, `ran_against`.
+- **Layer 3** is simply what you get by following the edges stored in Layer 2 values. Typed edges (as built): `touches`, `defines`, `worked_on`, `modified`, `ran_against`, `anchored_to`, `informs`, `part_of`.
 
 ### 2.2 Why hashing pays off here
 
 1. **Precise "out of date".** A check stores the content hashes it ran against. It is out of date exactly when any of those hashes differs from the current one. No time-based guessing.
 2. **Anchored decisions.** A decision linked to `createSession` records that symbol's hash. If the symbol changes, the decision is flagged "anchor changed, review" instead of silently going stale.
-3. **Cheap change detection.** A Merkle tree over directories means comparing two snapshots touches only the subtrees whose hashes differ.
+3. **Cheap change detection.** Comparing two snapshots touches only files whose hashes differ. (Built without a Merkle tree: git's index already has every clean file's hash.)
 4. **Reuse git's hashing.** For tracked files, git already gives us content hashes (`git ls-files -s`, `git hash-object`), so we only hash dirty and untracked files ourselves.
 5. **Cache keys for later.** Symbol extraction, summaries and any future embeddings are keyed by content hash, so unchanged code is never reprocessed.
 
@@ -111,7 +118,7 @@ hook / watcher / test wrapper
 
 ## 3. Broad build plan
 
-Milestones are sequential; each ends with something demonstrable. Detailed tasks, tests and risks live in `BUILD_PLAN.md`.
+All of these have shipped; the table is kept as the record of how the build was ordered. Detailed tasks, tests and risks live in `BUILD_PLAN.md`.
 
 | # | Milestone | Outcome you can see |
 | --- | --- | --- |
@@ -120,7 +127,7 @@ Milestones are sequential; each ends with something demonstrable. Detailed tasks
 | M2 | **Repository capture** | `continuum init/start/status`; git + file watcher; `continuum run -- npm test` records verified checks against content hashes |
 | M3 | **Claude Code integration** | MCP server + hooks via `continuum setup claude-code`; Claude can call `get_handoff` and passive capture works in a real session. The plugin bundle moves to M6, because it needs the published npm package to point at |
 | M4 | **Real UI** | Web app switches from mock to the local daemon; live activity; onboarding to pick a workspace; demo mode kept |
-| M5 | **Retrieval quality** | Symbol-level graph via tree-sitter; ranked, token-budgeted handoffs; evaluated on real sessions |
+| M5 | **Retrieval quality** | Symbol-level anchors (built with a small scanner instead of tree-sitter); ranked, token-budgeted handoffs; an evaluation harness (`npm run eval`) |
 | M6 | **Second agent + release** | Codex or Cursor over MCP; redaction, ignore rules, `forget`; packaged `v0.1` |
 
 **The proof point** is reached at M3: you work in Claude Code, stop mid-task, open a fresh session, and it resumes from Continuum's state without you re-explaining anything.
@@ -133,10 +140,10 @@ The goal is that any developer can try Continuum in minutes, without an account.
 
 | Surface | How people get it | Notes |
 | --- | --- | --- |
-| **CLI + daemon** | `npx <scope>/continuum init` inside any git repo | Published to npm under a scope we own (the unscoped `continuum` name is taken). Requires Node 22.5+ for built-in SQLite. |
+| **CLI + daemon** | `npx getcontinuum setup claude-code` (or `codex`, `cursor`, `vscode`) inside any git repo | Published to npm as `getcontinuum` (the unscoped `continuum` name is taken). Requires Node 22.13+, where built-in SQLite needs no flag. |
 | **Web dashboard** | Served locally by the daemon at `http://127.0.0.1:<port>` | The `apps/web` build ships inside the npm package; no separate install. |
 | **Claude Code integration** | One plugin install that bundles the MCP server, hooks and `/handoff` | Project-scoped by default; nothing written to global settings without consent. |
-| **Other agents** | `continuum mcp` registered in Codex or Cursor settings | Same MCP server. |
+| **Other agents** | `continuum setup codex`, `setup cursor` or `setup vscode` (GitHub Copilot) | Same MCP server; Codex and VS Code also get hooks. |
 | **Website** | A landing page with a demo video recorded from real sessions, hosted on Vercel (continuumgroup.dev) | No backend and no sample data; shows the real product before install. |
 
 Release checklist (M6): npm scope and name reserved, `npx` path tested on clean macOS and Linux machines, plugin install tested in a fresh repo, public demo deployed, and an "Uninstall / forget my data" section in the README.

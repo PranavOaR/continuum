@@ -78,4 +78,14 @@ describe('uncommittedChanges safety', () => {
     expect(JSON.stringify(diffs.get('linked-key') ?? null)).not.toContain('PRIVATE KEY')
     expect(JSON.stringify(diffs.get('config.ts')?.excerpt)).not.toContain('a'.repeat(36))
   })
+
+  it('masks the repository’s own patterns in excerpts', async () => {
+    const created = repo({ 'a.ts': 'x\n', '.continuum/config.json': JSON.stringify({ redactPatterns: ['CUST-[0-9]{5}'] }) })
+    created.commit('initial')
+    created.write('a.ts', 'const customer = "CUST-12345"\n')
+    created.write('notes.txt', 'call CUST-54321\n')
+    const diffs = await uncommittedChanges(created.root)
+    expect(JSON.stringify([...diffs.values()])).not.toMatch(/CUST-\d/)
+    expect(diffs.get('a.ts')?.excerpt).toContainEqual({ kind: 'add', text: 'const customer = "[redacted]"' })
+  })
 })

@@ -4,7 +4,7 @@ import {
   openWorkspace,
   readActiveSession,
   readWorkingTreeWithSymbols,
-  redactSecrets,
+  repositoryRedactor,
   scanRepository,
   claimActiveSession,
   type ActiveSession,
@@ -29,7 +29,10 @@ function flag(args: readonly string[], name: string): string | undefined {
   return index === -1 ? undefined : args[index + 1]
 }
 
-const note = (text: string) => redactSecrets(text).trim().slice(0, MAX_NOTE_CHARS)
+/** A note as stored: masked with the repository's redactor, trimmed and bounded. */
+async function note(root: string, text: string): Promise<string> {
+  return (await repositoryRedactor(root)).redact(text).trim().slice(0, MAX_NOTE_CHARS)
+}
 
 async function start(io: Io, args: readonly string[]): Promise<number> {
   const agent = flag(args, '--agent')
@@ -87,7 +90,7 @@ async function addNote(io: Io, text: string | undefined): Promise<number> {
       io.err('continuum: no session is open. Start one with: continuum session start --agent <id>')
       return EXIT_FAILURE
     }
-    store.record({ type: 'session.progress', payload: { sessionId: open.sessionId, note: note(text) }, evidence: 'agent-reported', source: SOURCE, occurredAt: io.now().toISOString() })
+    store.record({ type: 'session.progress', payload: { sessionId: open.sessionId, note: await note(workspace.root, text) }, evidence: 'agent-reported', source: SOURCE, occurredAt: io.now().toISOString() })
     io.out(`Noted on ${open.sessionId}.`)
     return EXIT_OK
   } finally {
@@ -104,14 +107,15 @@ async function end(io: Io, args: readonly string[]): Promise<number> {
       io.out('No session is open.')
       return EXIT_OK
     }
+    const summaryNote = summary?.trim() ? await note(workspace.root, summary) : undefined
     // Whatever changed until now was this session's work.
     const { changes } = await scanRepository(store, workspace.root, { now: io.now, attributeToActiveSession: true })
     // Close the file first: a crash after this point leaves an unended session, never one that keeps collecting changes.
     await clearActiveSession(workspace.root)
     store.record({
       type: 'session.ended',
-      payload: { sessionId: open.sessionId, ...(summary?.trim() ? { summary: note(summary) } : {}) },
-      evidence: summary?.trim() ? 'agent-reported' : 'observed',
+      payload: { sessionId: open.sessionId, ...(summaryNote ? { summary: summaryNote } : {}) },
+      evidence: summaryNote ? 'agent-reported' : 'observed',
       source: SOURCE,
       occurredAt: io.now().toISOString(),
     })

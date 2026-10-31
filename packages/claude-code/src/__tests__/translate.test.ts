@@ -1,3 +1,4 @@
+import { redactSecrets } from '@continuum/capture'
 import { describe, expect, it } from 'vitest'
 import { editedPath, InvalidHookPayloadError, parseHookPayload, type HookPayload } from '../hookPayload'
 import { translateHook, type TranslateContext } from '../translate'
@@ -11,7 +12,7 @@ function payload(fields: Record<string, unknown>): HookPayload {
   return parsed
 }
 
-const context = (extra: Partial<TranslateContext> = {}): TranslateContext => ({ now: NOW, revision: 'a3f9c21', knownSession: false, ...extra })
+const context = (extra: Partial<TranslateContext> = {}): TranslateContext => ({ now: NOW, redact: redactSecrets, revision: 'a3f9c21', knownSession: false, ...extra })
 
 describe('parseHookPayload', () => {
   it('accepts the documented payloads and keeps unknown fields', () => {

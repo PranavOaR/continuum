@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { ContextStore } from '@continuum/store'
+import { loadContinuumIgnore, UnreadableIgnoreFileError } from '../continuumIgnore'
 import { uncommittedChanges } from '../diff'
 import { isIgnored, readWorkingTree } from '../git'
 import { scanRepository } from '../scan'
@@ -33,5 +34,29 @@ describe('.continuumignore', () => {
     expect(recorded).not.toContain('secrets/')
     expect(recorded).not.toContain('key.pem')
     store.close()
+  })
+
+  it('ignores nothing when there is no .continuumignore', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    expect((await loadContinuumIgnore(repo.root))('a.ts')).toBe(false)
+  })
+
+  it('refuses to capture while a .continuumignore exists but cannot be read', async () => {
+    const { mkdirSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const repo = createSandbox({ 'secrets/prod.env': 'TOKEN=1' })
+    sandboxes.push(repo)
+    repo.commit('initial')
+    // A directory where the file should be: reading it fails on every platform, unlike permissions.
+    mkdirSync(join(repo.root, '.continuumignore'))
+    await expect(loadContinuumIgnore(repo.root)).rejects.toBeInstanceOf(UnreadableIgnoreFileError)
+    const store = ContextStore.open(':memory:')
+    try {
+      await expect(scanRepository(store, repo.root)).rejects.toBeInstanceOf(UnreadableIgnoreFileError)
+      expect(store.eventCount()).toBe(0)
+    } finally {
+      store.close()
+    }
   })
 })

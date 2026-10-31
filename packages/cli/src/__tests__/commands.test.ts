@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { EXIT_NOT_FOUND, EXIT_USAGE } from '../io'
 import { handlesInterrupts } from '../main'
-import { cli } from './harness'
+import { cli, NOW } from './harness'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 
 const NODE = process.execPath
@@ -181,6 +181,17 @@ describe('continuum status', () => {
     expect(result.out).toContain('Revision   no commits yet')
     expect(result.out).toContain('2 tracked files · all recorded')
     expect(result.out).toContain('none recorded yet')
+  })
+
+  it("says when each agent's hooks last reached Continuum, and when the last one failed", async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'codex'])
+    expect((await cli(repo.root, ['status'])).out).toMatch(/Hooks\s+Codex: none yet \(run `continuum doctor`\)/)
+    const { recordHookArrival, recordHookFailure } = await import('@continuum/capture')
+    await recordHookArrival(repo.root, 'codex', NOW)
+    expect((await cli(repo.root, ['status'])).out).toMatch(/Hooks\s+Codex: last arrived just now/)
+    await recordHookFailure(repo.root, 'codex', NOW, 'config.json is not valid')
+    expect((await cli(repo.root, ['status'])).out).toMatch(/Hooks\s+Codex: the last hook failed: config\.json is not valid/)
   })
 
   it('shows check results and goes out of date on unrecorded edits, without writing', async () => {

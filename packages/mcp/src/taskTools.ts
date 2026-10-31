@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { redactSecrets } from '@continuum/capture'
 import { currentTaskNode, isTaskNode, summarizeTask, taskSummaries, type TaskSummary } from '@continuum/context'
 import type { TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
@@ -26,7 +25,8 @@ function slug(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'task'
 }
 
-const clean = (value: string) => redactSecrets(value.trim())
+/** Masks text with the repository's redactor before it is stored. */
+type Redact = (text: string) => string
 
 function snapshotOf(task: TaskSummary): Snapshot {
   return {
@@ -74,7 +74,7 @@ const sameTitle = (a: string, b: string) => slug(a) === slug(b)
  * often calls start_task again with its title instead of update_task. Its
  * finished steps and met criteria stay; new steps and criteria are added.
  */
-function resumed(task: TaskSummary, input: StartInput): Snapshot {
+function resumed(task: TaskSummary, input: StartInput, clean: Redact): Snapshot {
   const current = snapshotOf(task)
   const criteria = current.acceptanceCriteria ?? []
   const done = current.completedSteps ?? []
@@ -96,14 +96,15 @@ function resumed(task: TaskSummary, input: StartInput): Snapshot {
  * planned) so an abandoned task cannot keep absorbing new work; blocked tasks
  * stay blocked.
  */
-export function startTask(store: ContextStore, input: StartInput, now: Date): { snapshot: Snapshot; isResumed: boolean } {
+export function startTask(store: ContextStore, input: StartInput, now: Date, redact: Redact): { snapshot: Snapshot; isResumed: boolean } {
+  const clean = (value: string) => redact(value.trim())
   const title = clean(input.title)
   let result: { snapshot: Snapshot; isResumed: boolean } | undefined
   store.transact(() => {
     const tasks = taskSummaries(store)
     const open = tasks.find((task) => task.status !== 'completed' && sameTitle(task.title, title))
     const snapshot: Snapshot = open
-      ? resumed(open, input)
+      ? resumed(open, input, clean)
       : {
           id: `${slug(title)}-${randomUUID().slice(0, 8)}`,
           title,
@@ -133,7 +134,8 @@ function hasChanges(input: UpdateInput): boolean {
 }
 
 /** Applies a partial update to a task as one new snapshot, read and written under the store lock. */
-export function updateTask(store: ContextStore, input: UpdateInput, now: Date): Snapshot {
+export function updateTask(store: ContextStore, input: UpdateInput, now: Date, redact: Redact): Snapshot {
+  const clean = (value: string) => redact(value.trim())
   if (!hasChanges(input)) throw new TaskToolError('Nothing to update: pass a status, next_action, completed_steps, remaining_steps or criteria_met.')
   let next: Snapshot | undefined
   store.transact(() => {
@@ -176,7 +178,7 @@ function describe(snapshot: Snapshot): string {
     .join(' ')
 }
 
-type Run = (work: (store: ContextStore) => Promise<string> | string) => Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }>
+type Run = (work: (store: ContextStore, redact: Redact) => Promise<string> | string) => Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }>
 
 /** Lets an agent record what it is working on, so the next session (or agent) continues the same task. */
 export function registerTaskTools(server: McpServer, run: Run, now: () => Date): void {
@@ -190,8 +192,8 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date):
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
     async (input) =>
-      run((store) => {
-        const { snapshot, isResumed } = startTask(store, input, now())
+      run((store, redact) => {
+        const { snapshot, isResumed } = startTask(store, input, now(), redact)
         return `${isResumed ? `Resumed the open task "${snapshot.title}" instead of starting a duplicate.` : 'Started.'} ${describe(snapshot)}`
       }),
   )
@@ -204,6 +206,6 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date):
       inputSchema: updateTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (input) => run((store) => `Updated. ${describe(updateTask(store, input, now()))}`),
+    async (input) => run((store, redact) => `Updated. ${describe(updateTask(store, input, now(), redact))}`),
   )
 }

@@ -1,4 +1,3 @@
-import { redactSecrets } from '@continuum/capture'
 import { SHELL_TOOL, type HookPayload } from './hookPayload'
 
 /** Longest agent check output kept, matching `continuum run`'s tail. */
@@ -28,7 +27,7 @@ export function recognizeCheck(command: string): string | null {
   const last = withoutRedirects.split('&&').at(-1)?.trim().replace(/\s+/g, ' ') ?? ''
   const unprefixed = last.replace(/^(\w+=\S*\s+)+/, '') // CI=1 npm test
   if (!CHECK_COMMANDS.some((pattern) => pattern.test(unprefixed))) return null
-  return redactSecrets(unprefixed)
+  return unprefixed
 }
 
 /** The exit code Claude Code reports in a failed Bash call's error ("Exit code 1\n…"). */
@@ -38,10 +37,10 @@ export function exitCodeFromError(error: string | undefined): number | null {
 }
 
 /** The last part of the command's output, redacted, for the record. */
-export function outputTail(...parts: unknown[]): string | undefined {
+export function outputTail(redact: (text: string) => string, ...parts: unknown[]): string | undefined {
   const text = parts.filter((part): part is string => typeof part === 'string' && part !== '').join('\n')
   // Redact before cutting, so a secret split by the cut cannot slip through as a fragment.
-  return text === '' ? undefined : redactSecrets(text).slice(-MAX_AGENT_OUTPUT_CHARS)
+  return text === '' ? undefined : redact(text).slice(-MAX_AGENT_OUTPUT_CHARS)
 }
 
 /** A check an agent ran, as observed from its Bash tool call. */
@@ -57,21 +56,22 @@ export interface AgentCheck {
  * The check a Bash tool call ran, with the exit code Claude Code observed, or
  * null. Interrupted, backgrounded and unrecognized commands are not evidence.
  */
-export function agentCheckOf(payload: HookPayload): AgentCheck | null {
+export function agentCheckOf(payload: HookPayload, redact: (text: string) => string): AgentCheck | null {
   if ((payload.hook_event_name !== 'PostToolUse' && payload.hook_event_name !== 'PostToolUseFailure') || payload.tool_name !== SHELL_TOOL) return null
   const command = typeof payload.tool_input.command === 'string' ? payload.tool_input.command : ''
   if (payload.tool_input.run_in_background === true) return null
-  const name = recognizeCheck(command)
-  if (!name) return null
+  const recognized = recognizeCheck(command)
+  if (!recognized) return null
+  const name = redact(recognized)
   const durationMs = typeof payload.duration_ms === 'number' ? payload.duration_ms : 0
   if (payload.hook_event_name === 'PostToolUseFailure') {
     const exitCode = payload.is_interrupt ? null : exitCodeFromError(payload.error)
     if (exitCode === null) return null
-    const output = outputTail(payload.error?.replace(/^Exit code \d+\n?/, ''))
-    return { name, command: redactSecrets(command), exitCode, durationMs, ...(output ? { outputTail: output } : {}) }
+    const output = outputTail(redact, payload.error?.replace(/^Exit code \d+\n?/, ''))
+    return { name, command: redact(command), exitCode, durationMs, ...(output ? { outputTail: output } : {}) }
   }
   const response = (payload.tool_response ?? {}) as { stdout?: unknown; stderr?: unknown; interrupted?: unknown }
   if (response.interrupted === true) return null
-  const output = outputTail(response.stdout, response.stderr)
-  return { name, command: redactSecrets(command), exitCode: 0, durationMs, ...(output ? { outputTail: output } : {}) }
+  const output = outputTail(redact, response.stdout, response.stderr)
+  return { name, command: redact(command), exitCode: 0, durationMs, ...(output ? { outputTail: output } : {}) }
 }

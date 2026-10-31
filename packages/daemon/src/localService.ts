@@ -11,7 +11,7 @@ import {
   type SearchResult,
   type TaskChange,
 } from '@continuum/core'
-import { openWorkspace } from '@continuum/capture'
+import { InvalidConfigError, openWorkspace, repositoryRedactor, type Redactor } from '@continuum/capture'
 import { applyTaskChange, renderHandoff, summarizeTask } from '@continuum/context'
 import { keys } from '@continuum/store'
 import { toActivity } from './mapActivity'
@@ -41,8 +41,12 @@ export interface LocalServiceOptions {
 
 /** One served repository could not be read (moved, deleted, or Continuum removed); the others still work. */
 export class ProjectUnavailableError extends Error {
-  constructor(projectId: string) {
-    super(`Continuum could not read project "${projectId}". Check that the repository still exists and has been set up with continuum init.`)
+  constructor(projectId: string, cause?: unknown) {
+    super(
+      cause instanceof InvalidConfigError
+        ? `Continuum is not showing project "${projectId}": ${cause.message}`
+        : `Continuum could not read project "${projectId}". Check that the repository still exists and has been set up with continuum init.`,
+    )
     this.name = 'ProjectUnavailableError'
   }
 }
@@ -107,6 +111,23 @@ const newestFirst = (a: ActivityEvent, b: ActivityEvent) => b.timestamp.localeCo
 export const DASHBOARD_SOURCE = 'dashboard'
 
 /**
+ * A next action typed in the dashboard goes into every later briefing, so it is masked like
+ * agent text. Steps and criteria are not: an edit only names one already stored, by its text.
+ */
+async function redactorFor(projectId: string, root: string): Promise<Redactor> {
+  try {
+    return await repositoryRedactor(root)
+  } catch (error) {
+    if (error instanceof InvalidConfigError) throw new ProjectUnavailableError(projectId, error)
+    throw error
+  }
+}
+
+function maskTyped(change: TaskChange, redactor: Redactor): TaskChange {
+  return change.kind === 'next-action' && change.nextAction ? { ...change, nextAction: redactor.redact(change.nextAction) } : change
+}
+
+/**
  * ContinuumService backed by real repositories' context stores. Everything is
  * derived from recorded evidence; the only write is a task edit you make in
  * the dashboard, recorded as user-reported.
@@ -161,7 +182,7 @@ export class LocalContinuumService implements ContinuumService {
   private async snapshot(projectId: string): Promise<RepoSnapshot> {
     const found = (await this.load()).find((result) => result.projectId === projectId)
     if (!found) throw new NotFoundError('Project', projectId)
-    if (!('snapshot' in found)) throw new ProjectUnavailableError(projectId)
+    if (!('snapshot' in found)) throw new ProjectUnavailableError(projectId, found.error)
     return found.snapshot
   }
 
@@ -210,12 +231,13 @@ export class LocalContinuumService implements ContinuumService {
   async updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask> {
     const repository = this.repositories.find((candidate) => candidate.projectId === projectId)
     if (!repository) throw new NotFoundError('Project', projectId)
-    const { store } = await openWorkspace(repository.cwd)
+    const { workspace, store } = await openWorkspace(repository.cwd)
     try {
+      const masked = maskTyped(change, await redactorFor(projectId, workspace.root))
       store.transact(() => {
         const node = store.graph.get(keys.task(taskId))
         if (!node || node.kind !== 'task') throw new NotFoundError('Task', taskId)
-        const payload = applyTaskChange(summarizeTask(store, node), change)
+        const payload = applyTaskChange(summarizeTask(store, node), masked)
         return [{ type: 'task.upserted', payload, evidence: 'user-reported', source: DASHBOARD_SOURCE, occurredAt: this.now().toISOString() }]
       })
     } finally {

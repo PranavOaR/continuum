@@ -9,7 +9,7 @@ const SECRET_NAME = String.raw`[A-Za-z0-9_.-]{0,40}(?:token|secret|passw(?:or)?d
 /** Text is redacted in pieces of at most this many characters (split at line ends), so cost stays linear in its length. */
 const MAX_CHUNK_CHARS = 16_384
 /** Custom patterns come from a repository's config; longer ones are refused rather than risk a pathological pattern. */
-const MAX_CUSTOM_PATTERN_CHARS = 200
+export const MAX_CUSTOM_PATTERN_CHARS = 200
 
 /** Shorter values after a secret-looking name are code (TOKEN_BYTES = 24), not credentials. */
 const MIN_VALUE_LENGTH = 6
@@ -98,22 +98,40 @@ function looksRandom(candidate: string): boolean {
 
 const ENTROPY_CANDIDATE = new RegExp(String.raw`(?<![A-Za-z0-9_+=-])[A-Za-z0-9_+=-]{${MIN_ENTROPY_LENGTH},}(?![A-Za-z0-9_+=-])`, 'g')
 
-let customRules: readonly RegExp[] = []
+/** Redacts text with the built-in rules and, for a repository, the patterns in its own config. */
+export interface Redactor {
+  redact(text: string): string
+  /** Redacts and says how many secrets it replaced. Cost grows linearly with the text, however long. */
+  redactWithCount(text: string): { text: string; count: number }
+  /** Custom patterns that were not used: invalid regular expressions, or longer than allowed. */
+  readonly rejectedPatterns: readonly string[]
+}
+
+function compile(pattern: string): RegExp | null {
+  if (pattern.length > MAX_CUSTOM_PATTERN_CHARS) return null
+  try {
+    return new RegExp(pattern, 'g')
+  } catch {
+    return null
+  }
+}
 
 /**
- * Extra patterns from the repository's config (`redactPatterns`), applied after
- * the built-in rules. Invalid patterns are skipped; returns the ones in use.
+ * A redactor that also masks `patterns` (a repository's `redactPatterns`).
+ * Each repository gets its own, so one repository's patterns never apply to another's text.
  */
-export function setCustomRedactions(patterns: readonly string[]): number {
-  customRules = patterns.flatMap((pattern) => {
-    if (pattern.length > MAX_CUSTOM_PATTERN_CHARS) return []
-    try {
-      return [new RegExp(pattern, 'g')]
-    } catch {
-      return []
-    }
-  })
-  return customRules.length
+export function createRedactor(patterns: readonly string[] = []): Redactor {
+  const compiled = patterns.map((pattern) => [pattern, compile(pattern)] as const)
+  const customRules = compiled.flatMap(([, rule]) => (rule ? [rule] : []))
+  const redactWithCount = (text: string) => {
+    const results = chunks(text).map((chunk) => redactChunk(chunk, customRules))
+    return { text: results.map((result) => result.text).join(''), count: results.reduce((total, result) => total + result.count, 0) }
+  }
+  return {
+    redact: (text) => redactWithCount(text).text,
+    redactWithCount,
+    rejectedPatterns: compiled.flatMap(([pattern, rule]) => (rule ? [] : [pattern])),
+  }
 }
 
 /** Splits long text at line ends into pieces of bounded size; a single huge line is cut where it must be. */
@@ -131,13 +149,7 @@ function chunks(text: string): string[] {
   return pieces
 }
 
-/** Redacts and says how many secrets it replaced. Cost grows linearly with the text, however long. */
-export function redactWithCount(text: string): { text: string; count: number } {
-  const results = chunks(text).map(redactChunk)
-  return { text: results.map((result) => result.text).join(''), count: results.reduce((total, result) => total + result.count, 0) }
-}
-
-function redactChunk(text: string): { text: string; count: number } {
+function redactChunk(text: string, customRules: readonly RegExp[]): { text: string; count: number } {
   let count = 0
   const replaceCounting = (current: string, pattern: RegExp, replacement: string, keep?: Rule[2]) =>
     current.replace(pattern, (...match) => {
@@ -156,6 +168,8 @@ function redactChunk(text: string): { text: string; count: number } {
   return { text: result, count }
 }
 
-export function redactSecrets(text: string): string {
-  return redactWithCount(text).text
-}
+/** The built-in rules only, for text that belongs to no repository. Repository text goes through `repositoryRedactor`. */
+export const BUILT_IN_REDACTOR = createRedactor()
+
+export const redactSecrets = BUILT_IN_REDACTOR.redact
+export const redactWithCount = BUILT_IN_REDACTOR.redactWithCount

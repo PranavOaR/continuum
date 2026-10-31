@@ -83,6 +83,30 @@ describe('continuum doctor', () => {
     expect(find(await doctor(repo.root, { invocation: other }), /different Continuum install/)?.status).toBe('warn')
   })
 
+  it('fails on a config it cannot read, since nothing is recorded until it is fixed', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    writeFileSync(join(repo.root, '.continuum/config.json'), '{ "redactPatterns": ["CUST-[0-9]+"], }')
+    expect(find(await doctor(repo.root), /Settings cannot be read/)).toMatchObject({ status: 'fail', detail: expect.stringContaining('not valid JSON') })
+  })
+
+  it('fails on a .continuumignore it cannot read', async () => {
+    const { mkdirSync } = await import('node:fs')
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    mkdirSync(join(repo.root, '.continuumignore'))
+    expect(find(await doctor(repo.root), /continuumignore/)).toMatchObject({ status: 'fail' })
+  })
+
+  it('warns about redaction patterns it cannot use, and names them', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]+', '(unclosed'] }))
+    expect(find(await doctor(repo.root), /redaction pattern/)).toMatchObject({ status: 'warn', label: '1 redaction pattern is not used', detail: '(unclosed' })
+    writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]+'] }))
+    expect(find(await doctor(repo.root), /Settings/)).toMatchObject({ status: 'ok', detail: expect.stringContaining('1 redaction pattern') })
+  })
+
   it('reports a damaged store without suggesting deletion for other errors', async () => {
     const repo = sandbox()
     await cli(repo.root, ['init'])
@@ -108,6 +132,26 @@ describe('continuum doctor', () => {
     expect(result.out).toMatch(/problems? to fix/)
     await cli(repo.root, ['setup', 'claude-code'])
     expect((await cli(repo.root, ['doctor'])).code).toBe(EXIT_OK)
+  })
+})
+
+describe('continuum doctor on hooks that never arrive or fail', () => {
+  it('warns when a connected agent has sent no hook yet, and passes once one arrives', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    expect(find(await doctor(repo.root), /hook has reached Continuum/)).toMatchObject({ status: 'warn', label: 'No Claude Code hook has reached Continuum yet' })
+    const { recordHookArrival } = await import('@continuum/capture')
+    await recordHookArrival(repo.root, 'claude-code', new Date())
+    expect(find(await doctor(repo.root), /hooks reach Continuum/)).toMatchObject({ status: 'ok', label: 'Claude Code hooks reach Continuum', detail: expect.stringContaining('just now') })
+  })
+
+  it('fails with the reason when the last hook failed, even for an agent set up by a plugin', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const { recordHookArrival, recordHookFailure } = await import('@continuum/capture')
+    await recordHookArrival(repo.root, 'claude-code', new Date())
+    await recordHookFailure(repo.root, 'claude-code', new Date(), 'git could not run, so nothing was recorded: Xcode license')
+    expect(find(await doctor(repo.root), /last Claude Code hook failed/)).toMatchObject({ status: 'fail', detail: expect.stringContaining('Xcode license') })
   })
 })
 
