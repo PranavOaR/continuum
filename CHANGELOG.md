@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.1] - 2026-10-31
 
 ### Fixed
 - **Your own `redactPatterns` now apply everywhere.** `continuum start`, `scan`, `session`, `init` and `setup` recorded diff excerpts, commit messages and session notes with only the built-in rules, so a pattern you added (a customer or ticket id, say) could still be stored. Every path now masks with the repository's own patterns, and one repository's patterns never apply to another's.
