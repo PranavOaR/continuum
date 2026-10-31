@@ -4,7 +4,7 @@
       "command": "sh",
       "args": [
         "-c",
-        "if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'mcp'; fi; exec 'npx' '-y' 'getcontinuum@0.2.0' 'mcp'"
+        "if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'mcp'; fi; exec 'npx' '-y' 'getcontinuum@0.2.1' 'mcp'"
       ]
     }
   }
