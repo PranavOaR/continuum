@@ -6,7 +6,7 @@ import { basename, resolve } from 'node:path'
 import { BUILD_INFO } from '../build'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
-export const SERVE_USAGE = 'Usage: continuum serve [--port <n>] [repository ...]'
+export const SERVE_USAGE = 'Usage: continuum serve [--port <n>] [--no-open] [repository ...]'
 const MAX_PORT = 65_535
 
 /** The dashboard shipped next to the release bundle, or the web app built in this checkout (`npm run build`). */
@@ -17,10 +17,13 @@ export const WEB_DIST = BUILD_INFO
 interface ServeArgs {
   port: number
   repositories: string[]
+  /** Open the dashboard in the browser once it is up; `--no-open` turns it off. */
+  open: boolean
 }
 
 function parseServeArgs(args: readonly string[]): ServeArgs | { error: string } {
   let port = DEFAULT_PORT
+  let open = true
   const repositories: string[] = []
   for (let index = 0; index < args.length; index += 1) {
     const token = args[index]
@@ -29,10 +32,11 @@ function parseServeArgs(args: readonly string[]): ServeArgs | { error: string } 
       if (!Number.isInteger(value) || value < 0 || value > MAX_PORT) return { error: '--port needs a number between 0 and 65535' }
       port = value
       index += 1
-    } else if (token.startsWith('-')) return { error: `Unknown option for serve: ${token}` }
+    } else if (token === '--no-open') open = false
+    else if (token.startsWith('-')) return { error: `Unknown option for serve: ${token}` }
     else repositories.push(token)
   }
-  return { port, repositories }
+  return { port, repositories, open }
 }
 
 /** Repositories named on the command line must all be set up: a typo should not silently serve less. */
@@ -86,6 +90,8 @@ export interface ServeOptions {
   /** When given, the server exits with RESTART_EXIT as soon as this value changes. */
   codeFingerprint?: () => string
   updatePollMs?: number
+  /** Opens the launch link in the browser; only a worker run from a terminal is given one. */
+  openBrowser?: (url: string) => Promise<void>
 }
 
 /**
@@ -149,6 +155,10 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   for (const workspace of unique) io.out(`  serving ${workspace.root}`)
   if (!hasDashboard) io.out(`  (the dashboard was not found at ${webDist}, so only the API is available; in a checkout, run \`npm run build\`)`)
   io.out('Open that exact link: it carries a one-time access token. Only this machine can reach the dashboard. Press Ctrl-C to stop.')
+  if (parsed.open && options.openBrowser) {
+    // Not awaited: the dashboard is already serving, and a missing browser is not a reason to stop.
+    options.openBrowser(daemon.launchUrl).catch((error: unknown) => io.out(`Could not open your browser (${error instanceof Error ? error.message : String(error)}); open the link above.`))
+  }
   const stopUpdateWatch = new AbortController()
   const updated = options.codeFingerprint
     ? untilCodeChanges(options.codeFingerprint, options.updatePollMs ?? UPDATE_POLL_MS, stopUpdateWatch.signal).then(() => 'updated' as const)

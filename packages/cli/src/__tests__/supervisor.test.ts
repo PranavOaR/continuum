@@ -43,18 +43,26 @@ describe('superviseServe', () => {
         return worker.child
       },
       () => {},
+      true,
     )
     expect(code).toBe(0)
+    // Only the first worker opens the browser: a restart reuses the tab already open.
     expect(calls.map((call) => call.args)).toEqual([
       ['-C', '/repo', 'serve', '--port', '0'],
-      ['-C', '/repo', 'serve', '--port', '0', '--port', '51234'],
-      ['-C', '/repo', 'serve', '--port', '0', '--port', '51234'],
+      ['-C', '/repo', 'serve', '--port', '0', '--port', '51234', '--no-open'],
+      ['-C', '/repo', 'serve', '--port', '0', '--port', '51234', '--no-open'],
     ])
     const [first] = workers[0].sent as { token: string; csrfToken: string }[]
     expect(first.token).toMatch(/^[\w-]{20,}$/)
     expect(workers.every((worker) => JSON.stringify(worker.sent) === JSON.stringify([first]))).toBe(true)
     expect(JSON.stringify(calls.map((call) => call.env))).not.toContain(first.token)
     expect(calls.every((call) => call.env[WORKER_ENV] === '1')).toBe(true)
+  })
+
+  it('opens no browser when it is not run from a terminal (scripts, CI, tests)', async () => {
+    const calls: (readonly string[])[] = []
+    await superviseServe(['serve'], (args) => (calls.push(args), fakeWorker(4747, 0).child), () => {}, false)
+    expect(calls).toEqual([['serve', '--no-open']])
   })
 
   it('retries a worker that fails right after an update, then gives up', async () => {
@@ -90,7 +98,7 @@ describe('serveWorkerOptions', () => {
     const channel = Object.assign(new EventEmitter(), { send: () => true })
     const options = serveWorkerOptions({ [WORKER_ENV]: '1' }, channel)
     channel.emit('message', { token: 'access-token', csrfToken: 'csrf-token' })
-    expect(await options).toMatchObject({ token: 'access-token', csrfToken: 'csrf-token', codeFingerprint: expect.any(Function) })
+    expect(await options).toMatchObject({ token: 'access-token', csrfToken: 'csrf-token', codeFingerprint: expect.any(Function), openBrowser: expect.any(Function) })
   })
 
   it('does nothing outside a supervised worker', async () => {

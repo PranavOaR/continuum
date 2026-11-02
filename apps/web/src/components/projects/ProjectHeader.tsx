@@ -90,9 +90,10 @@ export function ProjectHeader({ project, status, taskId }: { project: Project; s
           <span className="font-mono text-[12px]">{project.repositoryName}</span>
         </Meta>
         <Meta label="Branch">
-          <span className="inline-flex items-center gap-1 font-mono text-[12px]">
-            <GitBranch className="size-3.5 text-muted" aria-hidden />
-            {project.branch}
+          {/* A flex row can't be cut short with an ellipsis; the name inside it can. */}
+          <span className="flex min-w-0 items-center gap-1 font-mono text-[12px]" title={project.branch}>
+            <GitBranch className="size-3.5 shrink-0 text-muted" aria-hidden />
+            <span className="truncate">{project.branch}</span>
           </span>
         </Meta>
         <Meta label="Stack">{project.stack.join(', ')}</Meta>

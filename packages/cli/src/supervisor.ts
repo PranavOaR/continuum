@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createAccessToken } from '@continuum/daemon'
 import { RESTART_EXIT, type ServeOptions } from './commands/serve'
+import { openInBrowser } from './browser'
 import { codeFingerprint } from './codeVersion'
 
 /** Set in a serve worker's environment: it runs the dashboard; its parent restarts it after updates. */
@@ -11,6 +12,7 @@ const SECRETS_TIMEOUT_MS = 10_000
 const RESTART_GRACE_MS = 15_000
 const MAX_RESTART_RETRIES = 3
 const RETRY_DELAY_MS = 1_000
+const NO_OPEN = '--no-open'
 
 /** Sent to each worker over the IPC channel, never in the environment or argv where other tools could read it. */
 interface WorkerSecrets {
@@ -46,7 +48,7 @@ export async function serveWorkerOptions(env: NodeJS.ProcessEnv = process.env, c
       resolve(isSecrets(message) ? message : null)
     })
   })
-  return { ...(secrets ? { token: secrets.token, csrfToken: secrets.csrfToken } : {}), codeFingerprint }
+  return { ...(secrets ? { token: secrets.token, csrfToken: secrets.csrfToken } : {}), codeFingerprint, openBrowser: (url) => openInBrowser(url) }
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -58,10 +60,16 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  * tokens. Open dashboards reconnect on their own and their edits keep working.
  * Interrupts are passed to the worker, and its exit code becomes this process's.
  */
-export async function superviseServe(argv: readonly string[], spawnWorker: SpawnWorker = spawnSelf, write: (text: string) => void = (text) => process.stdout.write(text)): Promise<number> {
+export async function superviseServe(
+  argv: readonly string[],
+  spawnWorker: SpawnWorker = spawnSelf,
+  write: (text: string) => void = (text) => process.stdout.write(text),
+  /** Someone at a terminal ran it: scripts, CI and tests never get a browser window. */
+  canOpenBrowser: boolean = Boolean(process.stdout.isTTY) && !process.env.CI,
+): Promise<number> {
   const env = { ...process.env, [WORKER_ENV]: '1' }
   const secrets: WorkerSecrets = { token: createAccessToken(), csrfToken: createAccessToken() }
-  let args = [...argv]
+  let args = canOpenBrowser ? [...argv] : [...argv, NO_OPEN]
   let child: ChildProcess | undefined
   let stopping = false
   // A terminal's Ctrl-C reaches the worker too; forwarding also covers a signal sent to this process alone.
@@ -96,7 +104,8 @@ export async function superviseServe(argv: readonly string[], spawnWorker: Spawn
       })
       if (stopping) return code
       // Same port, so the link in the browser (and its cookie) keeps working.
-      if (port) args = [...argv, '--port', port]
+      // A restart reuses the tab already open, so it opens no new one.
+      if (port) args = [...argv, '--port', port, NO_OPEN]
       if (code === RESTART_EXIT) {
         restartedAt = Date.now()
         retries = 0
