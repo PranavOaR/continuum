@@ -46,7 +46,8 @@ Commands
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
   export <file>        Write the recorded history to a JSON file (import <file> restores it)
   forget               Permanently remove recorded data: --path, --session or --before
-  doctor               Check the install and this repository's setup, with fixes
+  doctor [--report]    Check the install and this repository's setup, with fixes;
+                       --report prints a scrubbed report to attach to an issue
   uninstall [--purge]  Disconnect every agent; --purge also deletes .continuum/
 
 Used by agents
