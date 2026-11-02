@@ -83,7 +83,7 @@ describe('ingestHook for VS Code', () => {
     const next = await ingestHook(vscodeHook(repo, { hook_event_name: 'SessionStart', source: 'new' }, 'vs-2'), asVsCode)
     const context = next.status === 'recorded' ? (next.additionalContext ?? '') : ''
     expect(context).toContain('Continuum (local project memory)')
-    expect(context).toContain('`vscode` session')
+    expect(context).toContain('VS Code Copilot session')
     expect(context).toContain('`src/c.ts`')
   })
 

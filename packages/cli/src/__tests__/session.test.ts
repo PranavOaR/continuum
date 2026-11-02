@@ -30,7 +30,7 @@ describe('continuum session', () => {
     expect((await cli(created.root, ['session'])).out).toBe('No session is open.')
 
     const handoff = (await cli(created.root, ['handoff'])).out
-    expect(handoff).toContain('`codex` session')
+    expect(handoff).toContain('Codex session')
     expect(handoff).toContain('Files it changed: `src/app.ts`')
     expect(handoff).toContain('App refactored; tests next')
     // The edit made before the session is not credited to it.
