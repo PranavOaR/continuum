@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import { getAgent, type FileStatus, type Project, type ProjectFile } from '@continuum/core'
 import type { UncommittedDiff } from '@continuum/capture'
 import type { GraphNode } from '@continuum/store'
@@ -23,16 +24,21 @@ export function detectStack(paths: Iterable<string>): string[] {
   return [...new Set(STACK_MARKERS.filter(([pattern]) => rootFiles.some((file) => pattern.test(file))).map(([, label]) => label))]
 }
 
+/** The path with the home folder written as ~, as a terminal shows it. */
+export function shortPath(path: string, home: string = homedir()): string {
+  return home && (path === home || path.startsWith(`${home}/`)) ? `~${path.slice(home.length)}` : path
+}
+
 export function toProject(snapshot: RepoSnapshot): Project {
   const latestEvent = snapshot.events[0]?.event.occurredAt
   return {
     id: snapshot.projectId,
     name: snapshot.name,
-    description: `Local repository at ${snapshot.root}`,
+    description: `Local repository at ${shortPath(snapshot.root)}`,
     repositoryName: snapshot.name,
     branch: snapshot.branch ?? 'detached HEAD',
     stack: detectStack(snapshot.tree.files.keys()),
-    lastActiveAgent: asAgent(snapshot.state.sessions[0]?.agent),
+    ...(snapshot.state.sessions[0] ? { lastActiveAgent: asAgent(snapshot.state.sessions[0].agent) } : {}),
     ...(snapshot.state.currentTaskId ? { currentTaskId: snapshot.state.currentTaskId } : {}),
     updatedAt: latestEvent ?? snapshot.state.generatedAt,
   }

@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Changed
+- **The dashboard shows work without a task.** A repository counted as active only while it had an open task, so the overview read "No active projects" minutes after agents worked in it. Active now means an open task or anything recorded in the last 7 days, and a project without a task shows its latest session: the agent, its note and when. A repository connected but not used yet is listed with what to do next.
+- Truthful copy on live screens: a project no agent has worked in says "None yet" instead of "Other agent", and a connected one is no longer told to run `setup`; empty panels no longer mention a task that does not exist; the verification note says where verified and observed results come from; Settings names the real default theme; the Handoffs page explains that connected agents are briefed automatically. Project paths under your home folder are written with `~`. "Idle" is now "No task". Activity in a project is listed newest first, like everywhere else, and the live dashboard no longer shows a demo account menu. An end-to-end check fails if demo or prototype wording appears on a live screen.
 - **Briefings name agents and lead with the next step.** Sessions read "Claude Code session" and "Codex session" instead of their ids (an agent Continuum does not know keeps its id). With no task, a briefing opens with the next step the most recent note names ("Next: add a test for empty names"), labelled agent-reported and with the session it came from. A task keeps its own next action. A new briefing-quality scenario covers it.
 
 ### Fixed

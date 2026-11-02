@@ -18,6 +18,8 @@ const GIT_IDENTITY = ['-c', 'user.name=Continuum Test', '-c', 'user.email=test@e
 let repo = ''
 /** A second repository with Continuum set up but no task recorded yet. */
 let emptyRepo = ''
+/** A third, where an agent worked and left a note without ever recording a task. */
+let noteRepo = ''
 let server: ChildProcess | undefined
 let url = ''
 let launchUrl = ''
@@ -68,7 +70,16 @@ test.beforeAll(async () => {
   writeFileSync(join(emptyRepo, 'notes.md'), 'nothing yet\n')
   execFileSync(process.execPath, [...CLI, '-C', emptyRepo, 'init'], { cwd: ROOT })
 
-  server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0', '.', emptyRepo], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] })
+  noteRepo = realpathSync(mkdtempSync(join(tmpdir(), 'continuum-e2e-note-')))
+  execFileSync('git', [...GIT_IDENTITY, 'init', '--quiet', '--initial-branch=main'], { cwd: noteRepo })
+  writeFileSync(join(noteRepo, 'notes.md'), 'draft\n')
+  execFileSync(process.execPath, [...CLI, '-C', noteRepo, 'init'], { cwd: ROOT })
+  const noteHook = (fields: Record<string, unknown>) =>
+    execFileSync(process.execPath, [...CLI, '-C', noteRepo, 'ingest'], { cwd: ROOT, input: JSON.stringify({ session_id: 'e2e-note', cwd: noteRepo, transcript_path: '/n.jsonl', ...fields }) })
+  noteHook({ hook_event_name: 'SessionStart', source: 'startup' })
+  noteHook({ hook_event_name: 'Stop', last_assistant_message: 'Outlined the release notes. Next: add the migration section.' })
+
+  server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0', '.', emptyRepo, noteRepo], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] })
   launchUrl = await new Promise<string>((resolve, reject) => {
     let output = ''
     server?.stdout?.on('data', (chunk: Buffer) => {
@@ -102,6 +113,7 @@ test.afterAll(async () => {
   }
   if (repo) rmSync(repo, { recursive: true, force: true })
   if (emptyRepo) rmSync(emptyRepo, { recursive: true, force: true })
+  if (noteRepo) rmSync(noteRepo, { recursive: true, force: true })
 })
 
 test('the printed link opens the dashboard, labelled as live local data', async ({ page }) => {
@@ -110,6 +122,34 @@ test('the printed link opens the dashboard, labelled as live local data', async 
   await expect(page.getByText('Local workspace').first()).toBeVisible()
   await expect(page.getByText('Mock data')).toHaveCount(0)
   await expect(page.getByText('Live records from repositories on this machine')).toBeVisible()
+})
+
+test('the overview shows every repository worked on recently, task or not', async ({ page }) => {
+  await page.goto(`${url}/app`)
+  const projects = page.getByRole('region', { name: 'Active projects' })
+  await expect(projects.getByText('Load config from env')).toBeVisible()
+  // Work without a task: the latest session's own words, labelled with its agent.
+  await expect(projects.getByText('Outlined the release notes. Next: add the migration section.')).toBeVisible()
+  await expect(projects.getByText(/Latest session · Claude Code/)).toBeVisible()
+  // Connected but not yet used: listed, with what to do next.
+  await expect(projects.getByText('No agent session yet. Start one in this repository and it appears here.')).toBeVisible()
+  await expect(page.getByText('No recent work')).toHaveCount(0)
+})
+
+test('live screens carry none of the demo or prototype wording', async ({ page }) => {
+  const slug = (path: string) => (path.split('/').at(-1) as string).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  const FORBIDDEN = ['simulated', 'Demo user', 'Demo workspace', 'would read', 'Mock data', 'demo dataset', 'prototype', 'Dark is the default']
+  for (const path of ['/app', '/app/projects', `/app/projects/${slug(repo)}`, `/app/projects/${slug(emptyRepo)}`, `/app/projects/${slug(noteRepo)}`, '/app/activity', '/app/memory', '/app/handoffs', '/app/settings']) {
+    await page.goto(`${url}${path}`)
+    await expect(page.getByRole('main')).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    const text = await page.locator('body').innerText()
+    for (const phrase of FORBIDDEN) expect(text, `${path} says "${phrase}"`).not.toContain(phrase)
+    // A project no agent has worked in names no agent (the Activity page may still list "Other agent" as a filter).
+    if (path.startsWith('/app/projects/')) expect(text, `${path} names an agent that never ran`).not.toContain('Other agent')
+  }
+  await page.goto(`${url}/app/projects/${slug(emptyRepo)}`)
+  await expect(page.getByText('None yet')).toBeVisible()
 })
 
 test('the root of the dashboard opens the dashboard, not the website', async ({ page }) => {

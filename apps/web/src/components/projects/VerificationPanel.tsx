@@ -45,7 +45,7 @@ export function VerificationPanel({ records, currentRevision }: { records: Verif
       <p className="mt-3 flex gap-1.5 text-[11px] text-subtle">
         <Info className="mt-px size-3 shrink-0" aria-hidden />
         {isLive
-          ? 'Recorded by continuum run and judged against the current file contents: a result goes out of date as soon as a file it covered changes.'
+          ? 'Verified results come from continuum run, observed ones from a test an agent ran itself. Both are judged against the current file contents: a result goes out of date as soon as a file it covered changes.'
           : 'Demonstrates the intended state model. No tests are run by this prototype.'}
       </p>
     </Panel>

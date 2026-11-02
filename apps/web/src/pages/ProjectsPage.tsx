@@ -9,6 +9,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useProjects } from '../hooks/useWorkspace'
 import type { ProjectSummary } from '../services'
 import { cn } from '../utils/cn'
+import { isRecentlyActive } from '../utils/projectActivity'
 import { matchesQuery } from '../utils/search'
 import { useIsLive } from '../state/dataMode'
 
@@ -17,14 +18,15 @@ const STATUS_FILTERS = [
   { id: 'active', label: 'Active' },
   { id: 'in-progress', label: 'In progress' },
   { id: 'blocked', label: 'Blocked' },
-  { id: 'idle', label: 'Idle' },
+  { id: 'idle', label: 'No task' },
 ] as const
 
 type StatusFilter = (typeof STATUS_FILTERS)[number]['id']
 
 function matchesStatus(summary: ProjectSummary, filter: StatusFilter): boolean {
   if (filter === 'all') return true
-  if (filter === 'active') return summary.status === 'in-progress' || summary.status === 'blocked'
+  // The same rule as the overview's Active projects, so its link lands on the same list.
+  if (filter === 'active') return isRecentlyActive(summary)
   return summary.status === filter
 }
 

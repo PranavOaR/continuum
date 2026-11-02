@@ -31,7 +31,7 @@ export function FileExplorer({ files, onOpenFile }: FileExplorerProps) {
     >
       {files.length === 0 ? (
         <div className="p-4">
-          <EmptyState icon={<FileCode2 />} title="No file changes recorded" description="This task has no associated file changes yet." />
+          <EmptyState icon={<FileCode2 />} title="No file changes recorded" description={isLive ? 'No file has changed since Continuum started recording.' : 'This task has no associated file changes yet.'} />
         </div>
       ) : visible.length === 0 ? (
         <div className="p-4">

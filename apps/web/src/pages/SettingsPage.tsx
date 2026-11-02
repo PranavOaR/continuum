@@ -95,7 +95,7 @@ export function SettingsPage() {
       <div className="grid max-w-3xl gap-6">
         <Panel title="General">
           <div className="divide-y divide-line">
-            <SettingRow label="Theme" description="Dark is the default.">
+            <SettingRow label="Theme" description="Light is the default.">
               <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-1 rounded-md border border-line p-0.5">
                 {THEMES.map((theme) => (
                   <button
@@ -184,8 +184,8 @@ export function SettingsPage() {
             <div className="space-y-2 text-[13px] text-muted">
               <p className="font-medium text-fg">Local-first architecture</p>
               <p>
-                Continuum is designed to index and retrieve project context on your machine, without requiring external AI APIs. Agent integrations
-                would read and write through local adapters.
+                Continuum records and retrieves project context on your machine, without external AI APIs. Agents read and write it through their hooks
+                and the local MCP server.
               </p>
               {isLive ? (
                 <p>

@@ -41,7 +41,7 @@ export function HandoffsPage() {
 
       <p className="mb-5 flex gap-2 rounded-md border border-line bg-surface px-3 py-2.5 text-[12px] text-muted">
         <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-        Handoffs are simulated. Preparing one builds a text package you can copy; nothing is delivered to any agent.
+        A handoff here is a text package you copy into an agent yourself. Agents connected with continuum setup are briefed automatically when a session starts.
       </p>
 
       <div role="group" aria-label="Filter by status" className="mb-3 flex flex-wrap gap-1">

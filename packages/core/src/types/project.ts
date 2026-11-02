@@ -9,7 +9,8 @@ export interface Project {
   repositoryName: string
   branch: string
   stack: string[]
-  lastActiveAgent: AgentType
+  /** Absent until an agent session has been recorded. */
+  lastActiveAgent?: AgentType
   currentTaskId?: string
   updatedAt: string
 }

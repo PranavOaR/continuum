@@ -41,7 +41,8 @@ test('landing page gives the setup command for the agent you pick, and copies it
 test('overview shows coherent summary values and opens a project', async ({ page }) => {
   await page.goto('/app')
   const card = (label: string) => page.getByRole('link', { name: new RegExp(`^${label}`) })
-  await expect(card('Active projects')).toContainText('3')
+  // Three with open tasks, and Docs Site: no task, but worked on five days ago.
+  await expect(card('Active projects')).toContainText('4')
   await expect(card('Active tasks')).toContainText('5')
   await expect(card('Recent changes')).toContainText('12')
   await expect(card('Pending handoffs')).toContainText('2')
