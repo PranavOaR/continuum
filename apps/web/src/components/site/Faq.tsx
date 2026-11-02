@@ -21,7 +21,7 @@ export function Faq() {
   return (
     <section id="faq" className="scroll-mt-16 border-t border-line py-24">
       <div className="mx-auto max-w-[1160px] px-4 sm:px-8">
-        <Eyebrow index="06">FAQ</Eyebrow>
+        <Eyebrow index="07">FAQ</Eyebrow>
         <SectionTitle>Questions, answered.</SectionTitle>
         <div className="max-w-[820px] divide-y divide-line border-y border-line">
           {FAQ.map((item) => (
