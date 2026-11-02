@@ -24,6 +24,12 @@ describe('mock continuum service', () => {
     expect(status).toEqual({ 'startup-app': 'in-progress', 'dev-portfolio': 'in-progress', 'analytics-platform': 'blocked', 'docs-site': 'idle' })
   })
 
+  it('summarizes each project\'s latest session like the live service', async () => {
+    const projects = await service.listProjects()
+    const docs = projects.find((summary) => summary.project.id === 'docs-site')
+    expect(docs?.latestSession).toMatchObject({ agent: 'chatgpt', note: 'Planned and reviewed the static search index approach.' })
+  })
+
   it('rejects unknown projects with NotFoundError', async () => {
     await expect(service.getWorkspace('nope')).rejects.toBeInstanceOf(NotFoundError)
     await expect(service.getMemoryGraph('nope')).rejects.toBeInstanceOf(NotFoundError)

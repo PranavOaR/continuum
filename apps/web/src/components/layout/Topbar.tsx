@@ -73,6 +73,8 @@ export function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
           )}
         </Popover>
 
+        {/* Live mode has no accounts, so no account menu; the demo shows who the sample belongs to. */}
+        {!isLive && (
         <Popover
           className="w-64"
           trigger={(props) => (
@@ -103,6 +105,7 @@ export function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
             </div>
           )}
         </Popover>
+        )}
       </div>
     </header>
   )

@@ -1,6 +1,7 @@
 import type {
   ActivityEvent,
   AgentSession,
+  AgentType,
   MemoryGraph,
   MemoryRecord,
   Project,
@@ -11,9 +12,19 @@ import type {
   VerificationRecord,
 } from './types'
 
+/** The most recent agent session in a project: what it last said, and when. */
+export interface LatestSession {
+  agent: AgentType
+  /** The session's closing summary, else its latest progress note. Agent-reported. */
+  note: string | null
+  lastActivityAt: string
+}
+
 export interface ProjectSummary {
   project: Project
   currentTask?: ProjectTask
+  /** Shown when there is no task, so a project's recent work is visible without one. */
+  latestSession?: LatestSession
   status: ProjectStatus
   /** Acceptance criteria marked complete vs total, for the current task. */
   progress: { done: number; total: number }

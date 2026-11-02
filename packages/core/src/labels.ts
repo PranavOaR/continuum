@@ -17,7 +17,7 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   'in-progress': 'In progress',
   blocked: 'Blocked',
   completed: 'Completed',
-  idle: 'Idle',
+  idle: 'No task',
 }
 
 export const VERIFICATION_LABEL: Record<VerificationStatus, string> = {

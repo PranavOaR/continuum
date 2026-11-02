@@ -97,7 +97,7 @@ export function ProjectHeader({ project, status, taskId }: { project: Project; s
         </Meta>
         <Meta label="Stack">{project.stack.join(', ')}</Meta>
         <Meta label="Last active agent">
-          <AgentChip agent={project.lastActiveAgent} />
+          {project.lastActiveAgent ? <AgentChip agent={project.lastActiveAgent} /> : <span className="text-muted">None yet</span>}
         </Meta>
         <Meta label="Last updated">{format(project.updatedAt)}</Meta>
       </dl>

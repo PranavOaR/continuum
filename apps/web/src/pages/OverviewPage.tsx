@@ -1,17 +1,17 @@
-import { ArrowRight, ArrowRightLeft, FileCode2, FolderGit2, FolderOpen, ListChecks, Search, type LucideIcon } from 'lucide-react'
+import { ArrowRight, ArrowRightLeft, FileCode2, FolderGit2, FolderOpen, ListChecks, type LucideIcon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ActivityTimeline } from '../components/activity/ActivityTimeline'
 import { ProjectCard } from '../components/projects/ProjectCard'
 import { AttentionList } from '../components/shared/AttentionList'
-import { Button, ButtonLink } from '../components/shared/Button'
+import { ButtonLink } from '../components/shared/Button'
 import { PageHeader } from '../components/shared/PageHeader'
 import { Panel } from '../components/shared/Panel'
 import { EmptyState, ErrorState, LoadingBlock, Skeleton } from '../components/shared/States'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAttentionItems, useOverviewQuery } from '../hooks/useOverview'
 import { useHandoffs } from '../state/handoffs'
-import { useUI } from '../state/ui'
 import { usePreferredProjectId } from '../hooks/useWorkspace'
+import { RECENT_DAYS, recentProjects } from '../utils/projectActivity'
 
 interface SummaryCardProps {
   label: string
@@ -41,7 +41,6 @@ export function OverviewPage() {
   const { items: attention } = useAttentionItems()
   const { handoffs } = useHandoffs()
   const preferredProjectId = usePreferredProjectId()
-  const { openSearch } = useUI()
   const navigate = useNavigate()
 
   const header = (
@@ -50,9 +49,6 @@ export function OverviewPage() {
       description="Here's where your projects stand."
       actions={
         <>
-          <Button size="sm" icon={<Search />} onClick={openSearch}>
-            Search
-          </Button>
           <ButtonLink to={preferredProjectId ? `/app/projects/${preferredProjectId}` : '/app/projects'} variant="primary" size="sm" icon={<FolderOpen />}>
             Open Project
           </ButtonLink>
@@ -76,7 +72,7 @@ export function OverviewPage() {
   }
   if (error || !data) return <ErrorState title="Could not load the overview" description={error?.message} />
 
-  const activeProjects = data.projects.filter((summary) => summary.status !== 'idle' && summary.status !== 'completed')
+  const activeProjects = recentProjects(data.projects)
   const pendingHandoffs = handoffs.filter((handoff) => handoff.status !== 'copied').length
   const projectNames = Object.fromEntries(data.projects.map(({ project }) => [project.id, project.name]))
 
@@ -85,7 +81,7 @@ export function OverviewPage() {
       {header}
 
       <div className="mb-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <SummaryCard label="Active projects" value={activeProjects.length} hint="In progress or blocked" icon={FolderGit2} to="/app/projects?status=active" />
+        <SummaryCard label="Active projects" value={activeProjects.length} hint="Open or recent work" icon={FolderGit2} to="/app/projects?status=active" />
         <SummaryCard label="Active tasks" value={data.activeTaskCount} hint="Not yet completed" icon={ListChecks} to="/app/projects" />
         <SummaryCard label="Recent changes" value={data.changedFileCount} hint="Files across active tasks" icon={FileCode2} to="/app/activity?type=file-change" />
         <SummaryCard label="Pending handoffs" value={pendingHandoffs} hint="Not yet copied" icon={ArrowRightLeft} to="/app/handoffs" />
@@ -102,7 +98,7 @@ export function OverviewPage() {
             </Link>
           </div>
           {activeProjects.length === 0 ? (
-            <EmptyState icon={<FolderGit2 />} title="No active projects" description="Projects with work in progress will appear here." />
+            <EmptyState icon={<FolderGit2 />} title="No recent work" description={`Nothing has been recorded in the last ${RECENT_DAYS} days. Start an agent session in a connected repository and it appears here.`} />
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {activeProjects.map((summary) => (
@@ -113,7 +109,7 @@ export function OverviewPage() {
         </section>
 
         <div className="min-w-0 space-y-6">
-          <Panel title="Attention required" description={`${attention.length} items across your projects`} bodyClassName="px-3 py-1">
+          <Panel title="Attention required" description={`${attention.length} ${attention.length === 1 ? 'item' : 'items'} across your projects`} bodyClassName="px-3 py-1">
             {attention.length === 0 ? (
               <p className="py-4 text-center text-[13px] text-muted">Nothing needs attention.</p>
             ) : (
