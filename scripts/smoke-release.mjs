@@ -126,7 +126,7 @@ function pluginHooksRunTheBundle(repo) {
 try {
   if (!existsSync(join(RELEASE, 'continuum.js'))) throw new Error('dist/release is missing: run `npm run build && npm run bundle` first.')
   const bin = packAndInstall()
-  const name = JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8')).name
+  const { name, version } = JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8'))
   const installed = join(dirname(dirname(bin)), name)
   const shipped = (file) => (existsSync(join(installed, file)) ? readFileSync(join(installed, file), 'utf8') : '')
   check('the package ships its license', shipped('LICENSE').startsWith('Continuum Software License'))
@@ -134,10 +134,11 @@ try {
   check('the package ships the user README, not the repository one', shipped('README.md').includes('npx getcontinuum setup') && !shipped('README.md').includes('npm run dev'))
   // Fully minified: Continuum's own function names do not survive into the bundle.
   check('the bundle is minified, with no source map', !shipped('continuum.js').includes('function renderHandoff') && !shipped('continuum.js').includes('sourceMappingURL'))
-  check('--version prints the package version', run(bin, ['--version'], scratch).trim() === JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8')).version)
+  check('--version prints the package version', run(bin, ['--version'], scratch).trim() === version)
 
   const repo = makeRepo()
-  run(bin, ['setup', 'claude-code'], repo)
+  const setupOutput = run(bin, ['setup', 'claude-code'], repo)
+  check('setup ends by naming the command that opens the dashboard', setupOutput.trim().endsWith(`See what Continuum records: npx -y ${name}@${version} serve`), setupOutput)
   const mcp = JSON.parse(readFileSync(join(repo, '.mcp.json'), 'utf8')).mcpServers.continuum
   check('setup writes a portable npx invocation', mcp.command === 'npx' && mcp.args[1].startsWith(`${name}@`), JSON.stringify(mcp))
 

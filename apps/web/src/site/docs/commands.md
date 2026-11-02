@@ -26,7 +26,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 | Command | What it does |
 |---|---|
 | `handoff` | Prints where the project left off, for any agent or chat. |
-| `serve [repo ...]` | Opens the dashboard for every connected repository, or the ones you name, on 127.0.0.1, and prints its sign-in link. |
+| `serve [repo ...]` | Opens the dashboard for every connected repository, or the ones you name, on 127.0.0.1: it prints its sign-in link and opens it in your browser (`--no-open` to skip). |
 
 ## Your data
 
