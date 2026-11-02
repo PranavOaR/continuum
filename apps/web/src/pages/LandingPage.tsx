@@ -5,6 +5,7 @@ import { FeatureList } from '../components/landing/FeatureList'
 import { HeroPreview } from '../components/landing/HeroPreview'
 import { useScrollSpy } from '../components/landing/useScrollSpy'
 import { Faq } from '../components/site/Faq'
+import { Measured } from '../components/site/Measured'
 import { Eyebrow, SectionTitle } from '../components/site/SectionHeading'
 import { SiteFooter } from '../components/site/SiteFooter'
 import { SiteHeader } from '../components/site/SiteHeader'
@@ -98,7 +99,7 @@ function GetStarted() {
   return (
     <section id="get-started" className="scroll-mt-16 border-t border-line bg-surface py-24">
       <div className="mx-auto max-w-[1160px] px-4 sm:px-8">
-        <Eyebrow index="05">Get started</Eyebrow>
+        <Eyebrow index="06">Get started</Eyebrow>
         <SectionTitle lead="Needs Node.js 22.13 or newer and git. Everything runs on your machine.">Install it in a minute.</SectionTitle>
         <ol className="grid gap-4">
           {GET_STARTED.map((step, index) => (
@@ -196,6 +197,7 @@ export function LandingPage() {
           </div>
         </section>
 
+        <Measured />
         <GetStarted />
         <Faq />
         <ClosingCta />

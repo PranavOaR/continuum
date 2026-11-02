@@ -41,6 +41,7 @@ npm run dev        # the dashboard on http://localhost:5173, with a labelled sam
 | `npm run eval` | Does each briefing hold what a fresh agent needs? (see below) |
 | `npm run check:website` | Loads the built website in Chromium |
 | `npm run bench:scan`, `npm run bench:store` | Time reading a 50,000-file working tree, and opening a store with 100,000 events (what every hook pays) |
+| `npm run bench:hooks` | Time the session-start briefing and an edit hook end to end through the release bundle (run `npm run bundle` first). The website's numbers come from here and `bench:scan` (`apps/web/src/components/site/siteStats.ts`) |
 
 CI runs all of these on every pull request, plus the release smoke test on macOS and Linux with Node 22.13 and 24. `main` is kept releasable: work happens on feature branches.
 
