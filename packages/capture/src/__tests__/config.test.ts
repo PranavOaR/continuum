@@ -29,6 +29,7 @@ describe('readConfig', () => {
     ['a value that is not an object', '["CUST-[0-9]+"]'],
     ['patterns that are not a list of strings', '{ "redactPatterns": "CUST-[0-9]+" }'],
     ['a setting that is not true or false', '{ "capturePrompts": "yes" }'],
+    ['a receipts setting that is not true or false', '{ "receipts": "off" }'],
     ['a pattern that is not a valid regular expression', '{ "redactPatterns": ["CUST-[0-9"] }'],
     ['a pattern longer than allowed', JSON.stringify({ redactPatterns: ['a'.repeat(500)] })],
   ])('refuses %s instead of quietly using the defaults', async (_case, content) => {

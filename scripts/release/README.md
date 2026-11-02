@@ -49,7 +49,7 @@ Setup writes only to the repository, never to your global agent settings. `setup
 | `continuum handoff` | Prints the briefing, for pasting into any agent or chat. |
 | `continuum status` | Tracked files, unrecorded changes and check results. |
 | `continuum serve` | The dashboard on 127.0.0.1, behind a private link that changes on every run. |
-| `continuum config` | Settings: `agent-checks on\|off`, `prompts on\|off` (off by default). |
+| `continuum config` | Settings: `agent-checks on\|off`, `prompts on\|off` (off by default), `receipts on\|off` (the line Claude Code shows after a reply that recorded something). |
 | `continuum forget --path <p> \| --session <id> \| --before <date>` | Permanently removes recorded data from the database file itself. |
 | `continuum export <file>` / `import <file>` | Moves the history between clones or machines. |
 

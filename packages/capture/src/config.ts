@@ -14,9 +14,11 @@ export interface ContinuumConfig {
   capturePrompts: boolean
   /** Extra regular expressions to mask before anything is stored, e.g. internal ticket or customer ids. */
   redactPatterns: string[]
+  /** After a Claude Code reply that recorded something, show one line saying what. */
+  receipts: boolean
 }
 
-export const DEFAULT_CONFIG: Readonly<ContinuumConfig> = { agentChecks: true, capturePrompts: false, redactPatterns: [] }
+export const DEFAULT_CONFIG: Readonly<ContinuumConfig> = { agentChecks: true, capturePrompts: false, redactPatterns: [], receipts: true }
 
 const configPath = (root: string) => join(root, CONTINUUM_DIR, CONFIG_FILE)
 
@@ -45,7 +47,7 @@ async function readRawConfig(root: string): Promise<RawConfig> {
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new InvalidConfigError(path, 'expected a JSON object')
   const values = parsed as RawConfig
-  for (const key of ['agentChecks', 'capturePrompts'] as const) {
+  for (const key of ['agentChecks', 'capturePrompts', 'receipts'] as const) {
     if (key in values && typeof values[key] !== 'boolean') throw new InvalidConfigError(path, `${key} must be true or false`)
   }
   const patterns = values.redactPatterns
@@ -65,6 +67,7 @@ function withDefaults(values: RawConfig): ContinuumConfig {
     agentChecks: (values.agentChecks as boolean | undefined) ?? DEFAULT_CONFIG.agentChecks,
     capturePrompts: (values.capturePrompts as boolean | undefined) ?? DEFAULT_CONFIG.capturePrompts,
     redactPatterns: (values.redactPatterns as string[] | undefined) ?? [...DEFAULT_CONFIG.redactPatterns],
+    receipts: (values.receipts as boolean | undefined) ?? DEFAULT_CONFIG.receipts,
   }
 }
 

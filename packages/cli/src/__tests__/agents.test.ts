@@ -111,6 +111,18 @@ describe('continuum ingest', () => {
     expect(bad.code).toBe(1)
     expect(bad.err).toContain('Invalid Claude Code hook payload: not JSON')
   })
+
+  it('answers a Stop hook with a systemMessage, which Claude Code shows the user', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    const send = (fields: Record<string, unknown>) =>
+      cli(repo.root, ['ingest'], { readStdin: async () => JSON.stringify({ session_id: 's', cwd: repo.root, transcript_path: '/t.jsonl', ...fields }) })
+    await send({ hook_event_name: 'SessionStart', source: 'startup' })
+    writeFileSync(join(repo.root, 'src/login.ts'), 'export const login = () => true\n')
+    await send({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/login.ts') } })
+    const stop = await send({ hook_event_name: 'Stop', last_assistant_message: 'Done.' })
+    expect(JSON.parse(stop.out)).toEqual({ systemMessage: 'Continuum recorded 1 file edit for the next session.' })
+  })
 })
 
 describe('continuum handoff', () => {
