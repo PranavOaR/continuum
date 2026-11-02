@@ -28,6 +28,17 @@ describe('projectState', () => {
     ])
   })
 
+  it('notes when a check last ran a different command than the run before it', () => {
+    const store = seededStore()
+    const rerun = (command: string) =>
+      store.record({ type: 'check.recorded', payload: { name: 'unit', command, exitCode: 0, durationMs: 5, ranAgainst: {} }, evidence: 'verified', source: 'test', occurredAt: NOW.toISOString() })
+    expect(projectState(store, tree(CURRENT_FILES), NOW).checks.find((check) => check.name === 'unit')?.previousCommand).toBeNull()
+    rerun('true')
+    expect(projectState(store, tree(CURRENT_FILES), NOW).checks.find((check) => check.name === 'unit')).toMatchObject({ command: 'true', previousCommand: 'npm test' })
+    rerun('true')
+    expect(projectState(store, tree(CURRENT_FILES), NOW).checks.find((check) => check.name === 'unit')?.previousCommand).toBeNull()
+  })
+
   it('reports decisions whose anchored code changed', () => {
     const fresh = projectState(seededStore(), tree(CURRENT_FILES), NOW)
     expect(fresh.decisions).toEqual([expect.objectContaining({ id: 'reuse-session', kind: 'decision', status: 'current', evidence: 'agent-reported' })])

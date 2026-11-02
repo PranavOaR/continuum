@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import './warnings'
 import { defaultConfigDir } from '@continuum/capture'
+import { defaultClaudeConfigDir } from '@continuum/claude-code'
 import { commandName, handlesInterrupts, main } from './main'
 import { superviseServe, WORKER_ENV } from './supervisor'
 
@@ -49,6 +50,7 @@ process.exitCode = supervise
       signal: controller.signal,
       readStdin,
       configDir: defaultConfigDir(),
+      claudeConfigDir: defaultClaudeConfigDir(),
     })
 
 // The IPC channel to the supervisor would otherwise keep a finished worker alive, and its restart would never come.

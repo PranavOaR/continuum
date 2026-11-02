@@ -5,7 +5,7 @@ import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RESTART_EXIT, serveCommand, type ServeOptions } from '../commands/serve'
 import { EXIT_USAGE } from '../io'
-import { cli, TEST_CONFIG_DIR } from './harness'
+import { cli, TEST_CLAUDE_DIR, TEST_CONFIG_DIR } from './harness'
 
 const sandboxes: Sandbox[] = []
 const dirs: string[] = []
@@ -23,7 +23,7 @@ function sandbox(name: Record<string, string> = { 'a.ts': 'a' }) {
 async function serving(cwd: string, args: string[], webDist?: string, configDir = TEST_CONFIG_DIR, options: Omit<ServeOptions, 'webDist'> = {}) {
   const controller = new AbortController()
   const lines: string[] = []
-  const io = { cwd, out: (line: string) => lines.push(line), err: (line: string) => lines.push(line), now: () => new Date(), signal: controller.signal, readStdin: async () => '', configDir }
+  const io = { cwd, out: (line: string) => lines.push(line), err: (line: string) => lines.push(line), now: () => new Date(), signal: controller.signal, readStdin: async () => '', configDir, claudeConfigDir: TEST_CLAUDE_DIR }
   const done = serveCommand(io, args, 'test', { ...(webDist ? { webDist } : {}), ...options })
   await vi.waitFor(() => expect(lines.join('\n')).toContain('Continuum dashboard: http://127.0.0.1:'), { timeout: 5000 })
   const launch = /http:\/\/127\.0\.0\.1:\d+\/app\?token=[\w-]+/.exec(lines.join('\n'))?.[0] as string

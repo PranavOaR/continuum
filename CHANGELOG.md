@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- **A redaction pattern that cannot be used now stops capture.** A `redactPatterns` entry that is not a valid regular expression, or is longer than 200 characters, was skipped and only `doctor` warned, so what it was meant to mask was stored. Continuum now records nothing until it is fixed, as it already did for a config it cannot read, and `doctor` names the pattern.
+- A check run under an existing name with a different command (`continuum run --name tests -- true`) took over the old check's result silently. The briefing now marks it `COMMAND CHANGED` and names the command the previous run used.
+- `@modelcontextprotocol/sdk` 1.32.2 and `npm audit fix` clear the advisories against `fast-uri` (bundled) and `body-parser`.
+
+### Added
+- `setup claude-code` and `doctor` warn when the Continuum plugin is also enabled for the repository, since every hook would then run twice, and say how to keep only one.
+
 ## [0.2.1] - 2026-10-31
 
 ### Fixed

@@ -11,6 +11,10 @@ export const NOW = new Date('2026-10-16T12:00:00.000Z')
 export const TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'continuum-config-'))
 process.once('exit', () => rmSync(TEST_CONFIG_DIR, { recursive: true, force: true }))
 
+/** Nor the real ~/.claude, whose enabled plugins would change what setup and doctor report. */
+export const TEST_CLAUDE_DIR = mkdtempSync(join(tmpdir(), 'continuum-claude-'))
+process.once('exit', () => rmSync(TEST_CLAUDE_DIR, { recursive: true, force: true }))
+
 function sink(lines: string[]) {
   return new Writable({
     write(chunk, _encoding, done) {
@@ -35,6 +39,7 @@ export async function cli(cwd: string, argv: string[], extra: Partial<Io> = {}) 
     signal: new AbortController().signal,
     readStdin: async () => '',
     configDir: TEST_CONFIG_DIR,
+    claudeConfigDir: TEST_CLAUDE_DIR,
     ...extra,
   })
   return { code, out: out.join('\n'), err: err.join('\n'), raw: raw.join('') }

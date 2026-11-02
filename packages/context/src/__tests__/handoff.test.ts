@@ -55,6 +55,13 @@ describe('renderHandoff', () => {
     expect(text).toContain('- [agent-reported] Decision: Callbacks reuse createSession. Do not mint tokens in the callback.')
   })
 
+  it('warns when a check ran a different command than before, so a renamed run is not mistaken for the old check', () => {
+    const store = seededStore()
+    store.record({ type: 'check.recorded', payload: { name: 'unit', command: 'true', exitCode: 0, durationMs: 5, ranAgainst: { 'file:src/auth/login.ts': 'h-login-1' } }, evidence: 'verified', source: 'test', occurredAt: NOW.toISOString() })
+    const text = renderHandoff(projectState(store, tree(CURRENT_FILES), NOW), { now: NOW })
+    expect(text).toContain('- [verified] passed: `unit` (`true`). Ran just now; COMMAND CHANGED: it previously ran `npm test`')
+  })
+
   it('flags decisions whose code changed and unrecorded edits', () => {
     const { 'src/auth/session.ts': _gone, 'src/auth/callback.ts': _alsoGone, ...rest } = CURRENT_FILES
     const text = handoff({ ...rest, 'src/new.ts': 'h-new' })

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
@@ -7,7 +7,7 @@ import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
 import { setupCommand } from '../commands/setup'
 import { EXIT_USAGE } from '../io'
-import { cli, NOW, TEST_CONFIG_DIR } from './harness'
+import { cli, NOW, TEST_CLAUDE_DIR, TEST_CONFIG_DIR } from './harness'
 
 const sandboxes: Sandbox[] = []
 afterEach(() => {
@@ -40,7 +40,7 @@ function fireHook(root: string, event: string, fields: Record<string, unknown>, 
 describe('continuum setup through npx', () => {
   it('records the files it writes, so they are never reported as unexplained changes', async () => {
     const repo = sandbox()
-    const io = { cwd: repo.root, out: () => {}, err: () => {}, now: () => NOW, configDir: TEST_CONFIG_DIR } as unknown as Parameters<typeof setupCommand>[0]
+    const io = { cwd: repo.root, out: () => {}, err: () => {}, now: () => NOW, configDir: TEST_CONFIG_DIR, claudeConfigDir: TEST_CLAUDE_DIR } as unknown as Parameters<typeof setupCommand>[0]
     // Through npx the files are portable, so they are not kept out of git and scans see them.
     const npx = { command: 'npx', args: ['-y', 'getcontinuum@0.1.0'], portable: true }
     for (const target of ['claude-code', 'codex', 'cursor']) expect(await setupCommand(io, [target], npx)).toBe(0)
@@ -51,6 +51,17 @@ describe('continuum setup through npx', () => {
 })
 
 describe('continuum setup claude-code', () => {
+  it('warns when the Continuum plugin is also enabled, since every hook would then run twice', async () => {
+    const repo = sandbox()
+    mkdirSync(join(repo.root, '.claude'), { recursive: true })
+    writeFileSync(join(repo.root, '.claude/settings.json'), JSON.stringify({ enabledPlugins: { 'continuum@continuum': true } }))
+    const setup = await cli(repo.root, ['setup', 'claude-code'])
+    expect(setup.code).toBe(0)
+    expect(setup.err).toContain('plugin')
+    expect(setup.err).toContain('setup claude-code --remove')
+    expect((await cli(sandbox().root, ['setup', 'claude-code'])).err).toBe('')
+  })
+
   it('initializes, wires hooks and MCP, and removes them again', async () => {
     const repo = sandbox()
     const setup = await cli(repo.root, ['setup', 'claude-code'])

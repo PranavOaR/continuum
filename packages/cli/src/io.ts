@@ -12,6 +12,8 @@ export interface Io {
   readStdin: () => Promise<string>
   /** Where Continuum keeps per-user state: the registry of connected repositories. */
   configDir: string
+  /** Claude Code's user settings directory, read to see whether the Continuum plugin is enabled. */
+  claudeConfigDir: string
   /** Raw streams for child-process output (`run`); default to the process's own. */
   stdout?: Writable
   stderr?: Writable

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { checkNode, runDoctor, type Finding } from '../doctor'
 import { selfInvocation } from '../invocation'
 import { EXIT_FAILURE, EXIT_OK } from '../io'
-import { cli, TEST_CONFIG_DIR } from './harness'
+import { cli, TEST_CLAUDE_DIR, TEST_CONFIG_DIR } from './harness'
 
 const sandboxes: Sandbox[] = []
 const dirs: string[] = []
@@ -26,7 +26,7 @@ const readSettings = (root: string) => JSON.parse(readFileSync(join(root, SETTIN
 const writeSettings = (root: string, value: unknown) => writeFileSync(join(root, SETTINGS), JSON.stringify(value))
 
 const doctor = (cwd: string, overrides: Partial<Parameters<typeof runDoctor>[0]> = {}) =>
-  runDoctor({ cwd, nodeVersion: '24.1.0', platform: 'linux', invocation: selfInvocation(), webDist: '/nowhere', configDir: TEST_CONFIG_DIR, ...overrides })
+  runDoctor({ cwd, nodeVersion: '24.1.0', platform: 'linux', invocation: selfInvocation(), webDist: '/nowhere', configDir: TEST_CONFIG_DIR, claudeConfigDir: TEST_CLAUDE_DIR, ...overrides })
 
 const find = (findings: Finding[], label: RegExp) => findings.find((finding) => label.test(finding.label))
 
@@ -98,13 +98,23 @@ describe('continuum doctor', () => {
     expect(find(await doctor(repo.root), /continuumignore/)).toMatchObject({ status: 'fail' })
   })
 
-  it('warns about redaction patterns it cannot use, and names them', async () => {
+  it('fails on redaction patterns it cannot use, naming them, since nothing is recorded until they are fixed', async () => {
     const repo = sandbox()
     await cli(repo.root, ['setup', 'claude-code'])
     writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]+', '(unclosed'] }))
-    expect(find(await doctor(repo.root), /redaction pattern/)).toMatchObject({ status: 'warn', label: '1 redaction pattern is not used', detail: '(unclosed' })
+    expect(find(await doctor(repo.root), /Settings cannot be read/)).toMatchObject({ status: 'fail', detail: expect.stringContaining('(unclosed') })
     writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['CUST-[0-9]+'] }))
     expect(find(await doctor(repo.root), /Settings/)).toMatchObject({ status: 'ok', detail: expect.stringContaining('1 redaction pattern') })
+  })
+
+  it('warns when the Claude Code plugin also runs here, since every hook would fire twice', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    expect(find(await doctor(repo.root), /plugin/)).toBeUndefined()
+    const claudeConfigDir = mkdtempSync(join(tmpdir(), 'continuum-claude-'))
+    dirs.push(claudeConfigDir)
+    writeFileSync(join(claudeConfigDir, 'settings.json'), JSON.stringify({ enabledPlugins: { 'continuum@continuum': true } }))
+    expect(find(await doctor(repo.root, { claudeConfigDir }), /plugin/)).toMatchObject({ status: 'warn', fix: expect.stringContaining('setup claude-code --remove') })
   })
 
   it('reports a damaged store without suggesting deletion for other errors', async () => {

@@ -4,13 +4,14 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { createRedactor, findRepoRoot, InvalidConfigError, isInitialized, isTracked, loadContinuumIgnore, locateWorkspace, MAX_CUSTOM_PATTERN_CHARS, NotAGitRepositoryError, readConfig, readRegistry, UnreadableIgnoreFileError, type ContinuumConfig } from '@continuum/capture'
+import { findRepoRoot, InvalidConfigError, isInitialized, isTracked, loadContinuumIgnore, locateWorkspace, NotAGitRepositoryError, readConfig, readRegistry, UnreadableIgnoreFileError, type ContinuumConfig } from '@continuum/capture'
 import {
   CODEX_HOOKS_FILE,
   CURSOR_MCP_FILE,
   HOOK_EVENTS,
   HOOKS_FILE,
   isContinuumHandler,
+  isContinuumPluginEnabled,
   isContinuumServer,
   MCP_FILE,
   MCP_SERVER_NAME,
@@ -30,6 +31,10 @@ const SETUP_FIX = 'Run `continuum setup claude-code` in this repository.'
 export const UNSUPPORTED_PLATFORM = 'win32'
 export const WINDOWS_FIX = 'Use WSL 2: install Node.js and git inside your WSL distribution, and run Continuum and your agents there.'
 
+/** The plugin and `setup claude-code` both register Continuum's hooks; with both, every hook runs twice. */
+export const PLUGIN_AND_SETUP = 'The Continuum plugin is enabled and this repository has its own Continuum hooks, so every hook runs twice'
+export const PLUGIN_AND_SETUP_FIX = 'Keep one: run `continuum setup claude-code --remove` here to use the plugin, or disable the plugin with /plugin to keep this setup.'
+
 export type FindingStatus = 'ok' | 'warn' | 'fail'
 
 export interface Finding {
@@ -48,6 +53,8 @@ export interface DoctorEnvironment {
   webDist: string
   /** Holds the registry of connected repositories that `continuum serve` shows. */
   configDir: string
+  /** Claude Code's user settings directory, where the plugin may be enabled. */
+  claudeConfigDir: string
   now?: Date
 }
 
@@ -107,7 +114,7 @@ function checkStore(storePath: string): Finding {
   }
 }
 
-/** The repository's settings: a config that cannot be read stops all capture, and an unusable pattern masks nothing. */
+/** The repository's settings: a config that cannot be read, or holds a pattern that cannot be used, stops all capture. */
 async function checkSettings(root: string): Promise<Finding> {
   let config: ContinuumConfig
   try {
@@ -115,16 +122,6 @@ async function checkSettings(root: string): Promise<Finding> {
   } catch (error) {
     if (!(error instanceof InvalidConfigError)) throw error
     return { status: 'fail', label: 'Settings cannot be read, so nothing is recorded', detail: error.message, fix: 'Fix .continuum/config.json, or delete it to use the defaults.' }
-  }
-  const { rejectedPatterns } = createRedactor(config.redactPatterns)
-  if (rejectedPatterns.length > 0) {
-    const count = rejectedPatterns.length
-    return {
-      status: 'warn',
-      label: `${count} redaction pattern${count === 1 ? ' is' : 's are'} not used`,
-      detail: rejectedPatterns.join(', '),
-      fix: `In .continuum/config.json, make each one a valid regular expression of at most ${MAX_CUSTOM_PATTERN_CHARS} characters.`,
-    }
   }
   const patterns = config.redactPatterns.length
   return {
@@ -286,6 +283,9 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
     findings.push({ status: 'ok', label: 'Claude Code not connected', detail: 'another agent is; run `continuum setup claude-code` to add it' }, ...others)
   } else {
     findings.push(claudeHooks, ...(await checkMcp(workspace.root, mcpConfig, settings)), ...others)
+    if (claudeHooks.status !== 'fail' && (await isContinuumPluginEnabled(workspace.root, env.claudeConfigDir))) {
+      findings.push({ status: 'warn', label: PLUGIN_AND_SETUP, fix: PLUGIN_AND_SETUP_FIX })
+    }
   }
   const now = env.now ?? new Date()
   findings.push(...(await hookStatuses(workspace.root)).map((status) => checkHookHealth(status, now)))
