@@ -87,9 +87,7 @@ export function ProjectWorkspacePage() {
 
   // Without a recorded task, show everything recorded for the project rather than a dead end.
   const taskFiles = task ? files.filter((file) => task.relatedFileIds.includes(file.id)) : files
-  const taskEvents = task
-    ? events.filter((event) => event.taskId === task.id).toReversed()
-    : events.toSorted((a, b) => a.timestamp.localeCompare(b.timestamp))
+  const taskEvents = (task ? events.filter((event) => event.taskId === task.id) : events).toSorted((a, b) => b.timestamp.localeCompare(a.timestamp))
   const taskVerification = task ? verification.filter((record) => task.verificationIds.includes(record.id)) : verification
   const taskMemory = task ? memory.filter((record) => record.taskId === task.id) : memory
   const latestRevision = taskFiles.find((file) => file.revision)?.revision
@@ -111,13 +109,13 @@ export function ProjectWorkspacePage() {
               onPrepareHandoff={() => openHandoffDialog({ projectId: project.id, taskId: task.id })}
             />
           ) : (
-            <LeftOffPanel sessions={workspace.sessions} />
+            <LeftOffPanel sessions={workspace.sessions} agentConnected={workspace.setup?.agentConnected ?? true} />
           )}
           <FileExplorer files={taskFiles} onOpenFile={(fileId) => setParam({ file: fileId })} />
           <Panel
             id="timeline"
             title="Agent activity"
-            description={task ? 'Recorded work events for this task, oldest first.' : 'Recorded work events for this project, oldest first.'}
+            description={task ? 'Recorded work events for this task, newest first.' : 'Recorded work events for this project, newest first.'}
             actions={
               <Link to={`/app/activity?project=${project.id}`} className="text-[12px] text-accent hover:underline">
                 All project activity
@@ -125,7 +123,7 @@ export function ProjectWorkspacePage() {
             }
           >
             {taskEvents.length === 0 ? (
-              <EmptyState icon={<Activity />} title="No activity recorded" description="No events are linked to this task yet." />
+              <EmptyState icon={<Activity />} title="No activity recorded" description={task ? 'No events are linked to this task yet.' : 'No agent work has been recorded in this project yet.'} />
             ) : (
               <ActivityTimeline events={taskEvents} onSelect={(eventId) => setParam({ event: eventId })} showClock />
             )}

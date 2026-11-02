@@ -5,7 +5,7 @@ import { Panel } from '../shared/Panel'
 import { EvidenceBadge } from '../shared/StatusBadge'
 
 /** For projects without a recorded task: the latest session's own account of where it stopped. */
-export function LeftOffPanel({ sessions }: { sessions: AgentSession[] }) {
+export function LeftOffPanel({ sessions, agentConnected }: { sessions: AgentSession[]; agentConnected: boolean }) {
   const format = useTimeFormat()
   const [latest] = sessions
   return (
@@ -21,7 +21,13 @@ export function LeftOffPanel({ sessions }: { sessions: AgentSession[] }) {
         </div>
       ) : (
         <p className="text-[13px] leading-relaxed text-muted">
-          No agent sessions recorded yet. Run <span className="font-mono text-fg">continuum setup claude-code</span> in the repository to capture them.
+          {agentConnected ? (
+            'No agent sessions recorded yet. Start your agent in this repository; its first session appears here.'
+          ) : (
+            <>
+              No agent sessions recorded yet. Run <span className="font-mono text-fg">continuum setup claude-code</span> (or codex, cursor, vscode) in the repository to connect one.
+            </>
+          )}
         </p>
       )}
     </Panel>

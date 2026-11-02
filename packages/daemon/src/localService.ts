@@ -14,6 +14,7 @@ import {
 import { InvalidConfigError, openWorkspace, repositoryRedactor, type Redactor } from '@continuum/capture'
 import { applyTaskChange, renderHandoff, summarizeTask } from '@continuum/context'
 import { keys } from '@continuum/store'
+import { asAgent } from './ids'
 import { toActivity } from './mapActivity'
 import { toGraph } from './mapGraph'
 import { allChangedFileNodes, toFiles, toProject } from './mapProject'
@@ -96,9 +97,11 @@ function summarize(snapshot: RepoSnapshot): ProjectSummary {
     criteria.length > 0
       ? { done: criteria.filter((criterion) => criterion.status === 'complete').length, total: criteria.length }
       : { done: task?.completedSteps.length ?? 0, total: (task?.completedSteps.length ?? 0) + (task?.remainingSteps.length ?? 0) }
+  const session = snapshot.state.sessions[0]
   return {
     project: toProject(snapshot),
     ...(task ? { currentTask: task } : {}),
+    ...(session ? { latestSession: { agent: asAgent(session.agent), note: session.note, lastActivityAt: session.lastActivityAt ?? toProject(snapshot).updatedAt } } : {}),
     status: task?.status ?? 'idle',
     progress,
     changedFileCount: allChangedFileNodes(snapshot).length,

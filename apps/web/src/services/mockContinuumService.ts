@@ -41,12 +41,20 @@ function findCurrentTask(project: Project): ProjectTask | undefined {
   return MOCK_TASKS.find((task) => task.id === project.currentTaskId)
 }
 
+/** The project's most recent session, as the live service reports it. */
+function latestSession(project: Project): ProjectSummary['latestSession'] {
+  const session = MOCK_SESSIONS.filter((candidate) => candidate.projectId === project.id).sort(byNewest((candidate) => candidate.endedAt))[0]
+  return session && { agent: session.agent, note: session.summary, lastActivityAt: session.endedAt }
+}
+
 function summarize(project: Project): ProjectSummary {
   const currentTask = findCurrentTask(project)
   const criteria = currentTask?.acceptanceCriteria ?? []
+  const session = latestSession(project)
   return {
     project,
     currentTask,
+    ...(session ? { latestSession: session } : {}),
     status: currentTask?.status ?? 'idle',
     progress: { done: criteria.filter((c) => c.status === 'complete').length, total: criteria.length },
     changedFileCount: currentTask?.relatedFileIds.length ?? 0,

@@ -1,5 +1,6 @@
 import { Clock, GitBranch } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { getAgent } from '@continuum/core'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
 import type { ProjectSummary } from '../../services'
 import { cn } from '../../utils/cn'
@@ -25,8 +26,29 @@ export function ProgressBar({ done, total, label }: { done: number; total: numbe
   )
 }
 
+/** With no task, the card shows the latest session's own words, so recent work is visible without one. */
+function LatestSessionNote({ session }: { session: ProjectSummary['latestSession'] }) {
+  const format = useTimeFormat()
+  if (!session) {
+    return (
+      <>
+        <p className="label-mono text-subtle">Latest session</p>
+        <p className="mt-1 text-[14px] text-muted">No agent session yet. Start one in this repository and it appears here.</p>
+      </>
+    )
+  }
+  return (
+    <>
+      <p className="label-mono text-subtle">
+        Latest session · {getAgent(session.agent).name} · {format(session.lastActivityAt)}
+      </p>
+      <p className="mt-1 line-clamp-2 text-[14px] text-fg">{session.note ?? 'No note recorded.'}</p>
+    </>
+  )
+}
+
 export function ProjectCard({ summary }: { summary: ProjectSummary }) {
-  const { project, currentTask, status, progress } = summary
+  const { project, currentTask, latestSession, status, progress } = summary
   const format = useTimeFormat()
 
   return (
@@ -45,17 +67,23 @@ export function ProjectCard({ summary }: { summary: ProjectSummary }) {
       <p className="mt-3 label-mono text-subtle">{project.stack.join(' · ')}</p>
 
       <div className="mt-5 border-t border-dashed border-line-strong pt-4">
-        <p className="label-mono text-subtle">Current task</p>
-        <p className="mt-1 text-[14px] font-medium text-fg">{currentTask?.title ?? 'No active task'}</p>
-        {currentTask && progress.total > 0 && (
-          <div className="mt-3">
-            <ProgressBar done={progress.done} total={progress.total} label="Criteria complete" />
-          </div>
+        {currentTask ? (
+          <>
+            <p className="label-mono text-subtle">Current task</p>
+            <p className="mt-1 text-[14px] font-medium text-fg">{currentTask.title}</p>
+            {progress.total > 0 && (
+              <div className="mt-3">
+                <ProgressBar done={progress.done} total={progress.total} label="Criteria complete" />
+              </div>
+            )}
+          </>
+        ) : (
+          <LatestSessionNote session={latestSession} />
         )}
       </div>
 
       <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-5 text-[12px] text-muted">
-        <AgentChip agent={project.lastActiveAgent} className="text-[12px]" />
+        {project.lastActiveAgent && <AgentChip agent={project.lastActiveAgent} className="text-[12px]" />}
         <span className="flex items-center gap-1 font-mono text-[11px]">
           <GitBranch className="size-3.5" aria-hidden />
           {project.branch}

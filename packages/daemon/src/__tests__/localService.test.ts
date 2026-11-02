@@ -3,7 +3,7 @@ import { NotFoundError } from '@continuum/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { projectIds } from '../ids'
 import { LocalContinuumService, ProjectUnavailableError } from '../localService'
-import { detectStack } from '../mapProject'
+import { detectStack, shortPath } from '../mapProject'
 import { NOW, openStore, seededRepo } from './fixtures'
 
 const sandboxes: Sandbox[] = []
@@ -30,6 +30,12 @@ describe('LocalContinuumService', () => {
       description: `Local repository at ${repo.root}`,
     })
     expect(summary).toMatchObject({ status: 'idle', changedFileCount: 1 })
+  })
+
+  it('summarizes the latest session, so a project without a task still shows its work', async () => {
+    const { service: local } = await service()
+    const [summary] = await local.listProjects()
+    expect(summary.latestSession).toEqual({ agent: 'claude-code', note: 'Auth now hashes passwords. Next: rate limiting.', lastActivityAt: '2026-10-16T11:14:00.000Z' })
   })
 
   it('lists only files changed after the first scan, attributed to the session', async () => {
@@ -149,6 +155,13 @@ describe('LocalContinuumService', () => {
 describe('helpers', () => {
   it('derives unique, URL-safe project ids', () => {
     expect(projectIds(['My App', 'my-app', '---', 'Ünïcode'])).toEqual(['my-app', 'my-app-2', 'project', 'n-code'])
+  })
+
+  it('writes the home folder as ~ in a repository path, and nothing else', () => {
+    expect(shortPath('/Users/ana/code/app', '/Users/ana')).toBe('~/code/app')
+    expect(shortPath('/Users/ana', '/Users/ana')).toBe('~')
+    expect(shortPath('/Users/anabel/app', '/Users/ana')).toBe('/Users/anabel/app')
+    expect(shortPath('/tmp/app', '')).toBe('/tmp/app')
   })
 
   it('detects the stack only from root marker files', () => {

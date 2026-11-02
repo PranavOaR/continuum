@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- **The dashboard shows work without a task.** A repository counted as active only while it had an open task, so the overview read "No active projects" minutes after agents worked in it. Active now means an open task or anything recorded in the last 7 days, and a project without a task shows its latest session: the agent, its note and when. A repository connected but not used yet is listed with what to do next.
+- Truthful copy on live screens: a project no agent has worked in says "None yet" instead of "Other agent", and a connected one is no longer told to run `setup`; empty panels no longer mention a task that does not exist; the verification note says where verified and observed results come from; Settings names the real default theme; the Handoffs page explains that connected agents are briefed automatically. Project paths under your home folder are written with `~`. "Idle" is now "No task". Activity in a project is listed newest first, like everywhere else, and the live dashboard no longer shows a demo account menu. An end-to-end check fails if demo or prototype wording appears on a live screen.
+
 ### Fixed
 - **A redaction pattern that cannot be used now stops capture.** A `redactPatterns` entry that is not a valid regular expression, or is longer than 200 characters, was skipped and only `doctor` warned, so what it was meant to mask was stored. Continuum now records nothing until it is fixed, as it already did for a config it cannot read, and `doctor` names the pattern.
 - A check run under an existing name with a different command (`continuum run --name tests -- true`) took over the old check's result silently. The briefing now marks it `COMMAND CHANGED` and names the earlier command, on every run until the name runs that command again. `setup` also checks the config before writing anything, so a pattern it cannot use no longer leaves setup half-done.
