@@ -8,6 +8,7 @@
 - `@modelcontextprotocol/sdk` 1.32.2 and `npm audit fix` clear the advisories against `fast-uri` (bundled) and `body-parser`.
 
 ### Added
+- **A receipt after each reply.** When a Claude Code reply edited files or ran checks, Claude Code now shows one line from Continuum: "Continuum recorded 2 file edits and `npm test` (passed) for the next session." Replies that recorded nothing stay silent. It counts only this session's own edits and checks since its previous reply. Turn it off with `continuum config receipts off`. Other agents get no receipt until their display of hook messages is confirmed.
 - **`continuum doctor --report`** prints a Markdown report to attach to an issue: Continuum, Node.js and platform versions, how it is installed, every `doctor` finding, the store's schema, size and event counts by type, settings (the number of redaction patterns, not the patterns) and each agent's hook health. The repository is shortened to `<repo>` and your home folder to `~`, and secrets are masked. It holds none of your code, prompts, tasks or decisions. Pipe it to a file or the clipboard: `npx getcontinuum doctor --report | pbcopy`.
 - `setup claude-code` and `doctor` warn when the Continuum plugin is also enabled for the repository, since every hook would then run twice, and say how to keep only one.
 

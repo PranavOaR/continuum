@@ -39,6 +39,53 @@ function withStore<T>(path: string, read: (store: ContextStore) => T): T {
   }
 }
 
+describe('the receipt Claude Code shows after a reply', () => {
+  const edit = (repo: Sandbox, path: string, content: string) => {
+    repo.write(path, content)
+    return ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, path) } }), { now: () => NOW })
+  }
+  const stop = (repo: Sandbox, options: { agent?: 'claude-code' | 'codex' } = {}) =>
+    ingestHook(hook(repo, { hook_event_name: 'Stop', last_assistant_message: 'Done for now.' }), { now: () => NOW, ...options })
+
+  it('sums up what this reply recorded: the files it edited and the checks it ran', async () => {
+    const { repo } = await initialized({ 'src/a.ts': 'a', 'src/b.ts': 'b' })
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+    await edit(repo, 'src/a.ts', 'a2')
+    await edit(repo, 'src/b.ts', 'b2')
+    await edit(repo, 'src/a.ts', 'a3')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: { command: 'npm test' }, tool_response: { stdout: 'ok' } }), { now: () => NOW })
+
+    const outcome = await stop(repo)
+    expect(outcome).toMatchObject({ status: 'recorded', receipt: 'Continuum recorded 2 file edits and `npm test` (passed) for the next session.' })
+  })
+
+  it('stays quiet after a reply that recorded nothing, and counts only what came after the previous reply', async () => {
+    const { repo } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+    await edit(repo, 'src/a.ts', 'a2')
+    expect((await stop(repo)) as { receipt?: string }).toMatchObject({ receipt: 'Continuum recorded 1 file edit for the next session.' })
+    expect(((await stop(repo)) as { receipt?: string }).receipt).toBeUndefined()
+  })
+
+  it('leaves out another session\'s edits', async () => {
+    const { repo } = await initialized({ 'src/a.ts': 'a', 'src/b.ts': 'b' })
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+    repo.write('src/b.ts', 'b by someone else')
+    await ingestHook(hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: join(repo.root, 'src/b.ts') } }, 'other-session'), { now: () => NOW })
+    expect(((await stop(repo)) as { receipt?: string }).receipt).toBeUndefined()
+  })
+
+  it('is off with `continuum config receipts off`, and not sent to agents whose display of it is unknown', async () => {
+    const { repo } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+    await edit(repo, 'src/a.ts', 'a2')
+    expect(((await stop(repo, { agent: 'codex' })) as { receipt?: string }).receipt).toBeUndefined()
+    await edit(repo, 'src/a.ts', 'a3')
+    repo.write('.continuum/config.json', JSON.stringify({ receipts: false }))
+    expect(((await stop(repo)) as { receipt?: string }).receipt).toBeUndefined()
+  })
+})
+
 describe('ingestHook', () => {
   it('ignores repositories without Continuum and non-git directories', async () => {
     const repo = createSandbox({ 'a.ts': 'a' })

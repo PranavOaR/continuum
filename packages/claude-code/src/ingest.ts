@@ -24,7 +24,8 @@ import { currentTaskId, projectState, renderHandoff, sinceYouLeft } from '@conti
 import { ContextStore, keys, normalizePath } from '@continuum/store'
 import { agentCheckOf } from './agentCheck'
 import { editedFiles, parseHookPayload, reportedTaskId, SHELL_TOOL, withVsCodeDefaults, type HookAgent, type HookPayload } from './hookPayload'
-import { cleanPrompt, translateHook, type FileEdit } from './translate'
+import { adapterSource, cleanPrompt, translateHook, type FileEdit } from './translate'
+import { replyReceipt } from './receipt'
 import { VERIFIED_RUN_HINT } from './guidance'
 
 /** How this adapter's sessions are recorded; "since you left" compares with this agent's previous session. */
@@ -59,7 +60,13 @@ function hasSessionId(raw: string, prepare: (data: Record<string, unknown>) => R
 
 export type IngestOutcome =
   | { status: 'ignored'; reason: string }
-  | { status: 'recorded'; events: number; additionalContext?: string }
+  | {
+      status: 'recorded'
+      events: number
+      additionalContext?: string
+      /** After a reply (Stop), one line for the person on what it recorded; Claude Code shows it as a systemMessage. */
+      receipt?: string
+    }
 
 /** The nearest directory at or above `cwd` holding a Continuum store, found without git. */
 function storeRootAbove(cwd: string): string | null {
@@ -198,6 +205,9 @@ async function ingestInto(workspace: Workspace, payload: HookPayload, agent: Hoo
 
   const store = ContextStore.open(workspace.storePath)
   try {
+    // Read before this reply's own note is recorded: that note marks where the next reply starts.
+    // Only Claude Code is known to show a Stop hook's systemMessage to the person.
+    const receipt = payload.hook_event_name === 'Stop' && agent === 'claude-code' && config.receipts ? replyReceipt(store, payload.session_id, adapterSource(agent)) : undefined
     const recorded = store.transact(() =>
       translateHook(payload, {
         now,
@@ -213,7 +223,7 @@ async function ingestInto(workspace: Workspace, payload: HookPayload, agent: Hoo
     )
     const additionalContext =
       payload.hook_event_name === 'SessionStart' ? await sessionStartContext(store, workspace.root, payload.session_id, now, agent) : undefined
-    return { status: 'recorded', events: recorded.length, ...(additionalContext ? { additionalContext } : {}) }
+    return { status: 'recorded', events: recorded.length, ...(additionalContext ? { additionalContext } : {}), ...(receipt ? { receipt } : {}) }
   } finally {
     store.close()
   }

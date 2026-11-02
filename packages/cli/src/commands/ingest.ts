@@ -18,5 +18,7 @@ export async function ingestCommand(io: Io, args: readonly string[] = []): Promi
   if (outcome.status === 'recorded' && outcome.additionalContext) {
     io.out(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: outcome.additionalContext } }))
   }
+  // Shown to the person, never to Claude, and it does not keep the conversation going.
+  if (outcome.status === 'recorded' && outcome.receipt) io.out(JSON.stringify({ systemMessage: outcome.receipt }))
   return EXIT_OK
 }

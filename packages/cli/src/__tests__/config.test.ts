@@ -18,6 +18,15 @@ describe('continuum config', () => {
     expect((await cli(repo.root, ['config'])).out).toMatch(/agent-checks\s+off/)
   })
 
+  it('turns the end-of-reply receipt off and on', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    await cli(repo.root, ['init'])
+    expect((await cli(repo.root, ['config'])).out).toMatch(/receipts\s+on/)
+    expect((await cli(repo.root, ['config', 'receipts', 'off'])).code).toBe(EXIT_OK)
+    expect((await cli(repo.root, ['config'])).out).toMatch(/receipts\s+off/)
+  })
+
   it('rejects unknown settings and values', async () => {
     const repo = createSandbox({ 'a.ts': 'a' })
     sandboxes.push(repo)

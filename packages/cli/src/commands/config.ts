@@ -7,6 +7,7 @@ export const CONFIG_USAGE = 'Usage: continuum config [<setting> on|off]'
 const SETTINGS: Record<string, { key: keyof ContinuumConfig; description: string }> = {
   'agent-checks': { key: 'agentChecks', description: 'record tests, lint and builds an agent runs (observed exit code)' },
   prompts: { key: 'capturePrompts', description: 'record the prompts you type to agents, redacted' },
+  receipts: { key: 'receipts', description: 'after a Claude Code reply, show one line of what was recorded' },
 }
 
 const VALUES: Record<string, boolean> = { on: true, off: false }
