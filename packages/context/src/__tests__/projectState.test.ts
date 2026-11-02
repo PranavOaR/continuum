@@ -35,7 +35,10 @@ describe('projectState', () => {
     expect(projectState(store, tree(CURRENT_FILES), NOW).checks.find((check) => check.name === 'unit')?.previousCommand).toBeNull()
     rerun('true')
     expect(projectState(store, tree(CURRENT_FILES), NOW).checks.find((check) => check.name === 'unit')).toMatchObject({ command: 'true', previousCommand: 'npm test' })
+    // Running the new command again does not make it the old check.
     rerun('true')
+    expect(projectState(store, tree(CURRENT_FILES), NOW).checks.find((check) => check.name === 'unit')?.previousCommand).toBe('npm test')
+    rerun('npm test')
     expect(projectState(store, tree(CURRENT_FILES), NOW).checks.find((check) => check.name === 'unit')?.previousCommand).toBeNull()
   })
 

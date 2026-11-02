@@ -51,6 +51,16 @@ describe('continuum setup through npx', () => {
 })
 
 describe('continuum setup claude-code', () => {
+  it('changes nothing when the repository config cannot be used', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    writeFileSync(join(repo.root, '.continuum/config.json'), JSON.stringify({ redactPatterns: ['(unclosed'] }))
+    const setup = await cli(repo.root, ['setup', 'claude-code'])
+    expect(setup.code).not.toBe(0)
+    expect(setup.err).toContain('(unclosed')
+    expect(existsSync(join(repo.root, '.claude/settings.local.json'))).toBe(false)
+  })
+
   it('warns when the Continuum plugin is also enabled, since every hook would then run twice', async () => {
     const repo = sandbox()
     mkdirSync(join(repo.root, '.claude'), { recursive: true })

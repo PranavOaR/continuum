@@ -1,4 +1,4 @@
-import { initWorkspace, locateWorkspace, registerRepository, scanRepository, unregisterRepository } from '@continuum/capture'
+import { initWorkspace, locateWorkspace, readConfig, registerRepository, scanRepository, unregisterRepository } from '@continuum/capture'
 import {
   isContinuumPluginEnabled,
   MCP_FILE,
@@ -106,6 +106,8 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
   const { workspace, store, created } = await initWorkspace(io.cwd)
   let result: SetupResult
   try {
+    // A config capture cannot use would fail the scan below; refuse before writing anything.
+    await readConfig(workspace.root)
     // Write first, then scan: the files setup writes are recorded now, not reported later as changes no session explains.
     result = await target.setup(workspace.root, invocation)
     await scanRepository(store, workspace.root, { now: io.now })
