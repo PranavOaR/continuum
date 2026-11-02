@@ -1,4 +1,5 @@
 import { basename } from 'node:path'
+import { AGENTS } from '@continuum/core'
 import type { CheckSummary, DecisionSummary, ProjectState, SessionSummary } from './projectState'
 import { isQuiet, type SinceYouLeft } from './sinceYouLeft'
 import type { TaskSummary } from './tasks'
@@ -46,9 +47,14 @@ function listPaths(paths: readonly string[]): string {
   return paths.length > MAX_LISTED ? `${shown} and ${paths.length - MAX_LISTED} more` : shown
 }
 
+/** A known agent by its name (Claude Code, Codex); any other id as code, exactly as it was recorded. */
+function agentName(id: string): string {
+  return AGENTS.find((agent) => agent.id === id)?.name ?? code(id)
+}
+
 function describeSession(session: SessionSummary, now: Date): string {
   const state = session.ended ? 'ended' : 'still open'
-  return `${code(session.agent)} session, started ${agoFromIso(session.startedAt, now)}, last active ${agoFromIso(session.lastActivityAt, now)}, ${state}`
+  return `${agentName(session.agent)} session, started ${agoFromIso(session.startedAt, now)}, last active ${agoFromIso(session.lastActivityAt, now)}, ${state}`
 }
 
 const MAX_STEPS = 8
@@ -96,6 +102,25 @@ function commitLines(state: ProjectState, now: Date, since: string | null = null
     .map((commit) => `Committed [observed]: ${code(commit.hash.slice(0, 7))} ${quote(commit.message)} (${agoFromIso(commit.committedAt, now)})`)
 }
 
+/**
+ * "… Next: add a test for empty names." → "add a test for empty names." Also "Next steps:" and
+ * "next - …"; a dash counts only with spaces around it, so "next-generation" is not a step.
+ */
+const NEXT_STEP = /\bnext(?:\s+steps?)?(?:\s*:|\s+[\u2013\u2014-]\s)\s*(\S.*)$/is
+
+/**
+ * With no task (a task carries its own next action), the next step the most
+ * recent note names, newest session first. Agent-reported, and it says whose.
+ */
+function nextStepSection(state: ProjectState, now: Date): string[] {
+  if (state.tasks.some((task) => task.id === state.currentTaskId)) return []
+  for (const session of state.sessions) {
+    const named = session.note ? NEXT_STEP.exec(session.note)?.[1] : undefined
+    if (named) return ['## Next step', `[agent-reported] ${quote(named, 300)} (from the ${agentName(session.agent)} session, last active ${agoFromIso(session.lastActivityAt, now)})`]
+  }
+  return []
+}
+
 function leftOffSection(state: ProjectState, now: Date): string[] {
   const [latest] = state.sessions
   if (!latest) return ['## Where we left off', 'No agent sessions recorded yet.', ...commitLines(state, now)]
@@ -126,7 +151,7 @@ function sinceSection(since: SinceYouLeft | null | undefined, now: Date): string
   for (const session of since.otherSessions) {
     const files = session.files.length > 0 ? `changed ${listPaths(session.files)}` : 'changed no files'
     const note = session.note ? ` Its last note [agent-reported]: ${quote(session.note, 200)}` : ''
-    lines.push(`- [observed] A ${code(session.agent)} session ${files} (${agoFromIso(session.at, now)}).${note}`)
+    lines.push(`- [observed] A ${agentName(session.agent)} session ${files} (${agoFromIso(session.at, now)}).${note}`)
   }
   if (since.outsideChanges.length > 0) {
     lines.push(`- [observed] Changed outside agent sessions (latest ${agoFromIso(since.outsideChangedAt, now)}): ${listPaths(since.outsideChanges)}`)
@@ -235,7 +260,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
     'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.',
   ]
   return fit(
-    [header, sinceSection(options.since, now), taskSection(state), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
+    [header, sinceSection(options.since, now), taskSection(state), nextStepSection(state, now), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }

@@ -437,7 +437,7 @@ describe('since your last session', () => {
     const section = briefing.slice(begins, briefing.indexOf('\n## ', begins + 5))
     expect(begins).toBeGreaterThan(-1)
     expect(begins).toBeLessThan(briefing.indexOf('## Where we left off'))
-    expect(section).toMatch(/A `codex` session changed `src\/b\.ts` \([^)]+\)\. Its last note \[agent-reported\]: "Refactored the b module"/)
+    expect(section).toMatch(/A Codex session changed `src\/b\.ts` \([^)]+\)\. Its last note \[agent-reported\]: "Refactored the b module"/)
     expect(section).toMatch(/Changed outside agent sessions \(latest [^)]+\): `notes\.md`/)
     expect(section).toMatch(/Decision recorded: "Keep b pure" \([^)]+\)/)
   })

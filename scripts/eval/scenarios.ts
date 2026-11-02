@@ -64,7 +64,7 @@ export const SCENARIOS: Scenario[] = [
       { id: 'next', ask: 'What is the next step?', expect: [/state/i], section: 'Current task', inBriefing: [/Next action: "Validate the OAuth state parameter"/] },
       { id: 'unit-trust', ask: 'Can the passing "unit" check still be trusted? Why?', expect: [/out of date|no longer|stale|not.*trust/i, /login\.ts/], forbid: [/^\s*yes\b/i], section: 'Checks', inBriefing: [/OUT OF DATE: `unit`[^\n]*src\/auth\/login\.ts/], notInBriefing: [/passed: `unit`/] },
       { id: 'e2e', ask: 'What is the state of the "e2e" check?', expect: [/fail/i], section: 'Checks', inBriefing: [/FAILED: `e2e`/] },
-      { id: 'other-agent', ask: 'Did any other agent work here since your last session? What did it change?', expect: [/codex/i, /login\.ts/], section: 'Since your last session', inBriefing: [/A `codex` session changed `src\/auth\/login\.ts`/] },
+      { id: 'other-agent', ask: 'Did any other agent work here since your last session? What did it change?', expect: [/codex/i, /login\.ts/], section: 'Since your last session', inBriefing: [/A Codex session changed `src\/auth\/login\.ts`/] },
       { id: 'by-hand', ask: 'Which files were changed outside any agent session?', expect: [/README\.md/], section: 'Changed outside agent sessions', inBriefing: [/- modified `README\.md`/] },
       { id: 'decision', ask: 'Is there a recorded decision you should follow?', expect: [/createSession/], section: 'Decisions', inBriefing: [/Callbacks reuse createSession/] },
       { id: 'evidence', ask: 'Is the claim "Callback route wired" verified or only reported by an agent?', expect: [/agent|reported|not verified/i], forbid: [/\bit is verified\b/i], section: 'Earlier sessions', inBriefing: [/Callback route wired/], notInBriefing: [/\[verified\][^\n]*Callback route wired/] },
@@ -88,6 +88,24 @@ export const SCENARIOS: Scenario[] = [
       { id: 'tests', ask: 'Do the tests pass on the current code?', expect: [/out of date|changed|not.*current|re-?run/i, /app\.py/], section: 'Checks', inBriefing: [/OUT OF DATE: `pytest -q`[^\n]*app\.py/], notInBriefing: [/passed: `pytest -q`/] },
       { id: 'how-run', ask: 'Who ran the pytest check: Continuum or an agent?', expect: [/agent/i], section: 'Checks', inBriefing: [/\[observed: run by an agent\][^\n]*`pytest -q`/], notInBriefing: [/\[verified\][^\n]*`pytest -q`/] },
       { id: 'pending', ask: 'Which changes have not been recorded yet?', expect: [/app\.py|notes\.txt/], section: 'Changed outside agent sessions', inBriefing: [/`app\.py` \(not yet recorded\)/, /`notes\.txt` \(not yet recorded\)/] },
+    ],
+  },
+  {
+    name: 'no task, two agents: the next step one of them named',
+    files: { 'src/login.ts': 'h-login-2' },
+    events: [
+      e('file.changed', { path: 'src/login.ts', contentHash: 'h-login-0', changeType: 'added' }, 600, 'observed', 'watcher:git'),
+      e('session.started', { sessionId: 'claude-n', agent: 'claude-code' }, 240),
+      e('file.changed', { path: 'src/login.ts', contentHash: 'h-login-1', changeType: 'modified', sessionId: 'claude-n' }, 230),
+      e('session.ended', { sessionId: 'claude-n', summary: 'Login now validates the user name. Next: add a test for empty names.' }, 200, 'agent-reported'),
+      e('session.started', { sessionId: 'cursor-n', agent: 'cursor' }, 90),
+      e('file.changed', { path: 'src/login.ts', contentHash: 'h-login-2', changeType: 'modified', sessionId: 'cursor-n' }, 80),
+      e('session.progress', { sessionId: 'cursor-n', note: 'Tidied the error messages.' }, 70, 'agent-reported'),
+    ],
+    resumingSession: { sessionId: 'claude-m', agent: 'claude-code' },
+    questions: [
+      { id: 'next', ask: 'What should happen next, and who said so?', expect: [/empty names/i, /claude/i], section: 'Next step', inBriefing: [/\[agent-reported\] "add a test for empty names\." \(from the Claude Code session, last active 3h ago\)/] },
+      { id: 'latest', ask: 'Which agent worked here most recently, and what did it do?', expect: [/cursor/i, /error messages/i], section: 'Where we left off', inBriefing: [/Latest: Cursor session/, /Last note \[agent-reported\]: "Tidied the error messages\."/] },
     ],
   },
   {

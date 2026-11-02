@@ -8,13 +8,64 @@ function handoff(files: Record<string, string> = CURRENT_FILES, maxChars?: numbe
   return renderHandoff(projectState(seededStore(), tree(files), NOW), { maxChars, now: NOW })
 }
 
+const sessionEvent = (type: 'session.started' | 'session.progress', payload: Record<string, unknown>, minutesAgo: number) =>
+  ({ type, payload, evidence: type === 'session.progress' ? 'agent-reported' : 'observed', source: 'test', occurredAt: new Date(NOW.getTime() - minutesAgo * 60_000).toISOString() }) as Parameters<ContextStore['record']>[0]
+
+const sectionOf = (text: string, heading: string) => {
+  const start = text.indexOf(`## ${heading}`)
+  if (start === -1) return ''
+  const next = text.indexOf('\n## ', start + 1)
+  return text.slice(start, next === -1 ? undefined : next)
+}
+
 describe('renderHandoff', () => {
+  it('with no task, leads with the next step the latest note names, labelled as the agent said it', () => {
+    const text = handoff()
+    expect(sectionOf(text, 'Next step')).toContain('[agent-reported] "validate the state parameter." (from the Claude Code session, last active 30m ago)')
+    expect(text.indexOf('## Next step')).toBeLessThan(text.indexOf('## Where we left off'))
+  })
+
+  it('takes the next step from an earlier session when the latest note names none, and says which session', () => {
+    const store = seededStore()
+    store.recordAll([sessionEvent('session.started', { sessionId: 'cursor-1', agent: 'cursor' }, 10), sessionEvent('session.progress', { sessionId: 'cursor-1', note: 'Read through the callback.' }, 5)])
+    const text = renderHandoff(projectState(store, tree(CURRENT_FILES), NOW), { now: NOW })
+    expect(sectionOf(text, 'Next step')).toContain('"validate the state parameter." (from the Claude Code session, last active 30m ago)')
+    expect(sectionOf(text, 'Where we left off')).toContain('Latest: Cursor session')
+  })
+
+  it('names no next step when no note does, or when a task is current (it has its own next action)', () => {
+    const quiet = ContextStore.open(':memory:')
+    quiet.recordAll([sessionEvent('session.started', { sessionId: 'a', agent: 'codex' }, 20), sessionEvent('session.progress', { sessionId: 'a', note: 'Looked around.' }, 10)])
+    expect(renderHandoff(projectState(quiet, tree({}), NOW), { now: NOW })).not.toContain('## Next step')
+
+    const withTask = seededStore()
+    withTask.record({ type: 'task.upserted', payload: { id: 'cb', title: 'Callback', status: 'in-progress', nextAction: 'Validate state' }, evidence: 'agent-reported', source: 'mcp', occurredAt: NOW.toISOString() })
+    expect(renderHandoff(projectState(withTask, tree(CURRENT_FILES), NOW), { now: NOW })).not.toContain('## Next step')
+  })
+
+  it('reads "Next steps:" and "next - …", but not words that merely start with next', () => {
+    const briefingFor = (note: string) => {
+      const store = ContextStore.open(':memory:')
+      store.recordAll([sessionEvent('session.started', { sessionId: 'a', agent: 'codex' }, 20), sessionEvent('session.progress', { sessionId: 'a', note }, 10)])
+      return sectionOf(renderHandoff(projectState(store, tree({}), NOW), { now: NOW }), 'Next step')
+    }
+    expect(briefingFor('Done. Next steps: ship it')).toContain('"ship it"')
+    expect(briefingFor('Done. Next - ship it')).toContain('"ship it"')
+    expect(briefingFor('Moved to the next-generation API.')).toBe('')
+  })
+
+  it('names known agents and keeps an unknown agent id as code', () => {
+    const store = ContextStore.open(':memory:')
+    store.recordAll([sessionEvent('session.started', { sessionId: 'g', agent: 'gemini-cli' }, 20)])
+    expect(renderHandoff(projectState(store, tree({}), NOW), { now: NOW })).toContain('Latest: `gemini-cli` session')
+  })
+
   it('leads with where the last session left off', () => {
     const text = handoff()
     expect(text).toContain('# Continuum handoff: acme-app')
     expect(text).toContain('revision a3f9c21')
     const leftOff = text.slice(text.indexOf('## Where we left off'), text.indexOf('## Checks'))
-    expect(leftOff).toContain('`claude-code` session, started 1h ago, last active 30m ago, still open')
+    expect(leftOff).toContain('Claude Code session, started 1h ago, last active 30m ago, still open')
     expect(leftOff).toContain('Last note [agent-reported]: "Callback route wired. Next: validate the state parameter."')
     expect(leftOff).toContain('Files it changed: `src/auth/callback.ts`, `src/auth/login.ts`')
   })

@@ -188,7 +188,7 @@ describe('VS Code (Copilot) session, end to end through the configured commands'
     repo.write('src/login.ts', 'export const login = (user: string) => user\n')
     // VS Code may leave out cwd; the hook runs in the workspace folder.
     expect(fireVsCodeHook(repo.root, 'PostToolUse', { tool_name: 'replace_string_in_file', tool_input: { filePath: join(repo.root, 'src/login.ts') }, tool_response: '' }, 'chat-1')).toBe('')
-    expect(await waitForHandoff(repo.root, 'Files it changed: `src/login.ts`')).toContain('`vscode` session')
+    expect(await waitForHandoff(repo.root, 'Files it changed: `src/login.ts`')).toContain('VS Code Copilot session')
 
     const output = JSON.parse(fireVsCodeHook(repo.root, 'SessionStart', { source: 'new' }, 'chat-2'))
     expect(output.hookSpecificOutput).toMatchObject({ hookEventName: 'SessionStart', additionalContext: expect.stringContaining('`src/login.ts`') })
@@ -202,7 +202,7 @@ describe('VS Code (Copilot) session, end to end through the configured commands'
       const handoff = await client.callTool({ name: 'get_handoff', arguments: {} })
       // The second chat is now the latest session; the first one, with its edit, is listed before it.
       const text = (handoff.content as { text: string }[])[0].text
-      expect(text).toContain('Latest: `vscode` session')
+      expect(text).toContain('Latest: VS Code Copilot session')
       expect(text).toContain('## Earlier sessions')
     } finally {
       await client.close()

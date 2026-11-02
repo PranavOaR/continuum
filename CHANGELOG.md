@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **Briefings name agents and lead with the next step.** Sessions read "Claude Code session" and "Codex session" instead of their ids (an agent Continuum does not know keeps its id). With no task, a briefing opens with the next step the most recent note names ("Next: add a test for empty names"), labelled agent-reported and with the session it came from. A task keeps its own next action. A new briefing-quality scenario covers it.
+
 ### Fixed
 - **A redaction pattern that cannot be used now stops capture.** A `redactPatterns` entry that is not a valid regular expression, or is longer than 200 characters, was skipped and only `doctor` warned, so what it was meant to mask was stored. Continuum now records nothing until it is fixed, as it already did for a config it cannot read, and `doctor` names the pattern.
 - A check run under an existing name with a different command (`continuum run --name tests -- true`) took over the old check's result silently. The briefing now marks it `COMMAND CHANGED` and names the earlier command, on every run until the name runs that command again. `setup` also checks the config before writing anything, so a pattern it cannot use no longer leaves setup half-done.
