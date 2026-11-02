@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CONTINUUM_DIR } from './git'
-import { createRedactor, type Redactor } from './redact'
+import { createRedactor, MAX_CUSTOM_PATTERN_CHARS, type Redactor } from './redact'
 
 export const CONFIG_FILE = 'config.json'
 
@@ -51,6 +51,11 @@ async function readRawConfig(root: string): Promise<RawConfig> {
   const patterns = values.redactPatterns
   if (patterns !== undefined && !(Array.isArray(patterns) && patterns.every((pattern) => typeof pattern === 'string'))) {
     throw new InvalidConfigError(path, 'redactPatterns must be a list of strings')
+  }
+  // A pattern that cannot be used would mask nothing, so what it was meant to hide would be stored.
+  const { rejectedPatterns } = createRedactor((patterns as string[] | undefined) ?? [])
+  if (rejectedPatterns.length > 0) {
+    throw new InvalidConfigError(path, `redactPatterns must be valid regular expressions of at most ${MAX_CUSTOM_PATTERN_CHARS} characters (not: ${rejectedPatterns.join(', ')})`)
   }
   return values
 }

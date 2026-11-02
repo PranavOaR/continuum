@@ -32,6 +32,8 @@ export interface SessionSummary {
 export interface CheckSummary {
   name: string
   command: string
+  /** The command the run before this one used, when it was different; null when unchanged. */
+  previousCommand: string | null
   status: CheckStatus
   exitCode: number | null
   ranAt: string | null
@@ -166,6 +168,7 @@ function summarizeCheck(store: ContextStore, node: GraphNode, current: CurrentHa
   return {
     name,
     command: text(node.props.command) ?? name,
+    previousCommand: text(node.props.previousCommand),
     status,
     exitCode: typeof node.props.exitCode === 'number' ? node.props.exitCode : null,
     ranAt: text(node.props.ranAt),

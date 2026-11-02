@@ -124,9 +124,16 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const ranAgainst = inline ?? (coverage ? coverageManifest(store, coverage) : {})
       const coverageHash = coverage ?? store.putObject(COVERAGE_KIND, ranAgainst)
       const runHash = store.putObject('check-run', { ...run, coverage: coverageHash, ranAt: at, revision: event.revision })
+      // The same name run as a different command (`--name tests -- true`) is not the check it replaced; say so,
+      // and keep saying so on later runs of the new command, until the name runs its earlier command again.
+      const last = store.getNode(check)?.props
+      const lastCommand = typeof last?.command === 'string' ? last.command : null
+      const flagged = typeof last?.previousCommand === 'string' ? last.previousCommand : null
+      const command = event.payload.command
+      const previousCommand = command === flagged ? null : command === lastCommand ? flagged : lastCommand
       store.upsertNode(check, {
         hash: runHash,
-        props: { name: event.payload.name, command: event.payload.command, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at, evidence: event.evidence, source: event.source },
+        props: { name: event.payload.name, command: event.payload.command, previousCommand, exitCode: event.payload.exitCode, lastRunHash: runHash, ranAt: at, evidence: event.evidence, source: event.source },
         at,
       })
       for (const covered of ensureAnchors(store, ranAgainst, at)) store.link(check, 'ran_against', covered)

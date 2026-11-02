@@ -1,5 +1,6 @@
-import { initWorkspace, locateWorkspace, registerRepository, scanRepository, unregisterRepository } from '@continuum/capture'
+import { initWorkspace, locateWorkspace, readConfig, registerRepository, scanRepository, unregisterRepository } from '@continuum/capture'
 import {
+  isContinuumPluginEnabled,
   MCP_FILE,
   removeClaudeCodeSetup,
   removeCodexSetup,
@@ -12,7 +13,7 @@ import {
   type Invocation,
   type SetupResult,
 } from '@continuum/claude-code'
-import { UNSUPPORTED_PLATFORM, WINDOWS_FIX } from '../doctor'
+import { PLUGIN_AND_SETUP, PLUGIN_AND_SETUP_FIX, UNSUPPORTED_PLATFORM, WINDOWS_FIX } from '../doctor'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 interface Target {
@@ -105,6 +106,8 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
   const { workspace, store, created } = await initWorkspace(io.cwd)
   let result: SetupResult
   try {
+    // A config capture cannot use would fail the scan below; refuse before writing anything.
+    await readConfig(workspace.root)
     // Write first, then scan: the files setup writes are recorded now, not reported later as changes no session explains.
     result = await target.setup(workspace.root, invocation)
     await scanRepository(store, workspace.root, { now: io.now })
@@ -121,5 +124,9 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
       ? `The configuration runs Continuum through npx, so you can commit ${target.shared} to share it with your team.`
       : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
   )
+  if (targetName === 'claude-code' && (await isContinuumPluginEnabled(workspace.root, io.claudeConfigDir))) {
+    io.err(`continuum: ${PLUGIN_AND_SETUP}.`)
+    io.err(PLUGIN_AND_SETUP_FIX)
+  }
   return EXIT_OK
 }

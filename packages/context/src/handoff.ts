@@ -146,7 +146,8 @@ function sinceSection(since: SinceYouLeft | null | undefined, now: Date): string
 
 function describeCheck(check: CheckSummary, now: Date): string {
   const tag = check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'
-  const ran = `Ran ${agoFromIso(check.ranAt, now)}`
+  const commandChanged = check.previousCommand === null ? '' : `; COMMAND CHANGED: it previously ran ${code(check.previousCommand)}`
+  const ran = `Ran ${agoFromIso(check.ranAt, now)}${commandChanged}`
   const label = check.name === check.command ? code(check.name) : `${code(check.name)} (${code(check.command)})`
   switch (check.status) {
     case 'out-of-date':
@@ -156,7 +157,7 @@ function describeCheck(check: CheckSummary, now: Date): string {
     case 'passed':
       return `- ${tag} passed: ${label}. ${ran}`
     default:
-      return `- ${check.status}: ${label}`
+      return `- ${check.status}: ${label}${commandChanged}`
   }
 }
 

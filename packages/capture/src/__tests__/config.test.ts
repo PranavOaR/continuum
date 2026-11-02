@@ -29,6 +29,8 @@ describe('readConfig', () => {
     ['a value that is not an object', '["CUST-[0-9]+"]'],
     ['patterns that are not a list of strings', '{ "redactPatterns": "CUST-[0-9]+" }'],
     ['a setting that is not true or false', '{ "capturePrompts": "yes" }'],
+    ['a pattern that is not a valid regular expression', '{ "redactPatterns": ["CUST-[0-9"] }'],
+    ['a pattern longer than allowed', JSON.stringify({ redactPatterns: ['a'.repeat(500)] })],
   ])('refuses %s instead of quietly using the defaults', async (_case, content) => {
     await expect(readConfig(repoWithConfig(content))).rejects.toThrow(InvalidConfigError)
   })
@@ -57,5 +59,10 @@ describe('repositoryRedactor', () => {
 
   it('refuses to redact with an unreadable config, so nothing is stored unmasked', async () => {
     await expect(repositoryRedactor(repoWithConfig('{'))).rejects.toThrow(InvalidConfigError)
+  })
+
+  it('refuses to redact when one of the patterns cannot be used, naming it', async () => {
+    const root = repoWithConfig(JSON.stringify({ redactPatterns: ['CUST-[0-9]{5}', '(unclosed'] }))
+    await expect(repositoryRedactor(root)).rejects.toThrow(/\(unclosed/)
   })
 })

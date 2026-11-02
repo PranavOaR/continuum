@@ -16,7 +16,7 @@
     "@continuum/context": "*",
     "@continuum/core": "*",
     "@continuum/store": "*",
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "zod": "4.6.7"
   },
   "license": "UNLICENSED"
