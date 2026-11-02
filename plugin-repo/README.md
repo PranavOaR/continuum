@@ -26,7 +26,7 @@ Other agents connect with `npx getcontinuum setup codex`, `setup cursor` or `set
 
 ## Help and bug reports
 
-[Open an issue](https://github.com/PranavOaR/continuum-plugin/issues) here. `npx getcontinuum doctor` diagnoses most setup problems; include its output.
+[Open an issue](https://github.com/PranavOaR/continuum-plugin/issues) here. `npx getcontinuum doctor` diagnoses most setup problems; include the output of `npx getcontinuum doctor --report`, which shortens your paths and masks secrets.
 
 ## License
 

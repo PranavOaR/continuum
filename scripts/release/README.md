@@ -61,7 +61,7 @@ Everything is stored in `.continuum/` inside your repository, kept out of git. C
 
 ## Help
 
-Report bugs and ask questions at [github.com/PranavOaR/continuum-plugin/issues](https://github.com/PranavOaR/continuum-plugin/issues). Include the output of `npx getcontinuum doctor`. CHANGELOG.md lists what is in each release.
+Report bugs and ask questions at [github.com/PranavOaR/continuum-plugin/issues](https://github.com/PranavOaR/continuum-plugin/issues). Include the output of `npx getcontinuum doctor --report`: versions, settings and counts, with your paths shortened and secrets masked. CHANGELOG.md lists what is in each release.
 
 ## License
 

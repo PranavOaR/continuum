@@ -1,17 +1,31 @@
 import type { Invocation } from '@continuum/claude-code'
-import { runDoctor, type FindingStatus } from '../doctor'
+import { VERSION } from '../build'
+import { runDoctor, type DoctorEnvironment, type FindingStatus } from '../doctor'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
+import { buildReport } from '../report'
 import { WEB_DIST } from './serve'
 
 const MARKS: Record<FindingStatus, string> = { ok: '✓', warn: '!', fail: '✗' }
+export const DOCTOR_USAGE = 'Usage: continuum doctor [--report]'
 
-/** Diagnoses the install and this repository's Claude Code wiring, with a fix for each problem. */
+/**
+ * Diagnoses the install and this repository's Claude Code wiring, with a fix for each problem.
+ * `--report` prints a scrubbed Markdown report to attach to an issue instead.
+ */
 export async function doctorCommand(io: Io, args: readonly string[], invocation: Invocation, webDist = WEB_DIST): Promise<number> {
-  if (args.length > 0) {
-    io.err(`continuum: doctor takes no arguments: ${args.join(' ')}`)
+  const isReport = args.length === 1 && args[0] === '--report'
+  if (args.length > 0 && !isReport) {
+    io.err(`continuum: unknown doctor arguments: ${args.join(' ')}`)
+    io.err(DOCTOR_USAGE)
     return EXIT_USAGE
   }
-  const findings = await runDoctor({ cwd: io.cwd, nodeVersion: process.versions.node, platform: process.platform, invocation, webDist, configDir: io.configDir, claudeConfigDir: io.claudeConfigDir, now: io.now() })
+  const env: DoctorEnvironment = { cwd: io.cwd, nodeVersion: process.versions.node, platform: process.platform, invocation, webDist, configDir: io.configDir, claudeConfigDir: io.claudeConfigDir, now: io.now() }
+  if (isReport) {
+    // A report is the answer even when checks fail, so it exits 0 and prints nothing else.
+    io.out(await buildReport({ ...env, version: VERSION, arch: process.arch }))
+    return EXIT_OK
+  }
+  const findings = await runDoctor(env)
   io.out('Continuum doctor')
   for (const finding of findings) {
     io.out(`  ${MARKS[finding.status]} ${finding.label}${finding.detail ? ` (${finding.detail})` : ''}`)

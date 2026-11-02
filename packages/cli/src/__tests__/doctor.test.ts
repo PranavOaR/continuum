@@ -1,11 +1,11 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
 import { checkNode, runDoctor, type Finding } from '../doctor'
 import { selfInvocation } from '../invocation'
-import { EXIT_FAILURE, EXIT_OK } from '../io'
+import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from '../io'
 import { cli, TEST_CLAUDE_DIR, TEST_CONFIG_DIR } from './harness'
 
 const sandboxes: Sandbox[] = []
@@ -142,6 +142,35 @@ describe('continuum doctor', () => {
     expect(result.out).toMatch(/problems? to fix/)
     await cli(repo.root, ['setup', 'claude-code'])
     expect((await cli(repo.root, ['doctor'])).code).toBe(EXIT_OK)
+  })
+})
+
+describe('continuum doctor --report', () => {
+  it('prints a shareable report with the repository shortened to <repo>, and exits 0 even when checks fail', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const result = await cli(repo.root, ['doctor', '--report'])
+    expect(result.code).toBe(EXIT_OK)
+    expect(result.out).toContain('## Continuum diagnostic report')
+    expect(result.out).toContain('✗ Claude Code hooks are not registered')
+    expect(result.out).toMatch(/- Store: schema \d+ of \d+, \d+ events?/)
+    expect(result.out).toContain('<repo>')
+    expect(result.out).not.toContain(repo.root)
+    expect(result.out).not.toContain(realpathSync(repo.root))
+    // The report goes to stdout alone, so it can be piped straight into a file or the clipboard.
+    expect(result.err).toBe('')
+  })
+
+  it('still reports outside a git repository', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'continuum-not-a-repo-'))
+    dirs.push(dir)
+    const result = await cli(dir, ['doctor', '--report'])
+    expect(result.code).toBe(EXIT_OK)
+    expect(result.out).toContain('No Continuum repository here')
+  })
+
+  it('refuses other arguments', async () => {
+    expect((await cli(sandbox().root, ['doctor', '--bogus'])).code).toBe(EXIT_USAGE)
   })
 })
 

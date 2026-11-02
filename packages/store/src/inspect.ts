@@ -9,6 +9,8 @@ const SQLITE_NOTADB = 26
 export interface StoreInfo {
   schemaVersion: number
   events: number
+  /** How many events of each type the log holds (compacted events are not counted). */
+  eventTypes: Record<string, number>
   lastActivity: string | null
 }
 
@@ -17,7 +19,8 @@ export function inspectStore(path: string): StoreInfo {
   const db = new DatabaseSync(path, { readOnly: true })
   try {
     const { events, last } = db.prepare('SELECT COUNT(*) AS events, MAX(occurred_at) AS last FROM events').get() as { events: number; last: string | null }
-    return { schemaVersion: readSchemaVersion(db), events, lastActivity: last }
+    const types = db.prepare('SELECT type, COUNT(*) AS count FROM events GROUP BY type ORDER BY type').all() as unknown as { type: string; count: number }[]
+    return { schemaVersion: readSchemaVersion(db), events, eventTypes: Object.fromEntries(types.map(({ type, count }) => [type, count])), lastActivity: last }
   } finally {
     db.close()
   }
