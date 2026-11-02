@@ -188,6 +188,13 @@
   display: none;
 }
 
+/* Without scroll-driven animations the edges cannot follow the scroll: fade the end, where hidden items usually are. */
+@supports not (animation-timeline: scroll(inline)) {
+  .cn-scroll-x {
+    mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+  }
+}
+
 @supports (animation-timeline: scroll(inline)) {
   .cn-scroll-x {
     --fade-start: 0px;

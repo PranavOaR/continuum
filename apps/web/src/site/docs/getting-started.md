@@ -59,4 +59,4 @@ npx getcontinuum handoff
 npx getcontinuum serve
 ```
 
-It prints a private sign-in link. Open it to see every connected repository: tasks (which you can edit), changed files with their diffs, checks, decisions and live activity. The dashboard runs on your machine, on 127.0.0.1 only, and the link's one-time token is what signs you in.
+It prints a private sign-in link and opens it in your browser. It shows every connected repository: tasks (which you can edit), changed files with their diffs, checks, decisions and live activity. The dashboard runs on your machine, on 127.0.0.1 only, and the link's one-time token is what signs you in.

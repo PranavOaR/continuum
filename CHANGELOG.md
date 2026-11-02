@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Changed
+- `continuum serve` opens the dashboard in your browser when run from a terminal (`--no-open` to skip; never from scripts or CI, and not again after an automatic restart). The browser is handed a private page that redirects to the sign-in link, so the access token never appears in a command line other users could read. `setup` ends with the command that opens the dashboard.
+- On a phone, a project shows one Prepare Handoff button instead of two, long branch names end in an ellipsis, and task tabs fade at the edge where more are hidden.
 - **The dashboard shows work without a task.** A repository counted as active only while it had an open task, so the overview read "No active projects" minutes after agents worked in it. Active now means an open task or anything recorded in the last 7 days, and a project without a task shows its latest session: the agent, its note and when. A repository connected but not used yet is listed with what to do next.
 - Truthful copy on live screens: a project no agent has worked in says "None yet" instead of "Other agent", and a connected one is no longer told to run `setup`; empty panels no longer mention a task that does not exist; the verification note says where verified and observed results come from; Settings names the real default theme; the Handoffs page explains that connected agents are briefed automatically. Project paths under your home folder are written with `~`. "Idle" is now "No task". Activity in a project is listed newest first, like everywhere else, and the live dashboard no longer shows a demo account menu. An end-to-end check fails if demo or prototype wording appears on a live screen.
 
