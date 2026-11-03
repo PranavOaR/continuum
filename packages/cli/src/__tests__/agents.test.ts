@@ -77,6 +77,7 @@ describe('continuum setup claude-code', () => {
     const setup = await cli(repo.root, ['setup', 'claude-code'])
     expect(setup.code).toBe(0)
     expect(setup.out).toContain('(and initialized Continuum)')
+    expect(setup.out.trim().split('\n').at(-1)).toBe('See what Continuum records: continuum serve')
     expect(setup.out).toContain('created   .claude/settings.local.json')
     expect(setup.out).toContain('created   .mcp.json')
     expect(repo.git('status', '--porcelain')).not.toMatch(/\.mcp\.json|\.claude|\.continuum/)

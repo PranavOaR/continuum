@@ -34,6 +34,28 @@ async function serving(cwd: string, args: string[], webDist?: string, configDir 
 }
 
 describe('continuum serve', () => {
+  it('opens the dashboard in the browser once it is up, unless told not to', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const opened: string[] = []
+    const server = await serving(repo.root, ['--port', '0', '.'], undefined, TEST_CONFIG_DIR, { openBrowser: async (url) => void opened.push(url) })
+    await vi.waitFor(() => expect(opened).toEqual([server.launch]))
+    await server.stop()
+
+    const quiet: string[] = []
+    const again = await serving(repo.root, ['--port', '0', '--no-open', '.'], undefined, TEST_CONFIG_DIR, { openBrowser: async (url) => void quiet.push(url) })
+    await again.stop()
+    expect(quiet).toEqual([])
+  })
+
+  it('says how to open the link when the browser cannot be opened', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const server = await serving(repo.root, ['--port', '0', '.'], undefined, TEST_CONFIG_DIR, { openBrowser: async () => Promise.reject(new Error('no browser here')) })
+    await vi.waitFor(() => expect(server.lines.join('\n')).toContain('Could not open your browser (no browser here); open the link above.'))
+    await server.stop()
+  })
+
   it('serves real repository data until stopped', async () => {
     const first = sandbox()
     const second = sandbox({ 'b.py': 'b' })

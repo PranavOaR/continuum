@@ -124,6 +124,8 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
       ? `The configuration runs Continuum through npx, so you can commit ${target.shared} to share it with your team.`
       : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
   )
+  // The same command the agent's config runs, so it names this exact package and version.
+  io.out(`See what Continuum records: ${invocation.portable ? [invocation.command, ...invocation.args, 'serve'].join(' ') : 'continuum serve'}`)
   if (targetName === 'claude-code' && (await isContinuumPluginEnabled(workspace.root, io.claudeConfigDir))) {
     io.err(`continuum: ${PLUGIN_AND_SETUP}.`)
     io.err(PLUGIN_AND_SETUP_FIX)

@@ -134,7 +134,8 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
       description="Select a task to inspect its state."
       actions={
         !isFinished && (
-          <Button size="sm" icon={<ArrowRightLeft />} onClick={onPrepareHandoff}>
+          // On a phone the header's Prepare Handoff sits just above; one is enough.
+          <Button size="sm" icon={<ArrowRightLeft />} onClick={onPrepareHandoff} className="max-sm:hidden">
             Prepare Handoff
           </Button>
         )
