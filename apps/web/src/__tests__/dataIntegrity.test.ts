@@ -31,6 +31,14 @@ describe('mock dataset integrity', () => {
     }
   })
 
+  it('lists only covered files as changed since a check ran', () => {
+    for (const record of MOCK_VERIFICATION) {
+      const covering = MOCK_FILES.filter((file) => file.verificationIds.includes(record.id)).map((file) => file.path)
+      for (const path of record.changedSince ?? []) expect(covering).toContain(path)
+      expect((record.changedSince ?? []).length).toBeLessThanOrEqual(record.coveredFiles ?? 0)
+    }
+  })
+
   it('links tasks only to files and checks within the same project', () => {
     for (const task of MOCK_TASKS) {
       expect(projectIds.has(task.projectId)).toBe(true)
@@ -47,6 +55,7 @@ describe('mock dataset integrity', () => {
     for (const file of MOCK_FILES) {
       if (file.taskId) expect(taskIds.has(file.taskId)).toBe(true)
       file.decisionIds.forEach((id) => expect(memoryIds.has(id)).toBe(true))
+      file.verificationIds.forEach((id) => expect(MOCK_VERIFICATION.find((v) => v.id === id)?.projectId).toBe(file.projectId))
     }
     for (const record of MOCK_MEMORY) {
       if (record.taskId) expect(taskIds.has(record.taskId)).toBe(true)

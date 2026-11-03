@@ -5,7 +5,7 @@ import type { GraphNode } from '@continuum/store'
 import { asAgent, ids, text } from './ids'
 import type { RepoSnapshot } from './snapshot'
 
-const FILE_PREFIX = 'file:'
+export const FILE_PREFIX = 'file:'
 const STACK_MARKERS: readonly (readonly [RegExp, string])[] = [
   [/^package\.json$/, 'Node.js'],
   [/^tsconfig(\..+)?\.json$/, 'TypeScript'],
@@ -76,6 +76,14 @@ function passingChecksCovering(snapshot: RepoSnapshot, key: string, hash: string
     .map((check) => check.name)
 }
 
+/** Ids of the checks whose latest run covered any of these files, whatever its result. */
+export function checksCovering(snapshot: RepoSnapshot, files: readonly string[]): string[] {
+  const keys = files.map((path) => `${FILE_PREFIX}${path}`)
+  return snapshot.state.checks
+    .filter((check) => keys.some((key) => key in (snapshot.checkCoverage.get(check.name) ?? {})))
+    .map((check) => ids.check(snapshot.projectId, check.name))
+}
+
 function fileStatus(isVerified: boolean, sessions: GraphNode[]): FileStatus {
   if (isVerified) return 'verified'
   return sessions.some((session) => !text(session.props.endedAt)) ? 'work-in-progress' : 'needs-verification'
@@ -104,6 +112,7 @@ export function toFile(snapshot: RepoSnapshot, node: GraphNode): ProjectFile {
     relevance: relevance.join(' ') || 'Not yet covered by a recorded check.',
     symbols: [],
     decisionIds: decisions.map((id) => ids.memory(snapshot.projectId, id)),
+    verificationIds: checksCovering(snapshot, [path]),
     ...lineDetail(snapshot.diffs.get(path)),
     updatedAt: node.updatedAt,
   }

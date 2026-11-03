@@ -1,20 +1,13 @@
 import type { ProjectTask } from '@continuum/core'
 import type { TaskSummary } from '@continuum/context'
 import { ids } from './ids'
-import { toFiles } from './mapProject'
+import { checksCovering, toFiles } from './mapProject'
 import type { RepoSnapshot } from './snapshot'
 
 const CRITERION_EVIDENCE = {
   'agent-reported': 'Reported by the agent through update_task; not verified.',
   'user-reported': 'Set by you in the dashboard; not verified.',
 } as const
-
-function checksCovering(snapshot: RepoSnapshot, files: readonly string[]): string[] {
-  const keys = files.map((path) => `file:${path}`)
-  return snapshot.state.checks
-    .filter((check) => keys.some((key) => key in (snapshot.checkCoverage.get(check.name) ?? {})))
-    .map((check) => ids.check(snapshot.projectId, check.name))
-}
 
 export function toTask(snapshot: RepoSnapshot, task: TaskSummary): ProjectTask {
   // Only files the dashboard lists (changed, within the cap) can be linked.

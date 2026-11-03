@@ -53,6 +53,7 @@ describe('LocalContinuumService', () => {
     })
     expect(files[0].diff).toContainEqual({ kind: 'add', text: expect.stringContaining('auth') })
     expect(files[0].relevance).toContain('Covered by passing check unit')
+    expect(files[0].verificationIds).toEqual(['acme~check~lint', 'acme~check~unit'])
   })
 
   it('marks a file as needing verification once it changes after the check', async () => {
@@ -61,6 +62,38 @@ describe('LocalContinuumService', () => {
     const { files, verification } = await local.getWorkspace('acme')
     expect(verification.find((record) => record.name === 'unit')).toMatchObject({ status: 'out-of-date', detail: expect.stringContaining('src/auth.ts') })
     expect(files.find((file) => file.path === 'src/auth.ts')?.status).toBe('needs-verification')
+  })
+
+  it('counts the files each check covered and lists those changed since it ran', async () => {
+    const { repo, service: local } = await service()
+    const unit = async () => (await local.getWorkspace('acme')).verification.find((record) => record.name === 'unit')
+    const fresh = await unit()
+    expect(fresh).toMatchObject({ coveredFiles: 5, changedSince: [] })
+    expect(fresh).not.toHaveProperty('previousCommand')
+
+    repo.write('src/auth.ts', 'auth v3')
+    expect(await unit()).toMatchObject({ coveredFiles: 5, changedSince: ['src/auth.ts'] })
+  })
+
+  it('names the earlier command when a check now runs a different one', async () => {
+    const { repo, storePath } = await seededRepo()
+    sandboxes.push(repo)
+    const before = new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 0 })
+    const original = (await before.getWorkspace('acme')).verification.find((record) => record.name === 'unit')?.command
+    const store = openStore(storePath)
+    store.record({
+      type: 'check.recorded',
+      payload: { name: 'unit', command: 'true', exitCode: 0, durationMs: 5, ranAgainst: { 'file:src/auth.ts': repo.git('hash-object', 'src/auth.ts') } },
+      evidence: 'verified',
+      source: 'test',
+      occurredAt: NOW.toISOString(),
+    })
+    store.close()
+
+    const local = new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 0 })
+    const unit = (await local.getWorkspace('acme')).verification.find((record) => record.name === 'unit')
+    expect(original).toBeDefined()
+    expect(unit).toMatchObject({ command: 'true', previousCommand: original, coveredFiles: 1, changedSince: [] })
   })
 
   it('maps checks, decisions and sessions with their evidence', async () => {
