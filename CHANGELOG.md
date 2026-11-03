@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Releases publish to npm through npm trusted publishing, with no stored npm token, and the Claude Code plugin repository is updated by the same release run, so the plugin no longer lags npm (it was still at 0.2.1). The package now names its source repository, as trusted publishing requires.
+- The website sends a strict Content-Security-Policy: everything it loads comes from its own origin.
+
 ## [0.3.0] - 2026-11-03
 
 ### Changed

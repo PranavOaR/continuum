@@ -24,6 +24,8 @@ const MIN_NODE = '>=22.13'
 const WEB_PACKAGES = 'third-party-packages.json'
 /** The public plugin repository hosts help and bug reports while the source is private. */
 const SUPPORT_REPO = 'https://github.com/PranavOaR/continuum-plugin'
+/** npm trusted publishing accepts a release only from the repository named here. */
+const SOURCE_REPO = 'git+https://github.com/PranavOaR/continuum.git'
 
 const packageName = process.env.CONTINUUM_PACKAGE_NAME ?? DEFAULT_NAME
 const version = process.env.CONTINUUM_VERSION ?? CLI.version
@@ -80,6 +82,7 @@ const manifest = {
   license: 'SEE LICENSE IN LICENSE',
   author: 'Pranav Rao',
   homepage: 'https://continuumgroup.dev',
+  repository: { type: 'git', url: SOURCE_REPO },
   bugs: { url: `${SUPPORT_REPO}/issues` },
   keywords: ['claude-code', 'codex', 'cursor', 'vscode', 'github-copilot', 'mcp', 'ai-agents', 'handoff', 'context', 'local-first'],
 }
