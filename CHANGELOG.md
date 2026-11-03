@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-11-03
 
 ### Changed
 - `continuum serve` opens the dashboard in your browser when run from a terminal (`--no-open` to skip; never from scripts or CI, and not again after an automatic restart). The browser is handed a private page that redirects to the sign-in link, so the access token never appears in a command line other users could read. `setup` ends with the command that opens the dashboard.
