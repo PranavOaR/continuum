@@ -50,25 +50,25 @@
       gsap.set("#dash-cursor", { x: 2000, y: 1180 });
 
       // Out of the Verified badge: it was the real dashboard all along.
-      tl.fromTo("#dash-cam", BADGE, { ...OVERVIEW, duration: 1.3, ease: "power3.inOut" }, 0.2);
+      tl.fromTo("#dash-cam", BADGE, { ...OVERVIEW, duration: 1.3, ease: "power3.inOut" }, 0.21);
       // "...it's one task,"
-      tl.to("#dash-cam", { ...TASK, duration: 0.65, ease: "power2.inOut" }, 2.0);
-      tl.to("#dash-cursor", { x: 470, y: 352, duration: 0.6, ease: "power3.out" }, 2.05);
+      tl.to("#dash-cam", { ...TASK, duration: 0.65, ease: "power2.inOut" }, 2.18);
+      tl.to("#dash-cursor", { x: 470, y: 352, duration: 0.6, ease: "power3.out" }, 2.24);
       // "...carried from one agent..."
-      tl.to("#dash-cam", { ...CLAUDE, duration: 0.8, ease: "power2.inOut" }, 3.0);
-      blur(3.0, 0.8, 14);
-      tl.to("#dash-cursor", { x: 560, y: 235, duration: 0.8, ease: "power2.inOut" }, 3.0);
-      tl.to("#dash-claude", { opacity: 1, duration: 0.25 }, 3.7);
-      tl.fromTo("#dash-agent-claude", { opacity: 0, scale: 0.7, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.6)" }, 3.75);
+      tl.to("#dash-cam", { ...CLAUDE, duration: 0.8, ease: "power2.inOut" }, 3.27);
+      blur(3.27, 0.8, 14);
+      tl.to("#dash-cursor", { x: 560, y: 235, duration: 0.8, ease: "power2.inOut" }, 3.27);
+      tl.to("#dash-claude", { opacity: 1, duration: 0.25 }, 3.92);
+      tl.fromTo("#dash-agent-claude", { opacity: 0, scale: 0.7, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.6)" }, 3.97);
       // "...to the next."
-      tl.to("#dash-cam", { ...CODEX, duration: 0.7, ease: "power2.inOut" }, 4.45);
-      blur(4.45, 0.7, 12);
-      tl.to("#dash-cursor", { x: 690, y: 168, duration: 0.7, ease: "power2.inOut" }, 4.45);
-      tl.to("#dash-codex", { opacity: 1, duration: 0.25 }, 5.1);
-      tl.fromTo("#dash-agent-codex", { opacity: 0, scale: 0.7, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.6)" }, 5.14);
+      tl.to("#dash-cam", { ...CODEX, duration: 0.7, ease: "power2.inOut" }, 4.68);
+      blur(4.68, 0.7, 12);
+      tl.to("#dash-cursor", { x: 690, y: 168, duration: 0.7, ease: "power2.inOut" }, 4.68);
+      tl.to("#dash-codex", { opacity: 1, duration: 0.25 }, 5.34);
+      tl.fromTo("#dash-agent-codex", { opacity: 0, scale: 0.7, transformOrigin: "0% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.6)" }, 5.38);
       // The click that opens the claim.
-      tl.to("#dash-cursor", { scale: 0.86, transformOrigin: "10% 5%", duration: 0.08, ease: "power2.in" }, 6.92);
-      tl.to("#dash-cursor", { scale: 1, duration: 0.14, ease: "power2.out" }, 7.0);
+      tl.to("#dash-cursor", { scale: 0.86, transformOrigin: "10% 5%", duration: 0.08, ease: "power2.in" }, 7.15);
+      tl.to("#dash-cursor", { scale: 1, duration: 0.14, ease: "power2.out" }, 7.23);
 
       window.__timelines["dash"] = tl;
     })();

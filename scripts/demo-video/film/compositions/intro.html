@@ -1,0 +1,57 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "Geist", sans-serif; }
+    /* Remotion's iris, from the mark's start ring (599, 568): the hole grows and the demo shows through it. */
+    #intro-stage {
+      --iris: 0px;
+      -webkit-mask-image: radial-gradient(circle at 599px 568px, transparent var(--iris), #000 calc(var(--iris) + 1px));
+      mask-image: radial-gradient(circle at 599px 568px, transparent var(--iris), #000 calc(var(--iris) + 1px));
+    }
+    #intro-lockup { position: absolute; inset: 0; }
+    /* The end card's lockup (close.html), centred on the frame's middle line. */
+    #intro-mark { position: absolute; left: 571px; top: 465px; width: 150px; height: 150px; overflow: visible; }
+    #intro-word { position: absolute; left: 749px; top: 461px; font-weight: 500; font-size: 128px; line-height: 150px; letter-spacing: -0.035em; color: var(--color-ink); white-space: pre; }
+    .intro-l { display: none; }
+    #intro-caret { display: inline-block; width: 8px; height: 104px; margin-left: 6px; vertical-align: -14px; border-radius: 2px; background: var(--color-accent); }
+  </style>
+  <div data-hf-id="hf-in00" id="root" data-composition-id="intro" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-in01" id="intro-stage" class="stage">
+      <div data-hf-id="hf-in02" id="intro-lockup">
+        <svg data-hf-id="hf-in03" id="intro-mark" viewBox="0 0 32 32" fill="none">
+          <path data-hf-id="hf-in04" id="intro-path" d="M6 22C6 13 16 11 16 16s10 3 10-6" pathLength="1" stroke="#141318" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="1" stroke-dashoffset="1" />
+          <circle data-hf-id="hf-in05" id="intro-start" cx="6" cy="22" r="3" fill="#fafaf7" stroke="#141318" stroke-width="2" />
+          <circle data-hf-id="hf-in06" id="intro-mid" cx="16" cy="16" r="1.9" fill="#141318" />
+          <circle data-hf-id="hf-in07" id="intro-end" cx="26" cy="10" r="3.4" fill="#5b45ff" />
+        </svg>
+        <div data-hf-id="hf-in08" id="intro-word"><span data-hf-id="hf-in10" class="intro-l">c</span><span data-hf-id="hf-in11" class="intro-l">o</span><span data-hf-id="hf-in12" class="intro-l">n</span><span data-hf-id="hf-in13" class="intro-l">t</span><span data-hf-id="hf-in14" class="intro-l">i</span><span data-hf-id="hf-in15" class="intro-l">n</span><span data-hf-id="hf-in16" class="intro-l">u</span><span data-hf-id="hf-in17" class="intro-l">u</span><span data-hf-id="hf-in18" class="intro-l">m</span><span data-hf-id="hf-in09" id="intro-caret"></span></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      // When each letter of "continuum" lands: a person typing, a little uneven, not a metronome.
+      const KEYS = [1.2, 1.27, 1.35, 1.41, 1.49, 1.55, 1.62, 1.7, 1.76];
+      gsap.set(["#intro-start", "#intro-mid", "#intro-end", "#intro-path", "#intro-caret"], { opacity: 0 });
+
+      // The mark opens up: the thread draws from where work starts, through the handoff, to where it continues.
+      tl.fromTo("#intro-start", { opacity: 0, scale: 0.3, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, 0.25);
+      tl.set("#intro-path", { opacity: 1 }, 0.3);
+      tl.to("#intro-path", { attr: { "stroke-dashoffset": 0 }, duration: 0.7, ease: "power2.inOut" }, 0.3);
+      tl.fromTo("#intro-mid", { opacity: 0, scale: 0.3, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.6)" }, 0.6);
+      tl.fromTo("#intro-end", { opacity: 0, scale: 0.2, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }, 0.95);
+
+      // The name types itself in, behind a caret that blinks twice and goes.
+      tl.set("#intro-caret", { opacity: 1 }, 1.08);
+      gsap.utils.toArray(".intro-l").forEach((letter, i) => tl.set(letter, { display: "inline" }, KEYS[i]));
+      [2.0, 2.2, 2.4].forEach((t, i) => tl.set("#intro-caret", { opacity: i % 2 ? 1 : 0 }, t));
+
+      // Into the start ring: the camera pushes in and the ring opens onto the demo (gap.html, underneath).
+      tl.to("#intro-lockup", { scale: 1.6, transformOrigin: "599px 568px", duration: 0.8, ease: "power3.in" }, 2.6);
+      tl.fromTo("#intro-stage", { "--iris": "0px" }, { "--iris": "2400px", duration: 0.8, ease: "power3.in" }, 2.6);
+
+      window.__timelines["intro"] = tl;
+    })();
+  </script>
+</template>
