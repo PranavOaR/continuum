@@ -1,6 +1,9 @@
 import type { Sandbox } from '@continuum/capture/testing'
 import { NotFoundError } from '@continuum/core'
-import { afterEach, describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectIds } from '../ids'
 import { LocalContinuumService, ProjectUnavailableError } from '../localService'
 import { detectStack, shortPath } from '../mapProject'
@@ -402,11 +405,30 @@ describe('LocalContinuumService task edits', () => {
 })
 
 describe('LocalContinuumService setup state', () => {
-  it('reports whether Claude Code is connected to the repository', async () => {
-    const { repo, service: local } = await service()
-    expect((await local.getWorkspace('acme')).setup).toEqual({ agentConnected: false })
-    const { setupClaudeCode } = await import('@continuum/claude-code')
-    await setupClaudeCode(repo.root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
-    expect((await local.getWorkspace('acme')).setup).toEqual({ agentConnected: true })
+  /** An empty Claude Code config, so a Continuum plugin enabled on this machine cannot leak in. */
+  function withoutClaudeSettings() {
+    const dir = mkdtempSync(join(tmpdir(), 'continuum-claude-'))
+    vi.stubEnv('CLAUDE_CONFIG_DIR', dir)
+    return () => {
+      vi.unstubAllEnvs()
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('reports which agents are connected to the repository, whichever they are', async () => {
+    const restore = withoutClaudeSettings()
+    try {
+      const { repo, service: local } = await service()
+      expect((await local.getWorkspace('acme')).setup).toEqual({ connectedAgents: [] })
+      const { setupClaudeCode, setupCodex } = await import('@continuum/claude-code')
+      await setupCodex(repo.root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
+      local.invalidate()
+      expect((await local.getWorkspace('acme')).setup).toEqual({ connectedAgents: ['codex'] })
+      await setupClaudeCode(repo.root, { command: 'npx', args: ['-y', '@acme/continuum@1.0.0'], portable: true })
+      local.invalidate()
+      expect((await local.getWorkspace('acme')).setup).toEqual({ connectedAgents: ['claude-code', 'codex'] })
+    } finally {
+      restore()
+    }
   })
 })

@@ -1,3 +1,4 @@
+import { DEMO_VIDEO } from '../src/components/site/siteContent'
 import { expect, test } from './fixtures'
 
 test('landing page keeps its design, shows the demo video and the install guide, and nothing from the demo', async ({ page }) => {
@@ -246,7 +247,7 @@ test.describe('the demo video', () => {
     await page.goto('/')
     const video = page.locator('#demo video')
     await expect(video).not.toHaveAttribute('controls')
-    await page.getByRole('button', { name: /Play the demo video \(1:05, with sound\)/ }).click()
+    await page.getByRole('button', { name: `Play the demo video (${DEMO_VIDEO.length}, with sound)` }).click()
     await expect(video).toHaveAttribute('controls')
     await expect.poll(() => video.evaluate((element: HTMLVideoElement) => element.currentTime)).toBeGreaterThan(0)
     await expect(page.getByRole('button', { name: /Play the demo video/ })).toHaveCount(0)

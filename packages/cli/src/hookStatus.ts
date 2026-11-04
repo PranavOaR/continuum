@@ -1,8 +1,5 @@
-import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { readHookHealth, type HookHealth } from '@continuum/capture'
-import { CODEX_HOOKS_FILE, HOOKS_FILE, isContinuumHandler, VSCODE_HOOKS_FILE, type HookAgent } from '@continuum/claude-code'
+import { connectedHookAgents, type HookAgent } from '@continuum/claude-code'
 import { getAgent } from '@continuum/core'
 
 const HOOK_AGENTS: readonly HookAgent[] = ['claude-code', 'codex', 'vscode']
@@ -18,44 +15,6 @@ export interface HookStatus {
   agent: HookAgent
   name: string
   health: HookHealth
-}
-
-/** The file's text, or '' when it is missing or unreadable: doctor reports broken agent configs on its own. */
-async function text(path: string): Promise<string> {
-  if (!existsSync(path)) return ''
-  try {
-    return await readFile(path, 'utf8')
-  } catch {
-    return ''
-  }
-}
-
-type Json = Record<string, unknown>
-const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value)
-const entries = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
-
-function hasClaudeCodeHooks(settings: string): boolean {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(settings)
-  } catch {
-    return false
-  }
-  const hooks = isObject(parsed) && isObject(parsed.hooks) ? parsed.hooks : {}
-  return Object.values(hooks)
-    .flatMap(entries)
-    .flatMap((group) => (isObject(group) ? entries(group.hooks) : []))
-    .some((handler) => isObject(handler) && isContinuumHandler(handler))
-}
-
-/** Agents whose hooks this repository's own config files run Continuum from. */
-async function connectedHookAgents(root: string): Promise<Set<HookAgent>> {
-  const [claude, codex, vscode] = await Promise.all([HOOKS_FILE, CODEX_HOOKS_FILE, VSCODE_HOOKS_FILE].map((file) => text(join(root, file))))
-  const connected = new Set<HookAgent>()
-  if (hasClaudeCodeHooks(claude)) connected.add('claude-code')
-  if (codex.includes('ingest --agent codex')) connected.add('codex')
-  if (vscode.includes('ingest --agent vscode')) connected.add('vscode')
-  return connected
 }
 
 /**
