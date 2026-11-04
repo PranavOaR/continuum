@@ -1,17 +1,21 @@
 import type { ReactNode } from 'react'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
-import type { MemoryRecord, ProjectFile, ProjectTask } from '@continuum/core'
+import type { MemoryRecord, ProjectFile, ProjectTask, VerificationRecord } from '@continuum/core'
 import { cn } from '../../utils/cn'
 import { useIsLive } from '../../state/dataMode'
 import { MEMORY_KIND_LABEL } from '@continuum/core'
 import { Dialog } from '../shared/Dialog'
+import { fileSinceCheck } from './checkCoverage'
+import { PreviousCommandNote } from './VerificationPanel'
 import { hasLineDetail } from './fileDetail'
-import { ChangeTypeBadge, EvidenceBadge, FileStatusBadge } from '../shared/StatusBadge'
+import { ChangeTypeBadge, CommandChangedBadge, EvidenceBadge, FileStatusBadge, VerificationBadge } from '../shared/StatusBadge'
 
 interface FileDetailDrawerProps {
   file: ProjectFile | undefined
   task: ProjectTask | undefined
   decisions: MemoryRecord[]
+  /** Checks whose latest run covered this file. */
+  checks: VerificationRecord[]
   onClose: () => void
   onSelectTask: (taskId: string) => void
 }
@@ -37,7 +41,7 @@ const DIFF_STYLE = {
   context: { row: 'text-muted', marker: ' ', markerClass: '' },
 }
 
-export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask }: FileDetailDrawerProps) {
+export function FileDetailDrawer({ file, task, decisions, checks, onClose, onSelectTask }: FileDetailDrawerProps) {
   const isLive = useIsLive()
   const format = useTimeFormat()
 
@@ -94,6 +98,34 @@ export function FileDetailDrawer({ file, task, decisions, onClose, onSelectTask 
               </button>
             ) : (
               <p className="text-[13px] text-subtle">Not linked to a task.</p>
+            )}
+          </Section>
+
+          <Section title="Checks">
+            {checks.length === 0 ? (
+              <p className="text-[13px] text-subtle">No recorded check covered this file.</p>
+            ) : (
+              <ul className="space-y-2">
+                {checks.map((check) => {
+                  const since = fileSinceCheck(check, file.path)
+                  return (
+                    <li key={check.id} className="rounded-md border border-line p-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[13px] text-fg">{check.name}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {check.previousCommand && <CommandChangedBadge previousCommand={check.previousCommand} />}
+                          <VerificationBadge status={check.status} />
+                        </div>
+                      </div>
+                      {check.previousCommand && <PreviousCommandNote command={check.previousCommand} />}
+                      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-subtle">
+                        <span>{check.lastRunAt ? `Last run ${format(check.lastRunAt)}` : 'No run recorded'}</span>
+                        <span className={since.hasChanges ? 'text-warning' : undefined}>{since.text}</span>
+                      </p>
+                    </li>
+                  )
+                })}
+              </ul>
             )}
           </Section>
 

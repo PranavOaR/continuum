@@ -2,6 +2,7 @@ import type { AgentSession, MemoryRecord, VerificationRecord } from '@continuum/
 import type { CheckSummary } from '@continuum/context'
 import { anchoredPath } from '@continuum/store'
 import { asAgent, ids } from './ids'
+import { FILE_PREFIX } from './mapProject'
 import type { RepoSnapshot } from './snapshot'
 
 const MAX_LISTED = 5
@@ -25,16 +26,22 @@ function checkDetail(check: CheckSummary, coverage: number): string {
 }
 
 export function toVerification(snapshot: RepoSnapshot): VerificationRecord[] {
-  return snapshot.state.checks.map((check) => ({
-    id: ids.check(snapshot.projectId, check.name),
-    projectId: snapshot.projectId,
-    name: check.name,
-    command: check.command,
-    status: check.status,
-    evidenceType: check.evidence,
-    ...(check.ranAt ? { lastRunAt: check.ranAt } : {}),
-    detail: checkDetail(check, Object.keys(snapshot.checkCoverage.get(check.name) ?? {}).length),
-  }))
+  return snapshot.state.checks.map((check) => {
+    const coverage = snapshot.checkCoverage.get(check.name)
+    const coveredFiles = Object.keys(coverage ?? {}).filter((key) => key.startsWith(FILE_PREFIX)).length
+    return {
+      id: ids.check(snapshot.projectId, check.name),
+      projectId: snapshot.projectId,
+      name: check.name,
+      command: check.command,
+      status: check.status,
+      evidenceType: check.evidence,
+      ...(check.ranAt ? { lastRunAt: check.ranAt } : {}),
+      ...(check.previousCommand !== null ? { previousCommand: check.previousCommand } : {}),
+      ...(coverage ? { coveredFiles, changedSince: check.changed } : {}),
+      detail: checkDetail(check, coveredFiles),
+    }
+  })
 }
 
 export function toMemory(snapshot: RepoSnapshot): MemoryRecord[] {

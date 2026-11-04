@@ -47,6 +47,8 @@ export interface ProjectFile {
   relevance: string
   symbols: CodeSymbol[]
   decisionIds: string[]
+  /** Checks whose latest run covered this file. */
+  verificationIds: string[]
   additions: number
   deletions: number
   /**
@@ -74,6 +76,12 @@ export interface VerificationRecord {
   evidenceType: EvidenceType
   lastRunAt?: string
   lastRunRevision?: string
+  /** The command this check's run before the latest one used, when it was different. */
+  previousCommand?: string
+  /** How many files the latest run covered; absent when no run recorded its coverage. */
+  coveredFiles?: number
+  /** Covered paths whose content changed since the latest run. */
+  changedSince?: string[]
   detail: string
 }
 

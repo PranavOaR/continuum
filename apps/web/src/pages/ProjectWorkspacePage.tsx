@@ -140,6 +140,7 @@ export function ProjectWorkspacePage() {
         file={selectedFile}
         task={tasks.find((candidate) => candidate.id === selectedFile?.taskId)}
         decisions={memory.filter((record) => selectedFile?.decisionIds.includes(record.id))}
+        checks={verification.filter((record) => selectedFile?.verificationIds.includes(record.id))}
         onClose={() => setParam({ file: null })}
         onSelectTask={(taskId) => setParam({ task: taskId, file: null })}
       />

@@ -174,6 +174,10 @@ test('shows the repository, its session, changed file and verified check', async
   await expect(drawer.getByText('Uncommitted changes (against the last commit)')).toBeVisible()
   await expect(drawer.getByText('export const app = 2')).toBeVisible()
   await expect(drawer.getByText('Mock excerpt')).toHaveCount(0)
+  await expect(drawer.getByText('unit', { exact: true })).toBeVisible()
+  await expect(drawer.getByText('Unchanged since this run')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('#verification').getByText(/^\d+ covered files? unchanged since it ran$/)).toBeVisible()
 })
 
 test('prepare handoff builds from the recorded task', async ({ page }) => {
@@ -204,6 +208,21 @@ test('updates without a reload when something new is recorded', async ({ page })
   continuum(['run', '--name', 'typecheck', '--', process.execPath, '-e', '0'])
   // Pushed by the daemon's change stream: nothing in the page reloads or navigates.
   await expect(page.locator('#verification').getByText('typecheck')).toBeVisible({ timeout: 4_000 })
+})
+
+test('flags a check whose name now runs a different command, in the panel and the file drawer', async ({ page }) => {
+  const name = repo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  await expect(page.locator('#verification').getByText('unit')).toBeVisible()
+  continuum(['run', '--name', 'unit', '--', process.execPath, '-e', '1'])
+  const unit = page.locator('#verification li').filter({ hasText: 'unit' })
+  await expect(unit.getByText('Command changed')).toBeVisible({ timeout: 4_000 })
+  await expect(unit.getByText(/Previously ran .* -e 0/)).toBeVisible()
+
+  await page.getByText('src/app.ts').first().click()
+  const drawer = page.getByRole('dialog')
+  await expect(drawer.getByText('Command changed')).toBeVisible()
+  await expect(drawer.getByText(/Previously ran .* -e 0/)).toBeVisible()
 })
 
 test('edits a task from the dashboard and records it as set by you', async ({ page }) => {

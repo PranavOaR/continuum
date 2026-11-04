@@ -6,7 +6,7 @@
 3. You record a verified test run.
 4. The real dashboard (`continuum serve`) shows one task carried from one agent to the next.
 
-Every terminal line and dashboard pixel comes from that run. The exceptions are the re-explanation typed into a blank Codex session, which stands for you doing it by hand, and the repository path, which is shown as `~/code/pricing`. The voice is ElevenLabs' `eleven_v3` model, voice "Chris", read as one continuous take. The music bed and most effects were generated with ElevenLabs' sound model; the rest come from Pixabay's free library, through HyperFrames' bundled set.
+Every terminal line and dashboard pixel comes from that run. The exceptions are the re-explanation typed into a blank Codex session, which stands for you doing it by hand, and the repository path, which is shown as `~/code/pricing`. It opens on the Continuum mark: the logo draws, the name types in, and the mark's start ring irises open onto the first terminal. The voice is ElevenLabs' `eleven_v4` model with "Mark - Natural Conversations", a professional voice clone from the Voice Library, read as one take of `film/voiceover.txt`: a script written to be spoken, with its fillers, one sigh and the stressed words in capitals. Scenes change through Remotion-style transitions (clock wipe, slide, flip, iris) and Runway-style ones (a liquid morph and a light leak), built on the real scenes. The music bed and most effects were generated with ElevenLabs' sound model; the rest come from Pixabay's free library, through HyperFrames' bundled set.
 
 ## Make it again
 
@@ -33,7 +33,9 @@ The terminal scenes quote the run's text directly. A new run words its replies d
 |---|---|
 | `film/STORYLINES.md`, `film/SPEC.md` | The three storylines considered, and the picked one as a shot list, with every look and motion choice as a number. |
 | `film/index.html` | The palette, the paper ground, six scene hosts, the voice cut into one clip per line, the music bed's volume envelope, and each effect placed so its peak lands a frame after its picture. |
-| `film/compositions/*.html` | The scenes: `gap` (Claude stops, Codex starts blank, the thread becomes the logo), `connect`, `carry` (the task card into Codex's briefing), `finish` (the fix and the verified run), `dash` (the real dashboard), `close` (the claim and the end card). |
+| `film/compositions/organic-light-leak-overlay.html` | The registry's light leak, recoloured to the brand, over the claim's turn to paper. |
+| `film/compositions/*.html` | The scenes: `intro` (the mark, the name typed in, the iris into the demo), `gap` (Claude stops, Codex starts blank, the thread becomes the logo), `connect`, `carry` (the task card into Codex's briefing), `finish` (the fix and the verified run), `dash` (the real dashboard), `close` (the claim and the end card). |
+| `film/voiceover.txt` | The voiceover as sent to ElevenLabs: one paragraph per voice clip, audio tags in brackets. |
 | `film/assets/audio/voice-timing.json` | The take's word timings, from ElevenLabs' alignment. Scenes cut on these words. |
 | `film/capture-dashboard.mjs` | Screenshots the real dashboard for the `dash` scene. |
 | `film/captions.mjs` | Writes the WebVTT captions from the word timings and where each line is placed. |

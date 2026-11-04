@@ -92,4 +92,8 @@ export const FileStatusBadge = ({ status }: { status: FileStatus }) => render(FI
 export const HandoffStatusBadge = ({ status }: { status: HandoffStatus }) =>
   render(HANDOFF_VISUAL[status], HANDOFF_STATUS_LABEL[status])
 
+/** A check whose name now runs a different command: its earlier results came from that other command. */
+export const CommandChangedBadge = ({ previousCommand }: { previousCommand: string }) =>
+  render({ tone: 'warning', icon: <TriangleAlert /> }, 'Command changed', `It previously ran ${previousCommand}`)
+
 export const CriterionBadge = ({ status }: { status: CriterionStatus }) => render(CRITERION_VISUAL[status], CRITERION_LABEL[status])

@@ -3,6 +3,7 @@
     @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
     @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
     #root { position: absolute; inset: 0; overflow: hidden; }
+    #carry-stage { filter: url(#carry-fx); }
     #carry-claude { left: 210px; top: 250px; width: 1500px; height: 590px; }
     #carry-taskid { position: absolute; inset: -4px -8px; border: 3px solid #8f7fff; border-radius: 8px; }
     .carry-tok { position: relative; }
@@ -29,6 +30,15 @@
     .carry-h { color: #fff; font-weight: 600; }
   </style>
   <div data-hf-id="hf-g4er" id="root" data-composition-id="carry" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <!-- The move's horizontal blur, then the liquid morph out: seeded turbulence displacing the frame (the same noise as finish.html's way in). -->
+    <svg data-hf-id="hf-cfx0" width="0" height="0" style="position: absolute">
+      <filter data-hf-id="hf-cfx1" id="carry-fx" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+        <feGaussianBlur data-hf-id="hf-cfx2" id="carry-hblur-amt" in="SourceGraphic" stdDeviation="0 0" result="moved" />
+        <feTurbulence data-hf-id="hf-cfx3" type="fractalNoise" baseFrequency="0.0045 0.007" numOctaves="2" seed="7" result="noise" />
+        <feDisplacementMap data-hf-id="hf-cfx4" id="carry-warp" in="moved" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+    <div data-hf-id="hf-cstg" id="carry-stage" class="stage" data-layout-allow-overlap>
     <!-- Claude Code at work: the reply that recorded the task. -->
     <div data-hf-id="hf-hwz4" id="carry-claude" class="term">
       <div data-hf-id="hf-vwwm" class="term-bar">
@@ -92,6 +102,7 @@
         </div>
       </div>
     </div>
+    </div>
   </div>
   <script>
     (function () {
@@ -101,38 +112,43 @@
       gsap.set(["#carry-done", "#carry-nextwrap"], { opacity: 0 });
             gsap.set(".carry-b", { opacity: 0 });
 
-      // Whip in from the setup terminal.
-      tl.fromTo("#carry-claude", { x: 1000, filter: "blur(16px)" }, { x: 0, filter: "blur(0px)", duration: 0.45, ease: "power3.out" }, 0);
+      // Remotion's slide: pushed in from the right as the setup terminal leaves (connect.html), on the same curve.
+      tl.fromTo("#carry-stage", { x: 1920 }, { x: 0, duration: 0.7, ease: "power3.inOut" }, 0.0);
+      tl.to("#carry-hblur-amt", { attr: { stdDeviation: "28 0" }, duration: 0.35, ease: "power2.in" }, 0.0);
+      tl.to("#carry-hblur-amt", { attr: { stdDeviation: "0 0" }, duration: 0.35, ease: "power2.out" }, 0.35);
 
       // "While Claude works, Continuum records...": the task it recorded is marked, and lifts out.
-      tl.to("#carry-taskid", { opacity: 1, duration: 0.2 }, 1.5);
-      tl.to("#carry-claude", { scale: 0.74, x: -520, y: 20, filter: "blur(3px)", duration: 0.8, ease: "power2.inOut" }, 1.6);
+      tl.to("#carry-taskid", { opacity: 1, duration: 0.2 }, 2.13);
+      tl.to("#carry-claude", { scale: 0.74, x: -520, y: 20, filter: "blur(3px)", duration: 0.8, ease: "power2.inOut" }, 2.26);
       // "...the task,"
-      tl.fromTo("#carry-card", { opacity: 0, scale: 0.3, x: -560, y: 150, filter: "blur(8px)" }, { opacity: 1, scale: 1, x: 0, y: 0, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 2.25);
+      tl.fromTo("#carry-card", { opacity: 0, scale: 0.3, x: -560, y: 150, filter: "blur(8px)" }, { opacity: 1, scale: 1, x: 0, y: 0, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 3.1);
       // "...what's done,"
-      tl.fromTo("#carry-done", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16 }, 3.3);
-      tl.fromTo("#carry-check", { scale: 0.5, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.35, ease: "back.out(1.8)" }, 3.36);
+      tl.fromTo("#carry-done", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16 }, 4.12);
+      tl.fromTo("#carry-check", { scale: 0.5, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.35, ease: "back.out(1.8)" }, 4.17);
       // "...and what comes next."
-      tl.fromTo("#carry-nextwrap", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16 }, 4.53);
-      tl.fromTo("#carry-next", { clipPath: "inset(0 100% 0 0 round 14px)" }, { clipPath: "inset(0 0% 0 0 round 14px)", duration: 0.5, ease: "expo.out" }, 4.55);
+      tl.fromTo("#carry-nextwrap", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16 }, 5.85);
+      tl.fromTo("#carry-next", { clipPath: "inset(0 100% 0 0 round 14px)" }, { clipPath: "inset(0 0% 0 0 round 14px)", duration: 0.5, ease: "expo.out" }, 5.88);
 
       // The task is carried over: Claude Code leaves, Codex's window builds around the card.
-      tl.to("#carry-claude", { x: -2300, filter: "blur(16px)", duration: 0.45, ease: "power3.in" }, 5.45);
-      tl.to("#carry-card", { scale: 0.62, x: -300, y: -60, duration: 0.8, ease: "power3.inOut" }, 5.6);
-      tl.to("#carry-card", { filter: "blur(6px)", duration: 0.4, ease: "power3.in" }, 5.6);
-      tl.to("#carry-card", { filter: "blur(0px)", duration: 0.4, ease: "power3.out" }, 6.0);
-      tl.fromTo("#carry-codex", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6, ease: "expo.out" }, 5.85);
+      tl.to("#carry-claude", { x: -2300, filter: "blur(16px)", duration: 0.45, ease: "power3.in" }, 6.89);
+      tl.to("#carry-card", { scale: 0.62, x: -300, y: -60, duration: 0.8, ease: "power3.inOut" }, 7.05);
+      tl.to("#carry-card", { filter: "blur(6px)", duration: 0.4, ease: "power3.in" }, 7.05);
+      tl.to("#carry-card", { filter: "blur(0px)", duration: 0.4, ease: "power3.out" }, 7.5);
+      tl.fromTo("#carry-codex", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 0.6, ease: "expo.out" }, 7.33);
       // ...and becomes the briefing Codex starts with.
-      tl.to("#carry-card", { opacity: 0, filter: "blur(10px)", duration: 0.22, ease: "power2.in" }, 6.5);
-      tl.fromTo(".carry-b", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, stagger: 0.05 }, 6.6);
+      tl.to("#carry-card", { opacity: 0, filter: "blur(10px)", duration: 0.22, ease: "power2.in" }, 8.0);
+      tl.fromTo(".carry-b", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, stagger: 0.05 }, 8.07);
 
       // "What's done, what's left, and exactly what to do next."
-      tl.to("#carry-band-done", { opacity: 1, duration: 0.15 }, 9.34);
-      tl.to("#carry-band-done", { opacity: 0, duration: 0.2 }, 10.3);
-      tl.to("#carry-band-left", { opacity: 1, duration: 0.15 }, 10.31);
-      tl.to("#carry-band-left", { opacity: 0, duration: 0.2 }, 11.15);
-      tl.to("#carry-band-next", { opacity: 1, duration: 0.2 }, 11.15);
-      tl.to("#carry-cam", { scale: 1.24, y: 160, transformOrigin: "950px 362px", duration: 0.75, ease: "power2.inOut" }, 11.15);
+      tl.to("#carry-band-done", { opacity: 1, duration: 0.15 }, 10.93);
+      tl.to("#carry-band-done", { opacity: 0, duration: 0.2 }, 11.72);
+      tl.to("#carry-band-left", { opacity: 1, duration: 0.15 }, 11.73);
+      tl.to("#carry-band-left", { opacity: 0, duration: 0.2 }, 12.49);
+      tl.to("#carry-band-next", { opacity: 1, duration: 0.2 }, 12.49);
+      tl.to("#carry-cam", { scale: 1.24, y: 160, transformOrigin: "950px 362px", duration: 0.75, ease: "power2.inOut" }, 12.49);
+
+      // Runway-style liquid morph: the briefing melts into Codex at work (finish.html fades in over it, un-melting).
+      tl.to("#carry-warp", { attr: { scale: 190 }, duration: 0.9, ease: "power2.in" }, 14.65);
 
       window.__timelines["carry"] = tl;
     })();

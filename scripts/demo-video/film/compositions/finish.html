@@ -3,6 +3,7 @@
     @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
     @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
     #root { position: absolute; inset: 0; overflow: hidden; }
+    #finish-stage { filter: url(#finish-fx); perspective: 3200px; }
     #finish-codex { left: 180px; top: 250px; width: 1560px; height: 520px; }
     #finish-task { position: absolute; right: 26px; top: 13px; display: flex; align-items: center; gap: 10px; padding: 6px 16px; border-radius: 10px; background: #f4f2ee; color: #141318; font-family: "Geist", sans-serif; font-size: 22px; font-weight: 500; }
     #finish-task svg { width: 22px; height: 22px; }
@@ -15,7 +16,7 @@
     .finish-type { display: inline-block; }
 
     #finish-run { left: 180px; top: 200px; width: 1560px; height: 520px; }
-    #finish-zoom { position: absolute; inset: 0; }
+    #finish-zoom { position: absolute; inset: 0; perspective: 3200px; }
     #finish-card { left: 400px; top: 470px; width: 1120px; padding: 40px 46px 42px; font-family: "Geist", sans-serif; }
     .finish-head { display: flex; align-items: center; justify-content: space-between; }
     .finish-head h3 { font-weight: 500; font-size: 46px; letter-spacing: -0.02em; }
@@ -27,6 +28,14 @@
     #finish-verified svg { width: 26px; height: 26px; }
   </style>
   <div data-hf-id="hf-ugwp" id="root" data-composition-id="finish" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <!-- The liquid morph in: the same seeded noise as carry.html's way out, relaxing to nothing. -->
+    <svg data-hf-id="hf-ffx0" width="0" height="0" style="position: absolute">
+      <filter data-hf-id="hf-ffx1" id="finish-fx" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+        <feTurbulence data-hf-id="hf-ffx3" type="fractalNoise" baseFrequency="0.0045 0.007" numOctaves="2" seed="7" result="noise" />
+        <feDisplacementMap data-hf-id="hf-ffx4" id="finish-warp" in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+    <div data-hf-id="hf-fstg" id="finish-stage" class="stage" data-layout-allow-overlap>
     <!-- Codex finishes the same task: the real change and its real reply. -->
     <div data-hf-id="hf-qo5r" id="finish-codex" class="term">
       <div data-hf-id="hf-vwwm" class="term-bar">
@@ -77,6 +86,7 @@
         </div>
       </div>
     </div>
+    </div>
   </div>
   <script>
     (function () {
@@ -85,32 +95,35 @@
       gsap.set(".finish-type", { clipPath: "inset(0 100% 0 0)" });
       gsap.set(["#finish-strike", "#finish-underline"], { scaleX: 0 });
 
-      // A punch cut: Codex, already working on the same task.
-      tl.fromTo("#finish-codex", { scale: 1.06 }, { scale: 1, duration: 0.4, ease: "expo.out" }, 0);
+      // Runway-style liquid morph: Codex, already working on the same task, resolves out of the melting briefing.
+      tl.fromTo("#finish-stage", { opacity: 0 }, { opacity: 1, duration: 0.9, ease: "power1.inOut" }, 0.0);
+      tl.fromTo("#finish-warp", { attr: { scale: 190 } }, { attr: { scale: 0 }, duration: 0.9, ease: "power2.out" }, 0.0);
       // "Codex picks up the same task..."
-      tl.fromTo("#finish-task", { opacity: 0, x: -40, filter: "blur(6px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.4, ease: "expo.out" }, 1.45);
+      tl.fromTo("#finish-task", { opacity: 0, x: -40, filter: "blur(6px)" }, { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.4, ease: "expo.out" }, 1.36);
       // "...and fixes the second bug."
-      tl.to("#finish-strike", { scaleX: 1, duration: 0.3, ease: "power3.out" }, 2.95);
-      tl.to(".finish-del", { opacity: 0.55, duration: 0.3 }, 2.95);
-      tl.to("#finish-plus", { clipPath: "inset(0 0% 0 0)", duration: 0.55, ease: "steps(68)" }, 3.05);
-      tl.to(".finish-reply", { opacity: 1, duration: 0.01, stagger: 0.12 }, 3.8);
+      tl.to("#finish-strike", { scaleX: 1, duration: 0.3, ease: "power3.out" }, 2.72);
+      tl.to(".finish-del", { opacity: 0.55, duration: 0.3 }, 2.72);
+      tl.to("#finish-plus", { clipPath: "inset(0 0% 0 0)", duration: 0.55, ease: "steps(68)" }, 2.81);
+      tl.to(".finish-reply", { opacity: 1, duration: 0.01, stagger: 0.12 }, 3.54);
 
-      // Blur swap to the test run, on the same ground.
-      tl.to("#finish-codex", { opacity: 0, filter: "blur(8px)", duration: 0.18, ease: "power2.in" }, 4.7);
-      tl.fromTo("#finish-run", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power2.out" }, 4.86);
+      // Remotion's flip: Codex's window turns away edge-on, and the test run turns in on the other side.
+      tl.to("#finish-codex", { rotationY: -90, duration: 0.26, ease: "power2.in" }, 4.91);
+      tl.set("#finish-codex", { opacity: 0 }, 5.17);
+      tl.set("#finish-run", { opacity: 1 }, 5.17);
+      tl.fromTo("#finish-run", { rotationY: 90 }, { rotationY: 0, duration: 0.42, ease: "power3.out" }, 5.17);
       // "Run the tests through Continuum..."
-      tl.to("#finish-cmd", { clipPath: "inset(0 0% 0 0)", duration: 0.65, ease: "steps(32)" }, 5.15);
-      tl.to(".finish-out", { opacity: 1, duration: 0.01, stagger: 0.14 }, 6.0);
+      tl.to("#finish-cmd", { clipPath: "inset(0 0% 0 0)", duration: 0.65, ease: "steps(32)" }, 5.58);
+      tl.to(".finish-out", { opacity: 1, duration: 0.01, stagger: 0.14 }, 6.28);
 
       // "...and the result is verified": the check card springs out of the passing line.
-      tl.to("#finish-run", { scale: 0.86, y: -150, filter: "blur(3px)", duration: 0.6, ease: "power2.inOut" }, 8.3);
-      tl.fromTo("#finish-card", { opacity: 0, scale: 0.4, y: -80, filter: "blur(8px)" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px)", duration: 0.55, ease: "expo.out" }, 8.4);
-      tl.fromTo("#finish-verified", { scale: 0.55, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.45, ease: "back.out(1.7)" }, 8.57);
+      tl.to("#finish-run", { scale: 0.86, y: -150, filter: "blur(3px)", duration: 0.6, ease: "power2.inOut" }, 8.04);
+      tl.fromTo("#finish-card", { opacity: 0, scale: 0.4, y: -80, filter: "blur(8px)" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px)", duration: 0.55, ease: "expo.out" }, 8.14);
+      tl.fromTo("#finish-verified", { scale: 0.55, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.45, ease: "back.out(1.7)" }, 8.32);
       // "...against the exact code it ran on."
-      tl.to("#finish-underline", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 10.0);
+      tl.to("#finish-underline", { scaleX: 1, duration: 0.5, ease: "power3.out" }, 9.66);
 
             // Push in on the Verified badge until it sits where, and as large as, the dashboard's real one: the cut is a match.
-      tl.to("#finish-zoom", { scale: 2.4, x: 406, y: -165, transformOrigin: "554px 730px", duration: 0.65, ease: "power3.inOut" }, 11.7);
+      tl.to("#finish-zoom", { scale: 2.4, x: 406, y: -165, transformOrigin: "554px 730px", duration: 0.65, ease: "power3.inOut" }, 11.25);
 
       window.__timelines["finish"] = tl;
     })();

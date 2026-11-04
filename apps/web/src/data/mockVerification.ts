@@ -12,6 +12,9 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(2 * DAY + 80),
     lastRunRevision: '7c1e0b4',
+    previousCommand: 'npm test -- tests/auth/email.test.ts',
+    coveredFiles: 38,
+    changedSince: ['src/auth/login.ts', 'src/auth/session.ts'],
     detail: 'Not run after the latest changes. Previous results may not reflect the current file revision.',
   },
   {
@@ -34,6 +37,8 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(29),
     lastRunRevision: 'a3f9c21',
+    coveredFiles: 214,
+    changedSince: [],
     detail: 'Recorded exit code 0 on the latest revision. Confirms types only, not behaviour.',
   },
   {
@@ -56,6 +61,8 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(2 * DAY + 80),
     lastRunRevision: '7c1e0b4',
+    coveredFiles: 17,
+    changedSince: [],
     detail: 'Recorded 6 passing tests on the revision that completed the task.',
   },
   {
@@ -68,6 +75,8 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(3 * HOUR + 10),
     lastRunRevision: 'e81d03f',
+    coveredFiles: 96,
+    changedSince: [],
     detail: 'Invalid frontmatter date in 2 legacy posts (RangeError: Invalid time value).',
   },
   {
@@ -90,6 +99,8 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(6 * DAY + 20),
     lastRunRevision: '41b7aa2',
+    coveredFiles: 9,
+    changedSince: [],
     detail: 'Recorded 4 passing tests.',
   },
   {
@@ -102,6 +113,8 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(22 * HOUR + 10),
     lastRunRevision: '9a0c55e',
+    coveredFiles: 31,
+    changedSince: [],
     detail: 'Run aborted: ClickHouse test container did not start. The failure does not reflect the retry logic itself.',
   },
   {
@@ -114,6 +127,8 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(22 * HOUR + 15),
     lastRunRevision: '9a0c55e',
+    coveredFiles: 58,
+    changedSince: [],
     detail: 'Recorded exit code 0.',
   },
   {
@@ -126,6 +141,8 @@ export const MOCK_VERIFICATION: readonly VerificationRecord[] = [
     evidenceType: 'verified',
     lastRunAt: minutesAgo(5 * DAY + 10),
     lastRunRevision: 'c02f9e1',
+    coveredFiles: 140,
+    changedSince: [],
     detail: 'Recorded successful build with search index generated.',
   },
 ]
