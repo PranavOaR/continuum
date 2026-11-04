@@ -10,7 +10,7 @@ export const CURSOR_MCP_FILE = '.cursor/mcp.json'
 export const CURSOR_RULE_FILE = '.cursor/rules/continuum.mdc'
 
 /** Marks the rule file as Continuum's, so setup never overwrites one you wrote. */
-const RULE_MARKER = '<!-- continuum: managed by `continuum setup cursor` -->'
+export const RULE_MARKER = '<!-- continuum: managed by `continuum setup cursor` -->'
 
 /**
  * Cursor has no hooks Continuum uses, so the rule asks its agent to do what

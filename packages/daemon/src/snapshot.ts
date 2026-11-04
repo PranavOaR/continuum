@@ -1,10 +1,8 @@
 import { basename } from 'node:path'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { currentBranch, openWorkspace, readWorkingTreeWithSymbols, uncommittedChanges, type UncommittedDiff, type WorkingTree } from '@continuum/capture'
-import { HOOKS_FILE, isContinuumHandler } from '@continuum/claude-code'
+import { connectedAgents, defaultClaudeConfigDir } from '@continuum/claude-code'
 import { liveHashes, projectState, type ProjectState } from '@continuum/context'
-import type { ContinuumEvent, CurrentHashes } from '@continuum/core'
+import type { AgentType, ContinuumEvent, CurrentHashes } from '@continuum/core'
 import type { GraphNode, ContextStore, Edge } from '@continuum/store'
 
 /** Events shown in feeds; older history stays in the store. */
@@ -18,8 +16,8 @@ export interface RepoSnapshot {
   branch: string | null
   state: ProjectState
   tree: WorkingTree
-  /** Claude Code's settings for this repository register Continuum's hooks. */
-  agentConnected: boolean
+  /** Agents connected to this repository, whichever they are. */
+  connectedAgents: AgentType[]
   /** Uncommitted change per path against the last commit, read live from git. */
   diffs: ReadonlyMap<string, UncommittedDiff>
   current: CurrentHashes
@@ -73,26 +71,14 @@ function snapshotGraph(store: ContextStore): Pick<RepoSnapshot, 'nodes' | 'edges
   }
 }
 
-/** Whether any hook in the repository's Claude Code settings runs Continuum; unreadable settings count as not connected. */
-async function hasContinuumHooks(root: string): Promise<boolean> {
-  try {
-    const settings = JSON.parse(await readFile(join(root, HOOKS_FILE), 'utf8')) as { hooks?: Record<string, { hooks?: unknown[] }[]> }
-    return Object.values(settings.hooks ?? {}).some((groups) =>
-      (Array.isArray(groups) ? groups : []).some((group) => (Array.isArray(group?.hooks) ? group.hooks : []).some((handler) => isContinuumHandler(handler as Record<string, unknown>))),
-    )
-  } catch {
-    return false
-  }
-}
-
 export async function loadSnapshot(projectId: string, cwd: string, now: Date): Promise<RepoSnapshot> {
   const { workspace, store } = await openWorkspace(cwd)
   try {
-    const [tree, branch, diffs, agentConnected] = await Promise.all([
+    const [tree, branch, diffs, connected] = await Promise.all([
       readWorkingTreeWithSymbols(store, workspace.root),
       currentBranch(workspace.root),
       uncommittedChanges(workspace.root),
-      hasContinuumHooks(workspace.root),
+      connectedAgents(workspace.root, defaultClaudeConfigDir()),
     ])
     return {
       projectId,
@@ -101,7 +87,7 @@ export async function loadSnapshot(projectId: string, cwd: string, now: Date): P
       branch,
       tree,
       diffs,
-      agentConnected,
+      connectedAgents: connected,
       state: projectState(store, tree, now),
       current: liveHashes(store, tree),
       baselineAt: firstScanTime(store),

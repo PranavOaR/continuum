@@ -44,8 +44,8 @@ export interface ProjectWorkspace {
 }
 
 export interface ProjectSetup {
-  /** Claude Code's hooks for Continuum are registered in this repository. */
-  agentConnected: boolean
+  /** Agents connected to this repository, whichever they are. */
+  connectedAgents: AgentType[]
 }
 
 export type AttentionKind = 'incomplete-task' | 'awaiting-verification' | 'stale-context' | 'handoff-review'

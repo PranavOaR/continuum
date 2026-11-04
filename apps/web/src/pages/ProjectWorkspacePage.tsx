@@ -109,7 +109,7 @@ export function ProjectWorkspacePage() {
               onPrepareHandoff={() => openHandoffDialog({ projectId: project.id, taskId: task.id })}
             />
           ) : (
-            <LeftOffPanel sessions={workspace.sessions} agentConnected={workspace.setup?.agentConnected ?? true} />
+            <LeftOffPanel sessions={workspace.sessions} agentConnected={workspace.setup ? workspace.setup.connectedAgents.length > 0 : true} />
           )}
           <FileExplorer files={taskFiles} onOpenFile={(fileId) => setParam({ file: fileId })} />
           <Panel
