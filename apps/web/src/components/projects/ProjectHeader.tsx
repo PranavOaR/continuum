@@ -1,15 +1,14 @@
-import { Activity, ArrowRightLeft, Brain, Copy, Ellipsis, GitBranch, Settings } from 'lucide-react'
+import { Activity, Brain, Copy, Ellipsis, FileText, GitBranch, Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
 import { useIsLive } from '../../state/dataMode'
 import { useToast } from '../../state/toasts'
-import { useUI } from '../../state/ui'
 import type { Project, ProjectStatus } from '@continuum/core'
 import { copyToClipboard } from '../../utils/clipboard'
 import { AgentChip } from '../shared/AgentChip'
 import { Breadcrumbs } from '../shared/Breadcrumbs'
-import { Button, ButtonLink, IconButton } from '../shared/Button'
+import { ButtonLink, IconButton } from '../shared/Button'
 import { Popover, PopoverItem } from '../shared/Popover'
 import { TaskStatusBadge } from '../shared/StatusBadge'
 
@@ -22,9 +21,8 @@ function Meta({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-export function ProjectHeader({ project, status, taskId }: { project: Project; status: ProjectStatus; taskId?: string }) {
+export function ProjectHeader({ project, status }: { project: Project; status: ProjectStatus }) {
   const isLive = useIsLive()
-  const { openHandoffDialog } = useUI()
   const notify = useToast()
   const navigate = useNavigate()
   const format = useTimeFormat()
@@ -54,9 +52,9 @@ export function ProjectHeader({ project, status, taskId }: { project: Project; s
           <ButtonLink to={`/app/activity?project=${project.id}`} icon={<Activity />} size="sm">
             View Activity
           </ButtonLink>
-          <Button variant="primary" size="sm" icon={<ArrowRightLeft />} onClick={() => openHandoffDialog({ projectId: project.id, taskId })}>
-            Prepare Handoff
-          </Button>
+          <ButtonLink to={`/app/briefings?project=${project.id}`} variant="primary" size="sm" icon={<FileText />}>
+            View Briefing
+          </ButtonLink>
           <Popover
             className="w-56"
             trigger={(props) => (

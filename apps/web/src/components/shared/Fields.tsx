@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Search, X } from 'lucide-react'
+import { ChevronDown, Search, X } from 'lucide-react'
 import { useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { cn } from '../../utils/cn'
 
@@ -62,38 +62,6 @@ export function SelectField({ label, hideLabel, className, children, id, ...rest
   )
 }
 
-interface CheckboxProps {
-  checked: boolean
-  onChange: (checked: boolean) => void
-  label: ReactNode
-  hint?: ReactNode
-}
-
-export function Checkbox({ checked, onChange, label, hint }: CheckboxProps) {
-  return (
-    <label
-      className={cn(
-        'flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2 transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent',
-        checked ? 'border-accent/50 bg-accent/[0.04]' : 'border-line hover:border-line-strong',
-      )}
-    >
-      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-      <span
-        aria-hidden
-        className={cn(
-          'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border',
-          checked ? 'border-accent-strong bg-accent-strong text-accent-fg' : 'border-line-strong bg-surface-2',
-        )}
-      >
-        {checked && <Check className="size-3" strokeWidth={3} />}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-[13px] font-medium text-fg">{label}</span>
-        {hint && <span className="block text-[12px] text-muted">{hint}</span>}
-      </span>
-    </label>
-  )
-}
 
 interface ToggleProps {
   checked: boolean

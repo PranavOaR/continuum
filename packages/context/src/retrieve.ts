@@ -1,11 +1,9 @@
-import type { EvidenceType } from '@continuum/core'
+import { CHARS_PER_TOKEN, type EvidenceType } from '@continuum/core'
 import { anchoredPath, type ContextStore } from '@continuum/store'
 import type { ProjectState } from './projectState'
 import type { TaskSummary } from './tasks'
 import { agoFromIso } from './time'
 
-/** Rough characters per token for English and code: the budget is an estimate, never an exact count. */
-export const CHARS_PER_TOKEN = 4
 export const DEFAULT_CONTEXT_TOKENS = 1_500
 /** Relevance halves for every this-many days without activity. */
 const RECENCY_HALF_LIFE_DAYS = 3

@@ -1,5 +1,5 @@
 /**
- * Minimal browser-local persistence for demo preferences and handoff history.
+ * Minimal browser-local persistence for preferences.
  * Kept behind this interface so it can later be swapped for API calls.
  */
 export interface PersistentStore<T> {
@@ -39,6 +39,18 @@ export function createPersistentStore<T>(key: string, fallback: T, isValid: (val
         // Nothing to clear if storage is unavailable.
       }
     },
+  }
+}
+
+/** What earlier versions kept here: the handoff history went with the page that used it. */
+const RETIRED_STORES = ['handoffs', 'handoffs.local']
+
+/** Removes those leftovers, so a browser does not hold them for good. */
+export function forgetRetiredData(): void {
+  try {
+    for (const key of RETIRED_STORES) window.localStorage.removeItem(`${NAMESPACE}.${key}`)
+  } catch {
+    // Nothing to remove if storage is unavailable.
   }
 }
 

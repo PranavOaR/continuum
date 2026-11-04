@@ -144,7 +144,7 @@ test('the overview shows every repository worked on recently, task or not', asyn
 test('live screens carry none of the demo or prototype wording', async ({ page }) => {
   const slug = (path: string) => (path.split('/').at(-1) as string).toLowerCase().replace(/[^a-z0-9]+/g, '-')
   const FORBIDDEN = ['simulated', 'demo user', 'demo workspace', 'would read', 'mock data', 'demo dataset', 'prototype', 'dark is the default']
-  for (const path of ['/app', '/app/projects', `/app/projects/${slug(repo)}`, `/app/projects/${slug(emptyRepo)}`, `/app/projects/${slug(noteRepo)}`, '/app/activity', '/app/memory', '/app/handoffs', '/app/settings']) {
+  for (const path of ['/app', '/app/projects', `/app/projects/${slug(repo)}`, `/app/projects/${slug(emptyRepo)}`, `/app/projects/${slug(noteRepo)}`, '/app/activity', '/app/memory', '/app/briefings', '/app/settings']) {
     await page.goto(`${url}${path}`)
     await expect(page.getByRole('main')).toBeVisible()
     await page.waitForLoadState('networkidle')
@@ -185,31 +185,18 @@ test('shows the repository, its session, changed file and verified check', async
   await expect(page.locator('#verification').getByText(/^\d+ covered files? unchanged since it ran$/)).toBeVisible()
 })
 
-test('prepare handoff builds from the recorded task', async ({ page }) => {
-  const name = repo.split('/').at(-1) as string
-  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
-  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).first().click()
-  const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('combobox', { name: 'Task' })).toHaveValue(/^load-config-from-env-/)
-  await expect(dialog.getByText('The app reads its config from the environment', { exact: false }).first()).toBeVisible()
-})
-
-test('a copied handoff of real records never calls itself a demo', async ({ page, context }) => {
+test('the copied briefing is what `continuum handoff` prints for the same repository', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   const name = repo.split('/').at(-1) as string
-  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
-  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).first().click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Prepare Handoff', exact: true }).click()
-  await page.getByRole('button', { name: 'Copy Context' }).click()
-  await expect(page.getByText('Context copied.', { exact: false })).toBeVisible()
+  await page.goto(`${url}/app/briefings?project=${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  await expect(page.getByLabel('Briefing text')).toContainText('The app reads its config from the environment')
+  await page.getByRole('button', { name: 'Copy briefing' }).click()
+  await expect(page.getByText('Briefing copied.', { exact: false })).toBeVisible()
   const copied = await page.evaluate(() => navigator.clipboard.readText())
-  expect(copied).toContain('# Continuum handoff context')
+  // Only the moment each was generated may differ.
+  const undated = (text: string) => text.trim().replace(/^Generated \S+/m, 'Generated').replace(/just now|\d+[mhd] ago/g, 'ago')
+  expect(undated(copied)).toBe(undated(continuum(['handoff'])))
   expect(copied).not.toMatch(/mock data|demo/i)
-})
-
-test('handoff history starts empty instead of showing demo samples', async ({ page }) => {
-  await page.goto(`${url}/app/handoffs`)
-  await expect(page.getByText('startup-app')).toHaveCount(0)
 })
 
 test('memory graph comes from the local context graph', async ({ page }) => {
@@ -260,15 +247,12 @@ test('edits a task from the dashboard and records it as set by you', async ({ pa
   expect(handoff).toContain('[set by you] Changed in the dashboard: status, steps done')
 })
 
-test('a project without tasks offers its briefing, and Prepare Handoff says why it is unavailable', async ({ page }) => {
+test('a project without tasks still has a briefing to copy', async ({ page }) => {
   const name = emptyRepo.split('/').at(-1) as string
   await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
-  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).first().click()
-  const dialog = page.getByRole('dialog')
-  await expect(dialog.getByRole('button', { name: 'Copy briefing' })).toBeVisible()
-  const prepare = dialog.getByRole('button', { name: 'Prepare Handoff', exact: true })
-  await expect(prepare).toBeDisabled()
-  await expect(dialog.getByText('This project has no recorded task to hand off. Copy the briefing instead.')).toBeVisible()
+  await page.getByRole('link', { name: 'View Briefing' }).click()
+  await expect(page.getByLabel('Briefing text')).toContainText('No agent sessions recorded yet.')
+  await expect(page.getByRole('button', { name: 'Copy briefing' })).toBeVisible()
 })
 
 test('a new project shows a getting-started checklist that ticks itself off live', async ({ page }) => {
@@ -298,6 +282,7 @@ test.describe('accessibility of live screens', () => {
       ['project without tasks', `/app/projects/${slug(emptyRepo)}`],
       ['activity', '/app/activity'],
       ['memory', '/app/memory'],
+      ['briefing', `/app/briefings?project=${slug(repo)}`],
       ['settings', '/app/settings'],
     ] as const
   }

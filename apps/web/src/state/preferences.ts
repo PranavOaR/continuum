@@ -1,8 +1,5 @@
 import { createContext, useContext } from 'react'
-import { AGENTS } from '@continuum/core'
 import { createPersistentStore, isRecord } from '../services/storage'
-import type { AgentType, ContextCategory } from '@continuum/core'
-import { CONTEXT_CATEGORIES, DEFAULT_CONTEXT } from '@continuum/core'
 
 export type ThemePreference = 'dark' | 'light' | 'system'
 
@@ -11,9 +8,6 @@ export interface Preferences {
   defaultProjectId: string
   relativeTimestamps: boolean
   reduceMotion: boolean
-  preferredSourceAgent: AgentType
-  preferredTargetAgent: AgentType
-  defaultContext: ContextCategory[]
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -21,13 +15,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   defaultProjectId: 'startup-app',
   relativeTimestamps: true,
   reduceMotion: false,
-  preferredSourceAgent: 'claude-code',
-  preferredTargetAgent: 'codex',
-  defaultContext: [...DEFAULT_CONTEXT],
 }
-
-const agentIds = new Set<string>(AGENTS.map((agent) => agent.id))
-const categoryIds = new Set<string>(CONTEXT_CATEGORIES.map((category) => category.id))
 
 function isPreferences(value: unknown): value is Preferences {
   if (!isRecord(value)) return false
@@ -35,13 +23,7 @@ function isPreferences(value: unknown): value is Preferences {
     (value.theme === 'dark' || value.theme === 'light' || value.theme === 'system') &&
     typeof value.defaultProjectId === 'string' &&
     typeof value.relativeTimestamps === 'boolean' &&
-    typeof value.reduceMotion === 'boolean' &&
-    typeof value.preferredSourceAgent === 'string' &&
-    agentIds.has(value.preferredSourceAgent) &&
-    typeof value.preferredTargetAgent === 'string' &&
-    agentIds.has(value.preferredTargetAgent) &&
-    Array.isArray(value.defaultContext) &&
-    value.defaultContext.every((item) => typeof item === 'string' && categoryIds.has(item))
+    typeof value.reduceMotion === 'boolean'
   )
 }
 

@@ -1,14 +1,6 @@
 import { createContext, useContext } from 'react'
 
-export interface HandoffDialogTarget {
-  projectId?: string
-  taskId?: string
-}
-
 export interface UIContextValue {
-  handoffDialog: HandoffDialogTarget | null
-  openHandoffDialog: (target?: HandoffDialogTarget) => void
-  closeHandoffDialog: () => void
   isSearchOpen: boolean
   openSearch: () => void
   closeSearch: () => void

@@ -1,11 +1,9 @@
 import type {
   ActivityType,
   ChangeType,
-  ContextCategory,
   CriterionStatus,
   EvidenceType,
   FileStatus,
-  HandoffStatus,
   MemoryKind,
   MemorySource,
   ProjectStatus,
@@ -69,15 +67,8 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   'task-update': 'Task update',
   decision: 'Decision',
   'test-result': 'Test result',
-  handoff: 'Handoff',
   session: 'Session',
   commit: 'Commit',
-}
-
-export const HANDOFF_STATUS_LABEL: Record<HandoffStatus, string> = {
-  draft: 'Draft',
-  prepared: 'Prepared',
-  copied: 'Copied',
 }
 
 export const MEMORY_KIND_LABEL: Record<MemoryKind, string> = {
@@ -95,15 +86,3 @@ export const MEMORY_SOURCE_LABEL: Record<MemorySource, string> = {
   'user-note': 'User note',
   derived: 'Derived by Continuum',
 }
-
-export const CONTEXT_CATEGORIES: readonly { id: ContextCategory; label: string; hint: string }[] = [
-  { id: 'project-overview', label: 'Project overview', hint: 'Name, repository, branch, stack' },
-  { id: 'current-task', label: 'Current task', hint: 'Objective, acceptance criteria, progress' },
-  { id: 'file-changes', label: 'File changes', hint: 'Changed files with summaries' },
-  { id: 'decisions', label: 'Related decisions', hint: 'Constraints the next agent must keep' },
-  { id: 'previous-attempts', label: 'Previous attempts', hint: 'Known issues and what failed before' },
-  { id: 'verification', label: 'Verification results', hint: 'What has and has not been checked' },
-  { id: 'next-steps', label: 'Next steps', hint: 'Remaining work and recommended action' },
-]
-
-export const DEFAULT_CONTEXT: readonly ContextCategory[] = ['current-task', 'file-changes', 'decisions', 'verification', 'next-steps']

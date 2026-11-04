@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **The Handoffs page is now Briefings.** It shows the text `continuum handoff` prints for a project, with a copy button and its estimated size in tokens, and it says how the shorter version agents get at session start differs. Connected agents were already briefed automatically, so the handoff text the browser built for itself, with its status tracking and history, is gone, and so are the agent and context defaults in Settings. Old links open the new page, and your other preferences are kept. The stored handoff history is deleted from your browser the next time the dashboard opens, and it cannot be brought back; a briefing is always rebuilt from the records. Settings now has one reset, for preferences.
+- The overview's fourth card counts what needs attention, in place of pending handoffs. Each project has one View Briefing button in place of Prepare Handoff.
+
 ## [0.3.0] - 2026-11-04
 
 ### Changed

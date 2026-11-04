@@ -46,7 +46,7 @@ test('overview shows coherent summary values and opens a project', async ({ page
   await expect(card('Active projects')).toContainText('4')
   await expect(card('Active tasks')).toContainText('5')
   await expect(card('Recent changes')).toContainText('12')
-  await expect(card('Pending handoffs')).toContainText('2')
+  await expect(card('Needs attention')).toContainText(await page.getByText(/^\d+ items? across your projects$/).innerText().then((text) => text.split(' ')[0]))
   await expect(page.getByText('Session ended before full verification').first()).toBeVisible()
   await page.getByRole('link', { name: /Startup App/ }).first().click()
   await expect(page).toHaveURL(/\/app\/projects\/startup-app/)
@@ -82,53 +82,43 @@ test('project workspace exposes files, events, verification and memory', async (
   await expect(page.getByText('src/billing/webhooks.ts')).toBeVisible()
 })
 
-test('handoff can be prepared, marked, copied and found in history', async ({ page, context }) => {
+test('a project links to its briefing, which can be read, sized and copied', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto('/app/projects/startup-app')
-  await page.getByRole('button', { name: 'Prepare Handoff' }).first().click()
+  await page.getByRole('link', { name: 'View Briefing' }).click()
+  await expect(page).toHaveURL(/\/app\/briefings\?project=startup-app/)
+  await expect(page.getByRole('heading', { name: 'Briefings', level: 1 })).toBeVisible()
 
-  const dialog = page.getByRole('dialog', { name: 'Prepare handoff' })
-  await expect(dialog).toBeVisible()
-  const target = dialog.getByLabel('Target agent')
-  await expect(target.locator('option', { hasText: 'Claude Code' })).toHaveCount(0)
-  await target.selectOption('cursor')
+  const briefing = page.getByLabel('Briefing text')
+  await expect(briefing).toContainText('Continuum handoff: Startup App')
+  await expect(page.getByText('tokens (estimate)')).toBeVisible()
 
-  await expect(dialog.getByRole('heading', { name: 'Next steps' })).toBeVisible()
-  await dialog.locator('label', { hasText: 'Remaining work and recommended action' }).click()
-  await expect(dialog.getByRole('heading', { name: 'Next steps' })).toHaveCount(0)
-  await dialog.locator('label', { hasText: 'Known issues and what failed before' }).click()
-  await expect(dialog.getByRole('heading', { name: 'Previous attempts' })).toBeVisible()
-  await expect(dialog).toContainText('tokens (estimate)')
+  await page.getByRole('button', { name: 'Copy briefing' }).click()
+  await expect(page.getByText('Briefing copied.', { exact: false })).toBeVisible()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await briefing.innerText())
 
-  await page.getByRole('button', { name: 'Prepare Handoff' }).last().click()
-  await expect(page).toHaveURL(/\/app\/handoffs\/h-/)
-  await expect(page.getByText('Draft', { exact: true })).toBeVisible()
+  await page.getByRole('combobox', { name: 'Project' }).selectOption({ label: 'Developer Portfolio' })
+  await expect(page).toHaveURL(/project=dev-portfolio/)
+  await expect(briefing).toContainText('Continuum handoff: Developer Portfolio')
+})
 
-  await page.getByRole('button', { name: 'Mark as Prepared' }).click()
-  await expect(page.getByText('Handoff prepared. Your context is ready to use with the selected agent.')).toBeVisible()
-
-  await page.getByRole('button', { name: 'Copy Context' }).click()
-  const clipboard = await page.evaluate(() => navigator.clipboard.readText())
-  expect(clipboard).toContain('# Continuum handoff context')
-  expect(clipboard).toContain('To: Cursor')
-  expect(clipboard).toContain('## Previous attempts')
-  expect(clipboard).not.toContain('## Next steps')
-  await expect(page.getByText('Copied', { exact: true })).toBeVisible()
-  await expect(page.locator('body')).not.toContainText(/has received/i)
-
-  await page.goto('/app/handoffs')
-  await expect(page.getByRole('link', { name: /Startup App.*Cursor.*Implement Google authentication/ })).toBeVisible()
+test('old handoff links open Briefings', async ({ page }) => {
+  for (const path of ['/app/handoffs', '/app/handoffs/h-mdx']) {
+    await page.goto(path)
+    await expect(page).toHaveURL(/\/app\/briefings/)
+    await expect(page.getByRole('heading', { name: 'Briefings', level: 1 })).toBeVisible()
+  }
 })
 
 test('clipboard failure offers a manual copy fallback', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('Permission denied')) } })
   })
-  await page.goto('/app/handoffs/h-mdx')
-  await page.getByRole('button', { name: 'Copy Context' }).click()
+  await page.goto('/app/briefings?project=startup-app')
+  await page.getByRole('button', { name: 'Copy briefing' }).click()
   const dialog = page.getByRole('dialog', { name: 'Copy manually' })
   await expect(dialog).toContainText('Permission denied')
-  await expect(dialog.getByRole('textbox')).toHaveValue(/Continuum handoff context/)
+  await expect(dialog.getByRole('textbox')).toHaveValue(/Continuum handoff/)
 })
 
 test('activity filters and search work, with an empty state', async ({ page }) => {
@@ -185,6 +175,13 @@ test('the command palette moves between pages and runs actions from the keyboard
   await field.press('Enter')
   await expect(page).toHaveURL(/\/app\/memory$/)
 
+  // The page's old name still finds it.
+  await page.keyboard.press('ControlOrMeta+k')
+  await field.fill('handoff')
+  await expect(dialog.getByRole('option').first()).toHaveAccessibleName(/Briefings/)
+  await field.press('Enter')
+  await expect(page).toHaveURL(/\/app\/briefings$/)
+
   await page.keyboard.press('ControlOrMeta+k')
   await field.fill('dark theme')
   await field.press('ArrowDown')
@@ -202,29 +199,26 @@ test('the command palette lists matching commands before search results', async 
   await expect(dialog.getByText('Results', { exact: true })).toBeVisible()
 })
 
-test('settings change theme and reset handoff history', async ({ page }) => {
+test('settings change the theme, and reset preferences', async ({ page }) => {
   await page.goto('/app/settings')
   await page.getByRole('radio', { name: 'Dark' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 
-  await page.getByRole('button', { name: 'Clear handoff history' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Clear history' }).click()
-  await page.goto('/app/handoffs')
-  await expect(page.getByText('No handoffs yet')).toBeVisible()
-
-  await page.goto('/app/settings')
-  await page.getByRole('button', { name: 'Restore defaults' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Restore defaults' }).click()
+  await page.getByRole('button', { name: 'Reset preferences' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Reset preferences' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
-  await page.goto('/app/handoffs')
-  await expect(page.getByRole('link', { name: /Developer Portfolio/ })).toBeVisible()
 })
 
 test('unknown routes and records show coherent states', async ({ page }) => {
   await page.goto('/app/projects/does-not-exist')
   await expect(page.getByText('Project not found')).toBeVisible()
-  await page.goto('/app/handoffs/missing')
-  await expect(page.getByText('Handoff not found')).toBeVisible()
+  await page.goto('/app/briefings?project=does-not-exist')
+  await expect(page.getByText('Project not found')).toBeVisible()
+  // Nothing suggests another project's briefing is the one you asked for, and you can still pick one.
+  await expect(page.getByLabel('Briefing text')).toHaveCount(0)
+  await expect(page.getByRole('combobox', { name: 'Project' })).toHaveValue('')
+  await page.getByRole('combobox', { name: 'Project' }).selectOption({ label: 'Startup App' })
+  await expect(page.getByLabel('Briefing text')).toContainText('Continuum handoff: Startup App')
   await page.goto('/app/nope')
   await expect(page.getByText('Page not found')).toBeVisible()
 })

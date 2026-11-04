@@ -1,10 +1,8 @@
-import { ArrowRightLeft, FlaskConical, HardDrive } from 'lucide-react'
+import { FlaskConical, HardDrive } from 'lucide-react'
 import { useIsLive } from '../../state/dataMode'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useProjects } from '../../hooks/useWorkspace'
-import { useUI } from '../../state/ui'
 import { cn } from '../../utils/cn'
-import { Button } from '../shared/Button'
 import { Logo } from '../shared/Logo'
 import { NAV_ITEMS } from './navItems'
 
@@ -39,8 +37,6 @@ function ProjectLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
-  const { openHandoffDialog } = useUI()
-
   return (
     <div className="flex h-full flex-col overflow-y-auto px-7 pt-8 pb-6">
       <Link to="/" onClick={onNavigate} aria-label="Continuum home" className="self-start">
@@ -74,19 +70,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           ))}
         </ul>
       </nav>
-
-      <Button
-        variant="primary"
-        size="sm"
-        icon={<ArrowRightLeft />}
-        className="mt-6 self-start"
-        onClick={() => {
-          onNavigate?.()
-          openHandoffDialog()
-        }}
-      >
-        Prepare handoff
-      </Button>
 
       <ProjectLinks onNavigate={onNavigate} />
 

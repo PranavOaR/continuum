@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures'
 
-const ROUTES = ['/', '/app', '/app/projects', '/app/projects/startup-app', '/app/activity', '/app/memory', '/app/handoffs', '/app/handoffs/h-mdx', '/app/settings']
+const ROUTES = ['/', '/app', '/app/projects', '/app/projects/startup-app', '/app/activity', '/app/memory', '/app/briefings?project=startup-app', '/app/settings']
 
 for (const width of [375, 820]) {
   test.describe(`at ${width}px`, () => {
@@ -26,11 +26,11 @@ test('mobile navigation drawer opens and navigates', async ({ page }) => {
   await expect(page.getByRole('dialog', { name: 'Navigation' })).toHaveCount(0)
 })
 
-test('a project on a phone has one Prepare Handoff, and long branch names end in an ellipsis', async ({ page }) => {
+test('a project on a phone has one View Briefing, and long branch names end in an ellipsis', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/app/projects/startup-app')
   await expect(page.getByRole('heading', { name: 'Implement Google authentication' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Prepare Handoff', exact: true }).filter({ visible: true })).toHaveCount(1)
+  await expect(page.getByRole('link', { name: 'View Briefing', exact: true }).filter({ visible: true })).toHaveCount(1)
   const branch = page.getByTitle('feature/google-auth')
   await expect(branch).toBeVisible()
   // The name is cut inside its cell rather than running past it.

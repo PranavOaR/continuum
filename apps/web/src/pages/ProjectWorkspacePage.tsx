@@ -17,7 +17,6 @@ import { EmptyState, ErrorState, LoadingBlock, Skeleton } from '../components/sh
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useWorkspace } from '../hooks/useWorkspace'
 import type { ProjectWorkspace } from '../services'
-import { useUI } from '../state/ui'
 import type { ProjectTask } from '@continuum/core'
 
 function resolveTask(workspace: ProjectWorkspace, requestedId: string | null): ProjectTask | undefined {
@@ -54,7 +53,6 @@ export function ProjectWorkspacePage() {
   const { projectId = '' } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const { data: workspace, error, isLoading } = useWorkspace(projectId)
-  const { openHandoffDialog } = useUI()
   useDocumentTitle(workspace?.project.name ?? 'Project')
   useScrollToHash(workspace !== undefined)
 
@@ -94,7 +92,7 @@ export function ProjectWorkspacePage() {
 
   return (
     <>
-      <ProjectHeader project={project} status={status} taskId={task?.id} />
+      <ProjectHeader project={project} status={status} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
@@ -106,7 +104,6 @@ export function ProjectWorkspacePage() {
               currentTaskId={project.currentTaskId}
               verification={verification}
               onSelectTask={(taskId) => setParam({ task: taskId, file: null })}
-              onPrepareHandoff={() => openHandoffDialog({ projectId: project.id, taskId: task.id })}
             />
           ) : (
             <LeftOffPanel sessions={workspace.sessions} agentConnected={workspace.setup ? workspace.setup.connectedAgents.length > 0 : true} />

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MOCK_ACTIVITY } from '../data/mockActivity'
 import { MOCK_FILES } from '../data/mockFiles'
-import { SEED_HANDOFFS } from '../data/mockHandoffs'
 import { MOCK_MEMORY } from '../data/mockMemory'
 import { MOCK_PROJECTS } from '../data/mockProjects'
 import { MOCK_SESSIONS } from '../data/mockSessions'
@@ -13,11 +12,10 @@ const projectIds = ids(MOCK_PROJECTS)
 const taskIds = ids(MOCK_TASKS)
 const fileIds = ids(MOCK_FILES)
 const memoryIds = ids(MOCK_MEMORY)
-const handoffIds = ids(SEED_HANDOFFS)
 
 describe('mock dataset integrity', () => {
   it('uses unique ids within every collection', () => {
-    const collections: ReadonlyArray<readonly { id: string }[]> = [MOCK_PROJECTS, MOCK_TASKS, MOCK_FILES, MOCK_MEMORY, MOCK_VERIFICATION, MOCK_ACTIVITY, MOCK_SESSIONS, SEED_HANDOFFS]
+    const collections: ReadonlyArray<readonly { id: string }[]> = [MOCK_PROJECTS, MOCK_TASKS, MOCK_FILES, MOCK_MEMORY, MOCK_VERIFICATION, MOCK_ACTIVITY, MOCK_SESSIONS]
     for (const collection of collections) {
       expect(ids(collection).size).toBe(collection.length)
     }
@@ -51,7 +49,7 @@ describe('mock dataset integrity', () => {
     }
   })
 
-  it('keeps file, memory, activity, session and handoff references valid', () => {
+  it('keeps file, memory, activity and session references valid', () => {
     for (const file of MOCK_FILES) {
       if (file.taskId) expect(taskIds.has(file.taskId)).toBe(true)
       file.decisionIds.forEach((id) => expect(memoryIds.has(id)).toBe(true))
@@ -65,14 +63,9 @@ describe('mock dataset integrity', () => {
       expect(projectIds.has(event.projectId)).toBe(true)
       if (event.taskId) expect(taskIds.has(event.taskId)).toBe(true)
       if (event.fileId) expect(fileIds.has(event.fileId)).toBe(true)
-      if (event.handoffId) expect(handoffIds.has(event.handoffId)).toBe(true)
     }
     for (const session of MOCK_SESSIONS) {
       if (session.taskId) expect(taskIds.has(session.taskId)).toBe(true)
-    }
-    for (const handoff of SEED_HANDOFFS) {
-      expect(MOCK_TASKS.find((t) => t.id === handoff.taskId)?.projectId).toBe(handoff.projectId)
-      expect(handoff.sourceAgent).not.toBe(handoff.targetAgent)
     }
     for (const record of MOCK_VERIFICATION) {
       if (record.taskId) expect(taskIds.has(record.taskId)).toBe(true)
