@@ -76,13 +76,15 @@ npm run build && npm run bundle    # dist/release: one minified ESM file plus th
 npm run smoke:release              # packs, installs and drives the real binary in a scratch repo
 ```
 
-[`scripts/release/README.md`](scripts/release/README.md) is the package's README. Pushing a `v*` tag publishes to npm (`.github/workflows/release.yml`); the tag must match `packages/cli/package.json` and have a dated CHANGELOG section. `CONTINUUM_PACKAGE_NAME` sets the npm name stamped into the bundle.
+[`scripts/release/README.md`](scripts/release/README.md) is the package's README. Pushing a `v*` tag releases everything (`.github/workflows/release.yml`): after the full checks it publishes to npm, updates the plugin repository and creates the GitHub release. The tag must match `packages/cli/package.json` and have a dated CHANGELOG section. A run that fails part way can be re-run: steps already done are skipped. `CONTINUUM_PACKAGE_NAME` sets the npm name stamped into the bundle.
+
+The workflow holds no npm token: it publishes through npm trusted publishing, configured for `getcontinuum` on npmjs.com (user `PranavOaR`, repository `continuum`, workflow `release.yml`). It pushes to the plugin repository with the `PLUGIN_REPO_DEPLOY_KEY` secret, the private half of a deploy key with write access there. Workflows pin actions to commit SHAs, and Dependabot proposes updates weekly.
 
 The store records its schema version. Migrations apply forward on open, and a store written by a newer Continuum is refused rather than changed.
 
 ### The Claude Code plugin
 
-`npm run plugin` writes `plugin/` from the same hooks and MCP server that `setup claude-code` writes. Users install it from a separate public repository, [PranavOaR/continuum-plugin](https://github.com/PranavOaR/continuum-plugin), which also hosts issues. It holds no source code, only the plugin and a copy of the release bundle, which its hooks run with `node` (`npx` would add about half a second to each hook). After a release:
+`npm run plugin` writes `plugin/` from the same hooks and MCP server that `setup claude-code` writes. Users install it from a separate public repository, [PranavOaR/continuum-plugin](https://github.com/PranavOaR/continuum-plugin), which also hosts issues. It holds no source code, only the plugin and a copy of the release bundle, which its hooks run with `node` (`npx` would add about half a second to each hook). The release workflow updates it; to do the same by hand:
 
 ```bash
 npm run build && npm run bundle && npm run plugin

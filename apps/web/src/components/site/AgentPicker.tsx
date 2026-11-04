@@ -5,7 +5,7 @@ import { InstallCommand } from './InstallCommand'
 
 /** Inline, so monochrome logos take the text colour. The SVGs are bundled files, never user input. */
 function Svg({ markup, className }: { markup: string; className: string }) {
-  return <span aria-hidden className={`inline-flex [&>svg]:h-full [&>svg]:w-auto ${className}`} dangerouslySetInnerHTML={{ __html: markup }} />
+  return <span aria-hidden className={`inline-flex [&>svg]:h-full [&>svg]:w-auto [&>svg]:flex-none ${className}`} dangerouslySetInnerHTML={{ __html: markup }} />
 }
 
 /** Pick an agent by its logo, get the exact command that connects it, and what to do next. */

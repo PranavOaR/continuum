@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Builds the public website (VITE_CONTINUUM_SITE=website, as Vercel does) and
 // fails if the dashboard's demo dataset or the prototype's wording is in it, or if
-// any page fails to render or links to GitHub.
+// any page fails to render or links to GitHub. Pages are served with the headers
+// vercel.json sets, so a Content-Security-Policy that blocks the site fails here.
 //   npm run check:website
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
@@ -44,6 +45,14 @@ const STSD_HEADER_BYTES = 8
 /** A visual sample entry's fixed fields (reserved bytes, size, resolution, compressor name…) come before its child boxes. */
 const VISUAL_SAMPLE_ENTRY_BYTES = 78
 
+/** The headers vercel.json sets on every page, so the check sees the site as production serves it. */
+const SITE_HEADERS = Object.fromEntries(
+  (JSON.parse(readFileSync(join(import.meta.dirname, '../vercel.json'), 'utf8')).headers.find((rule) => rule.source === '/(.*)')?.headers ?? []).map(({ key, value }) => [
+    key.toLowerCase(),
+    value,
+  ]),
+)
+
 /** How long vite preview may take to start. */
 const PREVIEW_START_MS = 30_000
 
@@ -63,6 +72,11 @@ async function renderErrors(dir) {
     await ready
     browser = await chromium.launch()
     const page = await browser.newPage()
+    // vite preview does not read vercel.json, so its headers are added on the way to the browser.
+    await page.route('**/*', async (route) => {
+      const response = await route.fetch()
+      await route.fulfill({ response, headers: { ...response.headers(), ...SITE_HEADERS } })
+    })
     const errors = []
     page.on('pageerror', (error) => errors.push(error.message.split('\n')[0]))
     page.on('console', (message) => message.type() === 'error' && errors.push(message.text().split('\n')[0]))
@@ -153,6 +167,7 @@ try {
   const code = assets.map((file) => readFileSync(join(out, 'assets', file), 'utf8')).join('\n') + readFileSync(join(out, 'index.html'), 'utf8')
   const failures = [
     ...FORBIDDEN.filter((text) => code.includes(text)).map((text) => `the website contains demo content: "${text}"`),
+    ...(SITE_HEADERS['content-security-policy'] ? [] : ['vercel.json sets no Content-Security-Policy for the website']),
     ...REQUIRED_FILES.filter((file) => !existsSync(join(out, file))).map((file) => `the website is missing ${file}`),
     ...videoFailures(out),
     ...(await renderErrors(out)),

@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Changed
+- Releases publish to npm through npm trusted publishing, with no stored npm token, and the Claude Code plugin repository is updated by the same release run, so the plugin no longer lags npm (it was still at 0.2.1). The package now names its source repository, as trusted publishing requires.
+- The website sends a strict Content-Security-Policy: everything it loads comes from its own origin.
 - **Clearer verification in the dashboard.** Each check in the Verification panel shows how many of the files its latest run covered have changed since ("2 of 38 covered files changed since it ran"). A check whose name now runs a different command is marked **Command changed** and names the earlier command, as briefings already did. A file's drawer lists the checks that covered it, each with its result, when it last ran and whether this file changed since.
 
 ## [0.3.0] - 2026-11-03
