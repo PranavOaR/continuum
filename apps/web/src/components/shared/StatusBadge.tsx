@@ -1,13 +1,12 @@
-import { Bot, CircleCheck, CircleDashed, CircleDot, CircleHelp, CirclePause, CircleX, Clock, Copy, Eye, FileMinus2, FilePen, FilePlus2, FlaskConical, Lightbulb, OctagonPause, PenLine, ShieldCheck, TriangleAlert, UserRound } from 'lucide-react'
+import { Bot, CircleCheck, CircleDashed, CircleDot, CircleHelp, CirclePause, CircleX, Clock, Eye, FileMinus2, FilePen, FilePlus2, FlaskConical, Lightbulb, OctagonPause, PenLine, ShieldCheck, TriangleAlert, UserRound } from 'lucide-react'
 import type { ReactNode } from 'react'
-import type { ChangeType, CriterionStatus, EvidenceType, FileStatus, HandoffStatus, ProjectStatus, VerificationStatus } from '@continuum/core'
+import type { ChangeType, CriterionStatus, EvidenceType, FileStatus, ProjectStatus, VerificationStatus } from '@continuum/core'
 import {
   CHANGE_LABEL,
   CRITERION_LABEL,
   EVIDENCE_DESCRIPTION,
   EVIDENCE_LABEL,
   FILE_STATUS_LABEL,
-  HANDOFF_STATUS_LABEL,
   PROJECT_STATUS_LABEL,
   VERIFICATION_LABEL,
 } from '@continuum/core'
@@ -57,12 +56,6 @@ const FILE_STATUS_VISUAL: Record<FileStatus, Visual> = {
   verified: { tone: 'success', icon: <ShieldCheck /> },
 }
 
-const HANDOFF_VISUAL: Record<HandoffStatus, Visual> = {
-  draft: { tone: 'muted', icon: <PenLine />, dashed: true },
-  prepared: { tone: 'accent', icon: <CircleCheck /> },
-  copied: { tone: 'success', icon: <Copy /> },
-}
-
 const CRITERION_VISUAL: Record<CriterionStatus, Visual> = {
   complete: { tone: 'success', icon: <CircleCheck /> },
   incomplete: { tone: 'warning', icon: <CircleDashed /> },
@@ -88,9 +81,6 @@ export const EvidenceBadge = ({ type }: { type: EvidenceType }) =>
 export const ChangeTypeBadge = ({ type }: { type: ChangeType }) => render(CHANGE_VISUAL[type], CHANGE_LABEL[type])
 
 export const FileStatusBadge = ({ status }: { status: FileStatus }) => render(FILE_STATUS_VISUAL[status], FILE_STATUS_LABEL[status])
-
-export const HandoffStatusBadge = ({ status }: { status: HandoffStatus }) =>
-  render(HANDOFF_VISUAL[status], HANDOFF_STATUS_LABEL[status])
 
 /** A check whose name now runs a different command: its earlier results came from that other command. */
 export const CommandChangedBadge = ({ previousCommand }: { previousCommand: string }) =>

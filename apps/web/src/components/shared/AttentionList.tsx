@@ -1,11 +1,10 @@
-import { ArrowRightLeft, ChevronRight, CircleDashed, Clock, FlaskConical } from 'lucide-react'
+import { ChevronRight, CircleDashed, Clock, FlaskConical } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { AttentionItem, AttentionKind } from '../../services'
 
 const KIND_META: Record<AttentionKind, { icon: typeof Clock; label: string; className: string }> = {
   'incomplete-task': { icon: CircleDashed, label: 'Incomplete task', className: 'text-warning' },
   'awaiting-verification': { icon: FlaskConical, label: 'Awaiting verification', className: 'text-warning' },
-  'handoff-review': { icon: ArrowRightLeft, label: 'Handoff review', className: 'text-accent' },
   'stale-context': { icon: Clock, label: 'Possibly stale', className: 'text-muted' },
 }
 

@@ -16,8 +16,7 @@ const ProjectsPage = lazyPage(() => import('../pages/ProjectsPage'), 'ProjectsPa
 const ProjectWorkspacePage = lazyPage(() => import('../pages/ProjectWorkspacePage'), 'ProjectWorkspacePage')
 const ActivityPage = lazyPage(() => import('../pages/ActivityPage'), 'ActivityPage')
 const MemoryPage = lazyPage(() => import('../pages/MemoryPage'), 'MemoryPage')
-const HandoffsPage = lazyPage(() => import('../pages/HandoffsPage'), 'HandoffsPage')
-const HandoffPreviewPage = lazyPage(() => import('../pages/HandoffPreviewPage'), 'HandoffPreviewPage')
+const BriefingsPage = lazyPage(() => import('../pages/BriefingsPage'), 'BriefingsPage')
 const SettingsPage = lazyPage(() => import('../pages/SettingsPage'), 'SettingsPage')
 
 const APP_ROUTES: RouteObject[] = [
@@ -33,8 +32,9 @@ const APP_ROUTES: RouteObject[] = [
       { path: 'projects/:projectId', element: <ProjectWorkspacePage /> },
       { path: 'activity', element: <ActivityPage /> },
       { path: 'memory', element: <MemoryPage /> },
-      { path: 'handoffs', element: <HandoffsPage /> },
-      { path: 'handoffs/:handoffId', element: <HandoffPreviewPage /> },
+      { path: 'briefings', element: <BriefingsPage /> },
+      // The page's old addresses, in bookmarks and open tabs.
+      { path: 'handoffs/*', element: <Navigate to="/app/briefings" replace /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <NotFoundPage inApp /> },
     ],

@@ -2,18 +2,14 @@ import { HardDrive, Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Button } from '../components/shared/Button'
 import { ConfirmDialog } from '../components/shared/Dialog'
-import { Checkbox, SelectField, Toggle } from '../components/shared/Fields'
+import { SelectField, Toggle } from '../components/shared/Fields'
 import { PageHeader } from '../components/shared/PageHeader'
 import { Panel } from '../components/shared/Panel'
-import { AGENTS } from '@continuum/core'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useProjects, usePreferredProjectId } from '../hooks/useWorkspace'
-import { useHandoffs } from '../state/handoffs'
 import { usePreferences, type ThemePreference } from '../state/preferences'
 import { useToast } from '../state/toasts'
-import type { AgentType, ContextCategory } from '@continuum/core'
 import { cn } from '../utils/cn'
-import { CONTEXT_CATEGORIES } from '@continuum/core'
 import { useIsLive } from '../state/dataMode'
 
 const THEMES: { id: ThemePreference; label: string; icon: ReactNode }[] = [
@@ -21,29 +17,6 @@ const THEMES: { id: ThemePreference; label: string; icon: ReactNode }[] = [
   { id: 'light', label: 'Light', icon: <Sun /> },
   { id: 'system', label: 'System', icon: <Monitor /> },
 ]
-
-type ResetAction = 'mock-data' | 'handoffs' | 'everything'
-
-const RESET_COPY: Record<ResetAction, { title: string; description: string; confirm: string; done: string }> = {
-  'mock-data': {
-    title: 'Reset mock data?',
-    description: 'Restores the sample handoff records and their original statuses. Handoffs you created will be removed.',
-    confirm: 'Reset mock data',
-    done: 'Mock data restored to the original sample.',
-  },
-  handoffs: {
-    title: 'Clear handoff history?',
-    description: 'Removes every handoff, including the sample records. You can restore the samples with “Reset mock data”.',
-    confirm: 'Clear history',
-    done: 'Handoff history cleared.',
-  },
-  everything: {
-    title: 'Restore the default demo state?',
-    description: 'Resets preferences, theme, and all handoff data to how the demo first loaded.',
-    confirm: 'Restore defaults',
-    done: 'Demo restored to its default state.',
-  },
-}
 
 function SettingRow({ label, description, children }: { label: string; description?: string; children: ReactNode }) {
   return (
@@ -62,31 +35,14 @@ export function SettingsPage() {
   useDocumentTitle('Settings')
   const { preferences, updatePreferences, resetPreferences } = usePreferences()
   const preferredProjectId = usePreferredProjectId()
-  const { restoreSeedData, clearHistory } = useHandoffs()
   const projects = useProjects()
   const notify = useToast()
-  const [pendingReset, setPendingReset] = useState<ResetAction | null>(null)
+  const [isConfirmingReset, setConfirmingReset] = useState(false)
 
-  const runReset = (action: ResetAction) => {
-    if (action === 'mock-data') restoreSeedData()
-    if (action === 'handoffs') clearHistory()
-    if (action === 'everything') {
-      restoreSeedData()
-      resetPreferences()
-    }
-    notify(RESET_COPY[action].done)
+  const reset = () => {
+    resetPreferences()
+    notify('Preferences reset.')
   }
-
-  const toggleContext = (category: ContextCategory, checked: boolean) =>
-    updatePreferences({
-      defaultContext: checked ? [...preferences.defaultContext, category] : preferences.defaultContext.filter((item) => item !== category),
-    })
-
-  const setSource = (agent: AgentType) =>
-    updatePreferences({
-      preferredSourceAgent: agent,
-      preferredTargetAgent: agent === preferences.preferredTargetAgent ? (AGENTS.find((a) => a.id !== agent)?.id ?? 'other') : preferences.preferredTargetAgent,
-    })
 
   return (
     <>
@@ -115,7 +71,7 @@ export function SettingsPage() {
                 ))}
               </div>
             </SettingRow>
-            <SettingRow label="Default project" description="Opened by “Open Project” and preselected in handoffs.">
+            <SettingRow label="Default project" description="Opened by “Open Project” and first on Briefings.">
               <SelectField label="Default project" hideLabel value={preferredProjectId ?? ''} onChange={(event) => updatePreferences({ defaultProjectId: event.target.value })}>
                 {(projects.data ?? []).map(({ project }) => (
                   <option key={project.id} value={project.id}>
@@ -141,43 +97,6 @@ export function SettingsPage() {
           </div>
         </Panel>
 
-        <Panel title="Agent preferences" description="Defaults used when you prepare a handoff.">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <SelectField label="Preferred source agent" value={preferences.preferredSourceAgent} onChange={(event) => setSource(event.target.value as AgentType)}>
-              {AGENTS.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField
-              label="Preferred target agent"
-              value={preferences.preferredTargetAgent}
-              onChange={(event) => updatePreferences({ preferredTargetAgent: event.target.value as AgentType })}
-            >
-              {AGENTS.filter((agent) => agent.id !== preferences.preferredSourceAgent).map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </SelectField>
-          </div>
-          <fieldset className="mt-5">
-            <legend className="mb-2 text-[12px] font-medium text-muted">Default handoff context</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {CONTEXT_CATEGORIES.map((category) => (
-                <Checkbox
-                  key={category.id}
-                  checked={preferences.defaultContext.includes(category.id)}
-                  onChange={(checked) => toggleContext(category.id, checked)}
-                  label={category.label}
-                  hint={category.hint}
-                />
-              ))}
-            </div>
-          </fieldset>
-        </Panel>
-
         <Panel title="Privacy and architecture">
           <div className="flex gap-3">
             <HardDrive className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
@@ -191,51 +110,34 @@ export function SettingsPage() {
                 <p>
                   <span className="font-medium text-fg">Connected to your local repositories.</span> This dashboard reads Continuum's records from
                   disk through <span className="font-mono">continuum serve</span> on 127.0.0.1. The only thing it writes is a task edit you make,
-                  recorded as set by you. Nothing is sent to any server. Preferences and handoff history are kept in this browser's local storage.
+                  recorded as set by you. Nothing is sent to any server. Preferences are kept in this browser's local storage.
                 </p>
               ) : (
                 <p>
                   <span className="font-medium text-fg">This prototype uses mock data only.</span> No project files are monitored, no repository is
-                  read, no tests are run, and nothing is sent to any agent or server. Preferences and handoff history are kept in this browser's local
-                  storage.
+                  read, no tests are run, and nothing is sent to any agent or server. Preferences are kept in this browser's local storage.
                 </p>
               )}
             </div>
           </div>
         </Panel>
 
-        <Panel title={isLive ? 'Browser data' : 'Demo controls'} description={isLive ? 'Data this browser keeps for the dashboard.' : 'Return the demo to a known state.'}>
-          <div className="divide-y divide-line">
-            {!isLive && (
-              <SettingRow label="Reset mock data" description="Restore the sample handoffs and statuses.">
-                <Button size="sm" icon={<RotateCcw />} onClick={() => setPendingReset('mock-data')} className="w-full">
-                  Reset mock data
-                </Button>
-              </SettingRow>
-            )}
-            <SettingRow label="Reset handoff history" description="Remove every handoff record.">
-              <Button size="sm" variant="danger" onClick={() => setPendingReset('handoffs')} className="w-full">
-                Clear handoff history
-              </Button>
-            </SettingRow>
-            {!isLive && (
-              <SettingRow label="Restore default demo state" description="Preferences and data back to first load.">
-                <Button size="sm" variant="danger" onClick={() => setPendingReset('everything')} className="w-full">
-                  Restore defaults
-                </Button>
-              </SettingRow>
-            )}
-          </div>
+        <Panel title="Browser data" description="What this browser keeps for the dashboard.">
+          <SettingRow label="Reset preferences" description="Theme, default project and the rest back to their defaults.">
+            <Button size="sm" variant="danger" icon={<RotateCcw />} onClick={() => setConfirmingReset(true)} className="w-full">
+              Reset preferences
+            </Button>
+          </SettingRow>
         </Panel>
       </div>
 
       <ConfirmDialog
-        open={pendingReset !== null}
-        title={pendingReset ? RESET_COPY[pendingReset].title : ''}
-        description={pendingReset ? RESET_COPY[pendingReset].description : ''}
-        confirmLabel={pendingReset ? RESET_COPY[pendingReset].confirm : ''}
-        onConfirm={() => pendingReset && runReset(pendingReset)}
-        onClose={() => setPendingReset(null)}
+        open={isConfirmingReset}
+        title="Reset preferences?"
+        description="Puts your theme, default project and the other settings on this page back to their defaults."
+        confirmLabel="Reset preferences"
+        onConfirm={reset}
+        onClose={() => setConfirmingReset(false)}
       />
     </>
   )

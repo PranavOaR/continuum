@@ -1,4 +1,4 @@
-import { ArrowRightLeft, CircleCheck, CircleDashed, Compass, Pencil } from 'lucide-react'
+import { CircleCheck, CircleDashed, Compass, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import type { ProjectTask, TaskField, TaskStatus, VerificationRecord, VerificationStatus } from '@continuum/core'
 import { cn } from '../../utils/cn'
@@ -22,7 +22,6 @@ interface TaskPanelProps {
   currentTaskId?: string
   verification: VerificationRecord[]
   onSelectTask: (taskId: string) => void
-  onPrepareHandoff: () => void
 }
 
 function StepList({ title, steps, done, editor }: { title: string; steps: string[]; done: boolean; editor?: TaskEditor }) {
@@ -118,28 +117,19 @@ function NextActionEditor({ task, editor }: { task: ProjectTask; editor: TaskEdi
   )
 }
 
-export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTask, onPrepareHandoff }: TaskPanelProps) {
+export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTask }: TaskPanelProps) {
   const isLive = useIsLive()
   const taskEditor = useTaskEditor(task.projectId, task.id)
   // Only live data can be edited: the demo dataset is shared and read-only.
   const editor = isLive ? taskEditor : undefined
   const criteriaDone = task.acceptanceCriteria.filter((criterion) => criterion.status === 'complete').length
   const taskVerification = verification.filter((record) => task.verificationIds.includes(record.id))
-  const isFinished = task.status === 'completed'
 
   return (
     <Panel
       id="task"
       title="Task"
       description="Select a task to inspect its state."
-      actions={
-        !isFinished && (
-          // On a phone the header's Prepare Handoff sits just above; one is enough.
-          <Button size="sm" icon={<ArrowRightLeft />} onClick={onPrepareHandoff} className="max-sm:hidden">
-            Prepare Handoff
-          </Button>
-        )
-      }
       bodyClassName="p-0"
     >
       <div className="cn-scroll-x flex gap-1 border-b border-line px-3 py-2" role="group" aria-label="Project tasks">

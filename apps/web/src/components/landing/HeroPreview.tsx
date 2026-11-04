@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowRightLeft, CircleCheck, CircleDot, Clock, FilePen, FilePlus2, GitBranch, Terminal } from 'lucide-react'
+import { ArrowRight, CircleCheck, CircleDot, Clock, FilePen, FilePlus2, FileText, GitBranch, Terminal } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 const FILES = [
@@ -92,7 +92,7 @@ export function HeroPreview() {
             <span className="text-muted">· next: complete callback validation</span>
           </p>
           <span className="inline-flex items-center gap-1.5 rounded-md bg-accent-strong px-2.5 py-1 text-[11px] font-medium text-accent-fg">
-            <ArrowRightLeft className="size-3" /> Prepare handoff
+            <FileText className="size-3" /> View briefing
           </span>
         </div>
       </div>

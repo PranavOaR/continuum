@@ -1,7 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useUI } from '../../state/ui'
-import { HandoffDialog } from '../handoffs/HandoffDialog'
 import { LoadingBlock } from '../shared/States'
 import { MobileNav } from './MobileNav'
 import { SearchDialog } from './SearchDialog'
@@ -46,7 +45,6 @@ export function AppShell() {
         </main>
       </div>
       <SearchDialog />
-      <HandoffDialog />
     </div>
   )
 }

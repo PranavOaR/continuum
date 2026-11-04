@@ -60,11 +60,6 @@ export function EventDetailDrawer({ event, projectName, onClose, onOpenFile }: E
                 Open changed file <ArrowRight className="size-3.5" aria-hidden />
               </button>
             )}
-            {event.handoffId && (
-              <Link to={`/app/handoffs/${event.handoffId}`} onClick={onClose} className="inline-flex items-center gap-1.5 text-[13px] text-accent hover:underline">
-                Open handoff <ArrowRight className="size-3.5" aria-hidden />
-              </Link>
-            )}
             {!onOpenFile && (
               <Link
                 to={event.fileId ? `${projectLink}${event.taskId ? '&' : '?'}file=${event.fileId}` : projectLink}

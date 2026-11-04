@@ -48,7 +48,7 @@ export interface ProjectSetup {
   connectedAgents: AgentType[]
 }
 
-export type AttentionKind = 'incomplete-task' | 'awaiting-verification' | 'stale-context' | 'handoff-review'
+export type AttentionKind = 'incomplete-task' | 'awaiting-verification' | 'stale-context'
 
 export interface AttentionItem {
   id: string
@@ -90,7 +90,7 @@ export interface ContinuumService {
   listActivity(): Promise<ActivityEvent[]>
   getMemoryGraph(projectId: string): Promise<MemoryGraph>
   search(query: string): Promise<SearchResult[]>
-  /** The plain-text handoff briefing a new agent session receives for this project. */
+  /** The briefing for this project, as `continuum handoff` prints it. */
   getBriefing(projectId: string): Promise<string>
   /** Applies one edit you made to a task and returns the task as it now stands. */
   updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask>

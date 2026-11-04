@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowRightLeft, FileCode2, FolderGit2, FolderOpen, ListChecks, type LucideIcon } from 'lucide-react'
+import { ArrowRight, FileCode2, FolderGit2, FolderOpen, ListChecks, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ActivityTimeline } from '../components/activity/ActivityTimeline'
 import { ProjectCard } from '../components/projects/ProjectCard'
@@ -9,7 +9,6 @@ import { Panel } from '../components/shared/Panel'
 import { EmptyState, ErrorState, LoadingBlock, Skeleton } from '../components/shared/States'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAttentionItems, useOverviewQuery } from '../hooks/useOverview'
-import { useHandoffs } from '../state/handoffs'
 import { usePreferredProjectId } from '../hooks/useWorkspace'
 import { RECENT_DAYS, recentProjects } from '../utils/projectActivity'
 
@@ -39,7 +38,6 @@ export function OverviewPage() {
   useDocumentTitle('Overview')
   const { data, error, isLoading } = useOverviewQuery()
   const { items: attention } = useAttentionItems()
-  const { handoffs } = useHandoffs()
   const preferredProjectId = usePreferredProjectId()
   const navigate = useNavigate()
 
@@ -73,7 +71,6 @@ export function OverviewPage() {
   if (error || !data) return <ErrorState title="Could not load the overview" description={error?.message} />
 
   const activeProjects = recentProjects(data.projects)
-  const pendingHandoffs = handoffs.filter((handoff) => handoff.status !== 'copied').length
   const projectNames = Object.fromEntries(data.projects.map(({ project }) => [project.id, project.name]))
 
   return (
@@ -84,7 +81,7 @@ export function OverviewPage() {
         <SummaryCard label="Active projects" value={activeProjects.length} hint="Open or recent work" icon={FolderGit2} to="/app/projects?status=active" />
         <SummaryCard label="Active tasks" value={data.activeTaskCount} hint="Not yet completed" icon={ListChecks} to="/app/projects" />
         <SummaryCard label="Recent changes" value={data.changedFileCount} hint="Files across active tasks" icon={FileCode2} to="/app/activity?type=file-change" />
-        <SummaryCard label="Pending handoffs" value={pendingHandoffs} hint="Not yet copied" icon={ArrowRightLeft} to="/app/handoffs" />
+        <SummaryCard label="Needs attention" value={attention.length} hint="Failing, out of date or blocked" icon={TriangleAlert} to={attention[0]?.to ?? '/app/projects'} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">

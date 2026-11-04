@@ -97,7 +97,7 @@ npm workspaces:
 
 | Path | Package | Contents |
 | --- | --- | --- |
-| `packages/core` | `@continuum/core` | Domain types, event schema, evidence rules, the `ContinuumService` contract and the handoff builder, shared by every other package |
+| `packages/core` | `@continuum/core` | Domain types, event schema, evidence rules, the `ContinuumService` contract, shared by every other package |
 | `packages/store` | `@continuum/store` | The local context store: content-addressed objects, an identity hash map of graph nodes, typed edges, and the append-only event log they are projected from (SQLite) |
 | `packages/capture` | `@continuum/capture` | Git working-tree hashing, change scanning, the file watcher, symbols and verified check runs |
 | `packages/context` | `@continuum/context` | Project state judged against the live working tree, ranked retrieval and the token-bounded handoff |
@@ -107,7 +107,7 @@ npm workspaces:
 | `packages/cli` | `@continuum/cli` | The `continuum` command |
 | `apps/web` | `@continuum/web` | The dashboard (live data from the daemon, or a sample dataset in development) and the website, built with `VITE_CONTINUUM_SITE=website` |
 
-Inside `apps/web/src`: `data/` holds the sample dataset, `services/` the sample and HTTP services, `state/` data mode, preferences and handoff history, `site/` the website and its docs, and `components/` + `pages/` the UI.
+Inside `apps/web/src`: `data/` holds the sample dataset, `services/` the sample and HTTP services, `state/` data mode and preferences, `site/` the website and its docs, and `components/` + `pages/` the UI.
 
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) explains how agents connect and how the store works; [`docs/ROADMAP.md`](docs/ROADMAP.md) lists what shipped and what is next.
 
@@ -122,7 +122,7 @@ Inside `apps/web/src`: `data/` holds the sample dataset, `services/` the sample 
 - **Motif:** the *continuity thread*, a short accent line and node on a surface's top edge, echoed in the logo and the landing page.
 - **Motion:** the landing page's activity-flow diagram (`apps/web/src/components/landing/ActivityFlow.tsx`) is pure SVG/SMIL on one shared 10s cycle. It pauses off-screen, has a pause control, and renders a static final frame when reduced motion is requested.
 
-Routes: `/` landing · `/app` overview · `/app/projects` · `/app/projects/:projectId` · `/app/activity` · `/app/memory` · `/app/handoffs` · `/app/handoffs/:handoffId` · `/app/settings`
+Routes: `/` landing · `/app` overview · `/app/projects` · `/app/projects/:projectId` · `/app/activity` · `/app/memory` · `/app/briefings` · `/app/settings`
 
 ## License
 
