@@ -2,9 +2,13 @@ import { Brain, Compass, History, Landmark, TriangleAlert, type LucideIcon } fro
 import { Link } from 'react-router-dom'
 import type { MemoryKind, MemoryRecord } from '@continuum/core'
 import { MEMORY_KIND_LABEL, MEMORY_SOURCE_LABEL } from '@continuum/core'
+import { useProjectEditor } from '../../hooks/useProjectEditor'
+import { useIsLive } from '../../state/dataMode'
+import { cn } from '../../utils/cn'
 import { Panel } from '../shared/Panel'
 import { EmptyState } from '../shared/States'
 import { EvidenceBadge } from '../shared/StatusBadge'
+import { AddMemory, ReviewActions } from './MemoryEditor'
 
 const KIND_ICON: Record<MemoryKind, { icon: LucideIcon; className: string }> = {
   decision: { icon: Landmark, className: 'text-accent' },
@@ -15,8 +19,11 @@ const KIND_ICON: Record<MemoryKind, { icon: LucideIcon; className: string }> = {
 
 const KIND_ORDER: MemoryKind[] = ['decision', 'known-issue', 'previous-attempt', 'next-action']
 
-export function MemoryPanel({ records, projectId }: { records: MemoryRecord[]; projectId: string }) {
-  const sorted = [...records].sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind))
+export function MemoryPanel({ records, projectId, taskId }: { records: MemoryRecord[]; projectId: string; taskId?: string }) {
+  const isLive = useIsLive()
+  const editor = useProjectEditor(projectId)
+  // What still applies comes first; resolved records stay visible, and can be reopened.
+  const sorted = [...records].sort((a, b) => Number(a.review === 'resolved') - Number(b.review === 'resolved') || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind))
 
   return (
     <Panel
@@ -29,30 +36,41 @@ export function MemoryPanel({ records, projectId }: { records: MemoryRecord[]; p
         </Link>
       }
     >
-      {sorted.length === 0 ? (
-        <EmptyState icon={<Brain />} title="No memory records" description="Decisions, known issues and previous attempts will appear here." />
-      ) : (
-        <ul className="space-y-2.5">
-          {sorted.map((record) => {
-            const { icon: Icon, className } = KIND_ICON[record.kind]
-            return (
-              <li key={record.id} className="rounded-md border border-line p-3">
-                <p className="flex items-center gap-1.5 label-mono text-muted ">
-                  <Icon className={`size-3.5 ${className}`} aria-hidden />
-                  {MEMORY_KIND_LABEL[record.kind]}
-                </p>
-                <p className="mt-1.5 text-[13px] font-medium text-fg">{record.title}</p>
-                <p className="mt-1 text-[12.5px] text-muted">{record.body}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-subtle">
-                  <EvidenceBadge type={record.evidenceType} />
-                  <span>Source: {MEMORY_SOURCE_LABEL[record.source]}</span>
-                  <span className="font-mono">· {record.sourceDetail}</span>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <div className="space-y-2.5">
+        {sorted.length === 0 ? (
+          <EmptyState icon={<Brain />} title="No memory records" description="Decisions, known issues and previous attempts will appear here." />
+        ) : (
+          <ul className="space-y-2.5">
+            {sorted.map((record) => {
+              const { icon: Icon, className } = KIND_ICON[record.kind]
+              const isResolved = record.review === 'resolved'
+              return (
+                <li key={record.id} className={cn('rounded-md border border-line p-3', isResolved && 'bg-surface-2/60')}>
+                  <p className="flex items-center gap-1.5 label-mono text-muted ">
+                    <Icon className={`size-3.5 ${className}`} aria-hidden />
+                    {MEMORY_KIND_LABEL[record.kind]}
+                    {isResolved && <span className="text-subtle">· Resolved</span>}
+                  </p>
+                  <p className={cn('mt-1.5 text-[13px] font-medium', isResolved ? 'text-muted line-through' : 'text-fg')}>{record.title}</p>
+                  <p className="mt-1 text-[12.5px] text-muted">{record.body}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-subtle">
+                    <EvidenceBadge type={record.evidenceType} />
+                    <span>Source: {MEMORY_SOURCE_LABEL[record.source]}</span>
+                    <span className="font-mono">· {record.sourceDetail}</span>
+                  </div>
+                  {isLive && (
+                    <div className="mt-2">
+                      <ReviewActions record={record} editor={editor} />
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {/* Keyed by task: a draft must not be saved against a task you have since switched to. */}
+        {isLive && <AddMemory key={taskId} editor={editor} {...(taskId ? { taskId } : {})} />}
+      </div>
     </Panel>
   )
 }

@@ -9,6 +9,12 @@ export const ids = {
   event: (projectId: string, seq: number) => `${projectId}~event~${seq}`,
 }
 
+/** The stored id inside a dashboard memory id, or null when it belongs to another project. */
+export function storedMemoryId(projectId: string, memoryId: string): string | null {
+  const prefix = ids.memory(projectId, '')
+  return memoryId.startsWith(prefix) ? memoryId.slice(prefix.length) : null
+}
+
 const KNOWN_AGENTS = new Set<string>(AGENTS.map((agent) => agent.id))
 
 export function asAgent(value: unknown): AgentType {

@@ -1,5 +1,5 @@
 import { SCAN_SOURCE } from '@continuum/capture'
-import type { ContinuumEvent, EvidenceType, TaskField } from '@continuum/core'
+import type { ContinuumEvent, EvidenceType, MemoryReview, TaskField } from '@continuum/core'
 import type { ContextStore, GraphNode } from '@continuum/store'
 
 /** Events looked at; older history is summarized by the rest of the handoff. */
@@ -16,7 +16,7 @@ export interface SinceYouLeft {
   /** The latest result of each check run since, with how it was recorded. */
   checks: { name: string; passed: boolean; evidence: EvidenceType; at: string }[]
   commits: { hash: string; message: string; at: string }[]
-  decisions: { title: string; at: string }[]
+  decisions: { title: string; at: string; evidence: EvidenceType; review: MemoryReview | null }[]
   /** Tasks you changed in the dashboard, and which parts. */
   taskEdits: { taskId: string; title: string; fields: TaskField[]; at: string }[]
 }
@@ -75,7 +75,7 @@ function fold(summary: SinceYouLeft, event: ContinuumEvent, sessionAgent: (sessi
     }
     case 'memory.recorded': {
       const decisions = summary.decisions.filter((decision) => decision.title !== event.payload.title)
-      return { ...summary, decisions: [...decisions, { title: event.payload.title, at: event.occurredAt }] }
+      return { ...summary, decisions: [...decisions, { title: event.payload.title, at: event.occurredAt, evidence: event.evidence, review: event.payload.review ?? null }] }
     }
     case 'task.upserted': {
       if (event.evidence !== 'user-reported') return summary

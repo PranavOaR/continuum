@@ -3,6 +3,19 @@ import type { EvidenceType } from './evidence'
 
 export type MemoryKind = 'decision' | 'known-issue' | 'previous-attempt' | 'next-action'
 
+/** The kinds of record you can add from the dashboard. */
+export type NewMemoryKind = Extract<MemoryKind, 'decision' | 'known-issue'>
+
+export interface NewMemory {
+  kind: NewMemoryKind
+  title: string
+  body?: string
+  taskId?: string
+}
+
+/** Your verdict on a record: `resolved` takes it out of briefings; `still-valid` vouches for it against today's code. */
+export type MemoryReview = 'resolved' | 'still-valid'
+
 export type MemorySource = 'architecture-decision' | 'file-change' | 'test-result' | 'agent-summary' | 'user-note' | 'derived'
 
 export interface MemoryRecord {
@@ -18,6 +31,7 @@ export interface MemoryRecord {
   taskId?: string
   relatedFileIds: string[]
   createdAt: string
+  review?: MemoryReview
 }
 
 export type GraphNodeType = 'project' | 'task' | 'session' | 'decision' | 'verification' | 'file' | 'symbol'

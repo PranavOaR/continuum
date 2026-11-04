@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { initWorkspace, runCheck, scanRepository } from '@continuum/capture'
+import { initWorkspace, openWorkspace, runCheck, scanRepository } from '@continuum/capture'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { Writable } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -87,6 +87,24 @@ describe('Continuum MCP server', () => {
     const client = await connect((await initializedRepo()).root)
     const state = JSON.parse(text(await client.callTool({ name: 'get_project_state', arguments: {} })))
     expect(state).toMatchObject({ files: { tracked: 3, unrecorded: [], unrecordedTotal: 0 }, checks: [{ name: 'unit', status: 'passed' }] })
+  })
+
+  it('tells agents nothing about records you resolved', async () => {
+    const repo = await initializedRepo()
+    const client = await connect(repo.root)
+    await client.callTool({ name: 'record_decision', arguments: { title: 'Still applies', kind: 'decision' } })
+    await client.callTool({ name: 'record_decision', arguments: { title: 'Fixed long ago', kind: 'known-issue' } })
+    const { store } = await openWorkspace(repo.root)
+    const key = store.graph.keysOfKind('memory').find((candidate) => store.graph.get(candidate)?.props.title === 'Fixed long ago') as string
+    store.record({ type: 'memory.recorded', payload: { id: key.slice('memory:'.length), kind: 'known-issue', title: 'Fixed long ago', body: '', anchors: {}, review: 'resolved' }, evidence: 'user-reported', source: 'dashboard', occurredAt: NOW.toISOString() })
+    store.close()
+
+    const state = text(await client.callTool({ name: 'get_project_state', arguments: {} }))
+    expect(state).toContain('Still applies')
+    expect(state).not.toContain('Fixed long ago')
+    expect(state).not.toContain('resolvedDecisions')
+    expect(text(await client.callTool({ name: 'get_handoff', arguments: {} }))).not.toContain('Fixed long ago')
+    expect(text(await client.callTool({ name: 'get_context', arguments: {} }))).not.toContain('Fixed long ago')
   })
 
   it('records decisions anchored to files and flags them when those files change', async () => {

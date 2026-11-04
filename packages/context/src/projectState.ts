@@ -9,6 +9,7 @@ import {
   type EvidenceType,
   type IdentityKey,
   type MemoryKind,
+  type MemoryReview,
 } from '@continuum/core'
 import { keys, type ContextStore, type GraphNode } from '@continuum/store'
 import { currentTaskId, taskSummaries, type TaskSummary } from './tasks'
@@ -52,6 +53,7 @@ export interface DecisionSummary {
   recordedAt: string
   status: AnchorStatus
   changed: string[]
+  review: MemoryReview | null
 }
 
 export interface ProjectState {
@@ -67,7 +69,10 @@ export interface ProjectState {
   /** Most recently active first. */
   sessions: SessionSummary[]
   checks: CheckSummary[]
+  /** What still applies. Everything agents read comes from here. */
   decisions: DecisionSummary[]
+  /** Records you marked resolved: kept for the dashboard, out of what agents are told. */
+  resolvedDecisions: DecisionSummary[]
   /** Most recently updated first. */
   tasks: TaskSummary[]
   /** The in-progress or blocked task most recently updated, if any. */
@@ -187,9 +192,10 @@ function summarizeDecision(node: GraphNode, current: CurrentHashes): DecisionSum
     title: text(node.props.title) ?? '(untitled)',
     body: text(node.props.body) ?? '',
     evidence: (text(node.props.evidence) ?? 'agent-reported') as EvidenceType,
-    recordedAt: node.updatedAt,
+    recordedAt: text(node.props.recordedAt) ?? node.updatedAt,
     status,
     changed: changed.map(pathOf),
+    review: node.props.review === 'resolved' || node.props.review === 'still-valid' ? node.props.review : null,
   }
 }
 
@@ -204,6 +210,9 @@ export interface ProjectStateOptions {
 export function projectState(store: ContextStore, tree: WorkingTree, now: Date, options: ProjectStateOptions = {}): ProjectState {
   const current = liveHashes(store, tree)
   const sessions = nodesOfKind(store, 'session').filter((node) => node.key !== `session:${options.excludeSessionId}`)
+  const decisions = nodesOfKind(store, 'memory')
+    .map((node) => summarizeDecision(node, current))
+    .sort((a, b) => newestFirst(a.recordedAt, b.recordedAt))
   return {
     root: tree.root,
     revision: tree.revision,
@@ -215,9 +224,8 @@ export function projectState(store: ContextStore, tree: WorkingTree, now: Date, 
     checks: nodesOfKind(store, 'check')
       .map((node) => summarizeCheck(store, node, current))
       .sort((a, b) => a.name.localeCompare(b.name)),
-    decisions: nodesOfKind(store, 'memory')
-      .map((node) => summarizeDecision(node, current))
-      .sort((a, b) => newestFirst(a.recordedAt, b.recordedAt)),
+    decisions: decisions.filter((decision) => decision.review !== 'resolved'),
+    resolvedDecisions: decisions.filter((decision) => decision.review === 'resolved'),
     tasks: taskSummaries(store),
     currentTaskId: currentTaskId(store, now) ?? null,
     commits: recentCommits(store),

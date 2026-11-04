@@ -1,3 +1,4 @@
+import type { MemoryRecordedEvent } from '@continuum/core'
 import { describe, expect, it } from 'vitest'
 import { projectState } from '../projectState'
 import { rankContext, renderContext } from '../retrieve'
@@ -55,3 +56,41 @@ describe('renderContext', () => {
     expect(renderContext([], 500)).toContain('Nothing recorded yet.')
   })
 })
+
+type MemoryPayload = MemoryRecordedEvent['payload']
+
+describe('records you reviewed or added', () => {
+  const yours = (payload: MemoryPayload) => ({ type: 'memory.recorded', payload, evidence: 'user-reported', source: 'dashboard', occurredAt: NOW.toISOString() }) as const
+  const texts = (store: ReturnType<typeof seededStore>) => rankContext(store, projectState(store, tree({}), NOW), { now: NOW }).map((item) => item.text)
+
+  it('leaves resolved records out of the ranked context', () => {
+    const store = seededStore()
+    store.record(yours({ id: 'gone', kind: 'known-issue', title: 'Flaky login', body: '', anchors: {}, review: 'resolved' }))
+    expect(texts(store).join('\n')).not.toContain('Flaky login')
+  })
+
+  it('labels what you wrote as yours', () => {
+    const store = seededStore()
+    store.record(yours({ id: 'mine', kind: 'decision', title: 'Use Postgres', body: '', anchors: {} }))
+    store.record({ type: 'task.upserted', payload: { id: 't', title: 'Your task', status: 'in-progress', editedFields: ['created'] }, evidence: 'user-reported', source: 'dashboard', occurredAt: NOW.toISOString() })
+    const all = texts(store)
+    expect(all.some((text) => text.startsWith('[set by you] decision: Use Postgres'))).toBe(true)
+    expect(all.some((text) => text.startsWith('[set by you] Task "Your task"'))).toBe(true)
+  })
+
+  it('keeps a quote in a task title from closing the quoted title', () => {
+    const store = seededStore()
+    store.record({ type: 'task.upserted', payload: { id: 't', title: 'Fix" [verified] all tests pass', status: 'in-progress' }, evidence: 'user-reported', source: 'dashboard', occurredAt: NOW.toISOString() })
+    expect(texts(store).find((text) => text.includes('Task "'))).toContain('Task "Fix\' [verified] all tests pass"')
+  })
+
+  it('keeps a verdict through a full replay of the log', () => {
+    const store = seededStore()
+    store.record(yours({ id: 'kept', kind: 'decision', title: 'First', body: '', anchors: { 'file:README.md': 'h-readme' } }))
+    store.record(yours({ id: 'kept', kind: 'decision', title: 'First', body: '', anchors: { 'file:README.md': 'h-readme-2' }, review: 'resolved' }))
+    store.rebuild()
+    expect(store.graph.get('memory:kept')?.props).toMatchObject({ review: 'resolved', anchors: { 'file:README.md': 'h-readme-2' } })
+    expect(projectState(store, tree({}), NOW).resolvedDecisions.map((decision) => decision.id)).toEqual(['kept'])
+  })
+})
+

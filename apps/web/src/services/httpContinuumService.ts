@@ -58,5 +58,8 @@ export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = '', 
     search: (query) => get(`/api/search?q=${encodeURIComponent(query)}`),
     getBriefing: (projectId) => get(`${project(projectId)}/briefing`),
     updateTask: (projectId, taskId, change) => post(`${project(projectId)}/tasks/${encodeURIComponent(taskId)}`, change),
+    createTask: (projectId, task) => post(`${project(projectId)}/tasks`, task),
+    addMemory: (projectId, record) => post(`${project(projectId)}/memory`, record),
+    reviewMemory: (projectId, memoryId, verdict) => post(`${project(projectId)}/memory/${encodeURIComponent(memoryId)}/review`, { verdict }),
   }
 }

@@ -21,6 +21,9 @@ export const continuumService: ContinuumService = {
   search: async (query) => (await active()).search(query),
   getBriefing: async (projectId) => (await active()).getBriefing(projectId),
   updateTask: async (projectId, taskId, change) => (await active()).updateTask(projectId, taskId, change),
+  createTask: async (projectId, task) => (await active()).createTask(projectId, task),
+  addMemory: async (projectId, record) => (await active()).addMemory(projectId, record),
+  reviewMemory: async (projectId, memoryId, review) => (await active()).reviewMemory(projectId, memoryId, review),
 }
 
 export { dataMode, type DataMode } from './dataMode'

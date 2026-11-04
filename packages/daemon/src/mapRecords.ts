@@ -1,5 +1,5 @@
 import type { AgentSession, MemoryRecord, VerificationRecord } from '@continuum/core'
-import type { CheckSummary } from '@continuum/context'
+import type { CheckSummary, DecisionSummary } from '@continuum/context'
 import { anchoredPath } from '@continuum/store'
 import { asAgent, ids } from './ids'
 import { FILE_PREFIX } from './mapProject'
@@ -44,25 +44,33 @@ export function toVerification(snapshot: RepoSnapshot): VerificationRecord[] {
   })
 }
 
+const REVIEW_NOTE = { resolved: ' You marked this resolved.', 'still-valid': ' You confirmed this still holds.' } as const
+
+function provenance(decision: DecisionSummary): string {
+  const author = decision.evidence === 'user-reported' ? 'Added by you in the dashboard.' : 'Recorded by an agent through Continuum.'
+  return decision.review ? `${author}${REVIEW_NOTE[decision.review]}` : author
+}
+
 export function toMemory(snapshot: RepoSnapshot): MemoryRecord[] {
   const taskOf = new Map(snapshot.edges.filter((edge) => edge.type === 'informs').map((edge) => [edge.from, edge.to.slice('task:'.length)]))
-  return snapshot.state.decisions.map((decision) => {
+  return [...snapshot.state.decisions, ...snapshot.state.resolvedDecisions].map((decision) => {
     const taskId = taskOf.get(`memory:${decision.id}`)
     const node = snapshot.nodeByKey.get(`memory:${decision.id}`)
     const anchors = [...new Set(Object.keys((node?.props.anchors ?? {}) as Record<string, string>).flatMap((key) => anchoredPath(key) ?? []))]
-    const stale = decision.status === 'anchor-changed' ? ` Anchored code changed since: ${list(decision.changed)}.` : ''
+    const stale = decision.status === 'anchor-changed' && decision.review !== 'resolved' ? ` Anchored code changed since: ${list(decision.changed)}.` : ''
     return {
       id: ids.memory(snapshot.projectId, decision.id),
       projectId: snapshot.projectId,
       kind: decision.kind,
       title: decision.title,
       body: decision.body,
-      source: 'agent-summary',
-      sourceDetail: `Recorded by an agent through Continuum.${stale}`,
+      source: decision.evidence === 'user-reported' ? 'user-note' : 'agent-summary',
+      sourceDetail: `${provenance(decision)}${stale}`,
       evidenceType: decision.evidence,
       relatedFileIds: anchors.map((path) => ids.file(snapshot.projectId, path)),
       createdAt: decision.recordedAt,
       ...(taskId ? { taskId } : {}),
+      ...(decision.review ? { review: decision.review } : {}),
     }
   })
 }

@@ -1,8 +1,8 @@
 import { basename } from 'node:path'
-import { AGENTS } from '@continuum/core'
+import { AGENTS, evidenceTag } from '@continuum/core'
 import type { CheckSummary, DecisionSummary, ProjectState, SessionSummary } from './projectState'
 import { isQuiet, type SinceYouLeft } from './sinceYouLeft'
-import type { TaskSummary } from './tasks'
+import { isYourTask, type TaskSummary } from './tasks'
 import { agoFromIso } from './time'
 
 /** Fits comfortably in a SessionStart hook (10k chars) and an MCP tool result. */
@@ -76,8 +76,9 @@ function recent(label: string, steps: readonly string[]): string[] {
 }
 
 function describeTask(task: TaskSummary): string[] {
-  const lines = [`[agent-reported] ${quote(task.title, 200)} (${task.status})`]
-  if (task.userEdited.length > 0) lines.push(`[set by you] Changed in the dashboard: ${task.userEdited.map((field) => FIELD_LABEL[field]).join(', ')}`)
+  const lines = [`${isYourTask(task) ? '[set by you]' : '[agent-reported]'} ${quote(task.title, 200)} (${task.status})`]
+  const edited = task.userEdited.filter((field) => field !== 'created')
+  if (edited.length > 0) lines.push(`[set by you] Changed in the dashboard: ${edited.map((field) => FIELD_LABEL[field]).join(', ')}`)
   if (task.objective) lines.push(`Objective: ${quote(task.objective)}`)
   if (task.nextAction) lines.push(`Next action: ${quote(task.nextAction)}`)
   if (task.acceptanceCriteria.length > 0) {
@@ -93,6 +94,17 @@ function taskSection(state: ProjectState): string[] {
   const current = state.tasks.find((task) => task.id === state.currentTaskId)
   if (!current) return []
   return ['## Current task', ...describeTask(current)]
+}
+
+/** Tasks you planned for later. Tasks merely paused stay out: an agent has nothing to do with those until someone resumes them. */
+function plannedSection(state: ProjectState): string[] {
+  const planned = state.tasks.filter((task) => task.status === 'planned' && isYourTask(task))
+  if (planned.length === 0) return []
+  return [
+    '## Planned by you',
+    ...planned.slice(0, MAX_LISTED).map((task) => `- ${quote(task.title, 200)}${task.objective ? `: ${quote(task.objective, 200)}` : ''}`),
+    ...(planned.length > MAX_LISTED ? [`- …and ${planned.length - MAX_LISTED} more`] : []),
+  ]
 }
 
 /** Commits made since `since` (all of them before any session), dated by git, not by when a scan noticed them. */
@@ -136,6 +148,7 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
 }
 
 const FIELD_LABEL: Record<TaskSummary['userEdited'][number], string> = {
+  created: 'created',
   status: 'status',
   nextAction: 'next action',
   steps: 'steps done',
@@ -157,15 +170,20 @@ function sinceSection(since: SinceYouLeft | null | undefined, now: Date): string
     lines.push(`- [observed] Changed outside agent sessions (latest ${agoFromIso(since.outsideChangedAt, now)}): ${listPaths(since.outsideChanges)}`)
   }
   for (const edit of since.taskEdits) {
+    const ago = agoFromIso(edit.at, now)
+    if (edit.fields.includes('created')) {
+      lines.push(`- [set by you] You created the task ${quote(edit.title, 120)} in the dashboard (${ago}).`)
+      continue
+    }
     const fields = edit.fields.map((field) => FIELD_LABEL[field]).join(', ') || 'the task'
-    lines.push(`- [set by you] You changed ${fields} of ${quote(edit.title, 120)} in the dashboard (${agoFromIso(edit.at, now)}).`)
+    lines.push(`- [set by you] You changed ${fields} of ${quote(edit.title, 120)} in the dashboard (${ago}).`)
   }
   for (const check of since.checks) {
     const tag = check.evidence === 'verified' ? '[verified]' : '[observed: run by an agent]'
     lines.push(`- ${tag} ${code(check.name)} ${check.passed ? 'passed' : 'FAILED'} (${agoFromIso(check.at, now)}).`)
   }
   for (const commit of since.commits.slice(-MAX_LISTED)) lines.push(`- [observed] Committed ${code(commit.hash.slice(0, 7))} ${quote(commit.message, 120)} (${agoFromIso(commit.at, now)})`)
-  for (const decision of since.decisions) lines.push(`- [agent-reported] Decision recorded: ${quote(decision.title, 160)} (${agoFromIso(decision.at, now)})`)
+  for (const decision of since.decisions) lines.push(`- ${evidenceTag(decision.evidence)} ${SINCE_VERB[decision.review ?? 'recorded']}: ${quote(decision.title, 160)} (${agoFromIso(decision.at, now)})`)
   return lines
 }
 
@@ -191,6 +209,8 @@ function checksSection(state: ProjectState, now: Date): string[] {
   return ['## Checks', ...state.checks.map((check) => describeCheck(check, now))]
 }
 
+const SINCE_VERB = { recorded: 'Decision recorded', resolved: 'Resolved', 'still-valid': 'Confirmed still valid' } as const
+
 function decisionsSection(state: ProjectState): string[] {
   if (state.decisions.length === 0) return []
   return [
@@ -198,7 +218,8 @@ function decisionsSection(state: ProjectState): string[] {
     ...state.decisions.map((decision) => {
       const stale = decision.status === 'anchor-changed' ? ` (anchored code changed since: ${listPaths(decision.changed)})` : ''
       const body = decision.body ? ` ${quote(decision.body).slice(1, -1)}` : ''
-      return `- [${decision.evidence}] ${KIND_LABELS[decision.kind]}: ${quote(decision.title).slice(1, -1)}.${body}${stale}`
+      const confirmed = decision.review === 'still-valid' ? ' (you confirmed it still holds)' : ''
+      return `- ${evidenceTag(decision.evidence)} ${KIND_LABELS[decision.kind]}: ${quote(decision.title).slice(1, -1)}.${body}${confirmed}${stale}`
     }),
   ]
 }
@@ -260,7 +281,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
     'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.',
   ]
   return fit(
-    [header, sinceSection(options.since, now), taskSection(state), nextStepSection(state, now), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
+    [header, sinceSection(options.since, now), taskSection(state), plannedSection(state), nextStepSection(state, now), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }

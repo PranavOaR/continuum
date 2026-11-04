@@ -23,7 +23,7 @@ Handoffs also list **changes no agent session made**, so the next agent asks abo
 | **verified** | A check Continuum ran itself (`continuum run`), tied to the exact files it covered. It goes out of date when one of them changes. |
 | **observed** | An agent ran it, and Continuum saw the exit code. |
 | **agent-reported** | An agent said so. A note, not proof. |
-| **set by you** | You changed it in the dashboard. |
+| **set by you** | You set it in the dashboard: a task you created or changed, a decision or known issue you added, or a record you marked resolved or still valid. A resolved record stays on the page and leaves what agents are told. |
 
 ## How to control it
 

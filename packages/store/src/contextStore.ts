@@ -402,6 +402,12 @@ export class ContextStore implements Mutations {
     }
   }
 
+  unlink(from: IdentityKey, type: EdgeType, to: IdentityKey): void {
+    if (this.graphIndex.unlink(from, type, to)) {
+      this.db.prepare('DELETE FROM edges WHERE from_key = ? AND type = ? AND to_key = ?').run(from, type, to)
+    }
+  }
+
   // ── Evidence queries ───────────────────────────────────────────
 
   /** Stores a check's coverage manifest once per distinct tree and returns its hash for `check.recorded`. */

@@ -1,5 +1,5 @@
 import { Activity } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { ActivityTimeline } from '../components/activity/ActivityTimeline'
 import { EventDetailDrawer } from '../components/activity/EventDetailDrawer'
@@ -8,6 +8,7 @@ import { FileExplorer } from '../components/projects/FileExplorer'
 import { GettingStarted } from '../components/projects/GettingStarted'
 import { LeftOffPanel } from '../components/projects/LeftOffPanel'
 import { MemoryPanel } from '../components/projects/MemoryPanel'
+import { NewTaskDialog } from '../components/projects/NewTaskDialog'
 import { ProjectHeader } from '../components/projects/ProjectHeader'
 import { TaskPanel } from '../components/projects/TaskPanel'
 import { VerificationPanel } from '../components/projects/VerificationPanel'
@@ -55,6 +56,7 @@ export function ProjectWorkspacePage() {
   const { data: workspace, error, isLoading } = useWorkspace(projectId)
   useDocumentTitle(workspace?.project.name ?? 'Project')
   useScrollToHash(workspace !== undefined)
+  const [isCreatingTask, setCreatingTask] = useState(false)
 
   const setParam = (changes: Record<string, string | null>) =>
     setSearchParams(
@@ -87,12 +89,23 @@ export function ProjectWorkspacePage() {
   const taskFiles = task ? files.filter((file) => task.relatedFileIds.includes(file.id)) : files
   const taskEvents = (task ? events.filter((event) => event.taskId === task.id) : events).toSorted((a, b) => b.timestamp.localeCompare(a.timestamp))
   const taskVerification = task ? verification.filter((record) => task.verificationIds.includes(record.id)) : verification
-  const taskMemory = task ? memory.filter((record) => record.taskId === task.id) : memory
+  // A record on no task concerns the whole project, so it shows with every task.
+  const taskMemory = task ? memory.filter((record) => record.taskId === task.id || record.taskId === undefined) : memory
   const latestRevision = taskFiles.find((file) => file.revision)?.revision
 
   return (
     <>
-      <ProjectHeader project={project} status={status} />
+      <ProjectHeader project={project} status={status} onNewTask={() => setCreatingTask(true)} />
+      <NewTaskDialog
+        projectId={project.id}
+        tasks={tasks}
+        open={isCreatingTask}
+        onClose={() => setCreatingTask(false)}
+        onCreated={(taskId) => {
+          setCreatingTask(false)
+          setParam({ task: taskId, file: null })
+        }}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-6">
@@ -129,14 +142,14 @@ export function ProjectWorkspacePage() {
 
         <div className="min-w-0 space-y-6">
           <VerificationPanel records={taskVerification} currentRevision={latestRevision} />
-          <MemoryPanel records={taskMemory} projectId={project.id} />
+          <MemoryPanel records={taskMemory} projectId={project.id} {...(task ? { taskId: task.id } : {})} />
         </div>
       </div>
 
       <FileDetailDrawer
         file={selectedFile}
         task={tasks.find((candidate) => candidate.id === selectedFile?.taskId)}
-        decisions={memory.filter((record) => selectedFile?.decisionIds.includes(record.id))}
+        decisions={memory.filter((record) => selectedFile?.decisionIds.includes(record.id) && record.review !== 'resolved')}
         checks={verification.filter((record) => selectedFile?.verificationIds.includes(record.id))}
         onClose={() => setParam({ file: null })}
         onSelectTask={(taskId) => setParam({ task: taskId, file: null })}
