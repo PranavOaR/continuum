@@ -1,58 +1,73 @@
 WEBVTT
 
-00:00:00.700 --> 00:00:03.060
-Claude Code just fixed one bug…
+00:00:03.300 --> 00:00:07.670
+So, Claude Code just fixed one bug, and then it stopped.
 
-00:00:03.060 --> 00:00:05.030
-and stopped. There's still one left.
+00:00:07.700 --> 00:00:09.070
+There's still one left.
 
-00:00:05.980 --> 00:00:09.340
-Open another agent, and normally, it starts from zero.
+00:00:10.020 --> 00:00:12.180
+Now normally, you'd open another agent,
 
-00:00:09.340 --> 00:00:11.450
-You explain everything, again.
+00:00:12.180 --> 00:00:14.670
+and it starts from zero.
 
-00:00:12.280 --> 00:00:15.270
-With Continuum, it doesn't have to.
+00:00:15.900 --> 00:00:18.060
+So you explain everything…
 
-00:00:16.680 --> 00:00:18.270
-Connect each agent once.
+00:00:18.060 --> 00:00:19.310
+all over again.
 
-00:00:18.270 --> 00:00:19.650
-One command each.
+00:00:20.140 --> 00:00:21.340
+But with Continuum?
 
-00:00:20.880 --> 00:00:23.620
-While Claude works, Continuum records the task,
+00:00:21.340 --> 00:00:22.540
+It doesn't have to.
 
-00:00:23.620 --> 00:00:25.800
-what's done, and what comes next.
+00:00:23.800 --> 00:00:26.120
+You just connect each agent once.
 
-00:00:26.980 --> 00:00:29.240
-So when Codex starts, it's already briefed.
+00:00:26.120 --> 00:00:28.050
+One command each, that's it.
 
-00:00:29.240 --> 00:00:33.480
+00:00:29.280 --> 00:00:32.640
+And while Claude's working, Continuum keeps track of the task,
+
+00:00:32.640 --> 00:00:35.450
+what's done, and, you know, what comes next.
+
+00:00:36.630 --> 00:00:39.280
+So when Codex starts up, it's already briefed.
+
+00:00:39.350 --> 00:00:43.200
 What's done, what's left, and exactly what to do next.
 
-00:00:34.480 --> 00:00:38.410
-Codex picks up the same task, and fixes the second bug.
+00:00:44.200 --> 00:00:47.490
+Codex just picks up the same task, and fixes the second bug.
 
-00:00:39.480 --> 00:00:43.580
-Run the tests through Continuum, and the result is verified,
+00:00:48.560 --> 00:00:50.360
+Then you run the tests through Continuum,
 
-00:00:43.580 --> 00:00:45.550
+00:00:50.360 --> 00:00:52.560
+and the result is actually verified,
+
+00:00:52.560 --> 00:00:54.490
 against the exact code it ran on.
 
-00:00:47.280 --> 00:00:49.960
-And in the dashboard, it's one task,
+00:00:56.220 --> 00:00:57.510
+And over in the dashboard?
 
-00:00:49.960 --> 00:00:52.210
-carried from one agent to the next.
+00:00:57.580 --> 00:01:00.500
+It's all one task, carried from one agent…
 
-00:00:53.980 --> 00:00:55.590
+00:01:00.500 --> 00:01:01.700
+to the next.
+
+00:01:03.120 --> 00:01:04.490
 Your work continues.
 
-00:00:55.590 --> 00:00:57.080
+00:01:04.560 --> 00:01:05.930
 Your agents change.
 
-00:00:58.080 --> 00:01:01.440
-Continuum. It's free, and it runs on your machine.
+00:01:06.930 --> 00:01:10.860
+That's Continuum. It's free, and it runs right on your machine.

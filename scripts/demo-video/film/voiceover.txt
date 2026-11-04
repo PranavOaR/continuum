@@ -1,0 +1,21 @@
+So, Claude Code just fixed one bug, and then it stopped. There's still one left.
+
+Now normally, you'd open another agent, and, um, it starts from ZERO. [sighs] So you explain everything... all over again.
+
+But with Continuum? It doesn't have to.
+
+You just connect each agent once. One command each, that's it.
+
+And while Claude's working, Continuum keeps track of the task, what's done, and, you know, what comes next.
+
+So when Codex starts up, it's already briefed. What's done, what's left, and EXACTLY what to do next.
+
+Codex just picks up the same task, and fixes the second bug.
+
+Then you run the tests through Continuum, and the result is actually verified, against the exact code it ran on.
+
+And over in the dashboard? It's all one task, carried from one agent... to the next.
+
+Your work continues. Your agents change.
+
+That's Continuum. It's free, and it runs right on your machine.

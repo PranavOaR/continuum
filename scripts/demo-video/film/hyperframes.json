@@ -9,6 +9,12 @@
   "media": {
     "autoProxy": true
   },
-  "registryItems": [],
+  "registryItems": [
+    {
+      "name": "organic-light-leak-overlay",
+      "type": "hyperframes:block",
+      "target": "compositions/organic-light-leak-overlay.html"
+    }
+  ],
   "authoringSkill": "hyperframes"
 }

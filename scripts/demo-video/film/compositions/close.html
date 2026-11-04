@@ -54,34 +54,34 @@
       gsap.set("#close-cta", { xPercent: -50 });
 
       // The click floods the frame in the accent.
-      tl.fromTo("#close-flood", { clipPath: "circle(0px at 690px 170px)" }, { clipPath: "circle(2300px at 690px 170px)", duration: 0.45, ease: "power2.inOut" }, 0);
-      tl.fromTo("#close-paper", { clipPath: "circle(0px at 693px 412px)" }, { clipPath: "circle(0px at 693px 412px)", duration: 0.01 }, 0);
+      tl.fromTo("#close-flood", { clipPath: "circle(0px at 690px 170px)" }, { clipPath: "circle(2300px at 690px 170px)", duration: 0.45, ease: "power2.inOut" }, -0.0);
+      gsap.set("#close-paper", { opacity: 0 });
 
       // "Your work continues. Your agents change." One word at a time, on the voice.
-      [0.38, 0.98, 1.18, 1.99, 2.22, 2.71].forEach((t, i) => {
+      [0.38, 0.62, 0.98, 1.76, 1.98, 2.46].forEach((t, i) => {
         tl.fromTo(words[i], { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13, ease: "power2.out" }, t - 0.03);
       });
-      tl.to(words, { opacity: 0, filter: "blur(8px)", duration: 0.18, stagger: 0.03, ease: "power2.in" }, 3.7);
+      tl.to(words, { opacity: 0, filter: "blur(8px)", duration: 0.18, stagger: 0.03, ease: "power2.in" }, 3.65);
 
-      // Back to paper, from the point where the mark's last dot will land.
-      tl.to("#close-paper", { clipPath: "circle(2300px at 693px 412px)", duration: 0.5, ease: "power2.inOut" }, 3.85);
+      // Back to paper under the light leak's peak (the leak host in index.html, 3.34-4.74 here).
+      tl.to("#close-paper", { opacity: 1, duration: 0.3, ease: "power1.inOut" }, 3.67);
 
       // The mark, performed: the thread draws from where work started, through the handoff, to where it continues.
-      tl.fromTo("#close-start", { opacity: 0, scale: 0.3, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, 4.2);
-      tl.set("#close-path", { opacity: 1 }, 4.22);
-      tl.to("#close-path", { attr: { "stroke-dashoffset": 0 }, duration: 0.7, ease: "power2.inOut" }, 4.22);
-      tl.fromTo("#close-mid", { opacity: 0, scale: 0.3, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.6)" }, 4.55);
-      tl.fromTo("#close-end", { opacity: 0, scale: 0.2, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }, 4.92);
+      tl.fromTo("#close-start", { opacity: 0, scale: 0.3, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(1.6)" }, 4.25);
+      tl.set("#close-path", { opacity: 1 }, 4.27);
+      tl.to("#close-path", { attr: { "stroke-dashoffset": 0 }, duration: 0.7, ease: "power2.inOut" }, 4.27);
+      tl.fromTo("#close-mid", { opacity: 0, scale: 0.3, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.3, ease: "back.out(1.6)" }, 4.65);
+      tl.fromTo("#close-end", { opacity: 0, scale: 0.2, transformOrigin: "50% 50%" }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2)" }, 4.98);
       // "Continuum."
-      tl.fromTo("#close-word", { opacity: 1, clipPath: "inset(0 100% 0 0)" }, { opacity: 1, clipPath: "inset(0 0% 0 0)", duration: 0.55, ease: "expo.out" }, 4.48);
+      tl.fromTo("#close-word", { opacity: 1, clipPath: "inset(0 100% 0 0)" }, { opacity: 1, clipPath: "inset(0 0% 0 0)", duration: 0.55, ease: "expo.out" }, 4.59);
 
       // The command to type, then "Free, and it runs on your machine."
-      tl.fromTo("#close-cta", { opacity: 0, y: 24, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.45, ease: "expo.out" }, 5.35);
+      tl.fromTo("#close-cta", { opacity: 0, y: 24, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.45, ease: "expo.out" }, 5.36);
       const facts = gsap.utils.toArray(".close-f");
-      [5.8, 6.5, 6.5, 7.05, 7.05].forEach((t, i) => {
+      [5.76, 6.63, 6.63, 7.31, 7.31].forEach((t, i) => {
         tl.fromTo(facts[i], { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.13 }, t);
       });
-      tl.set({}, {}, 10.9);
+      tl.set({}, {}, 11.17);
 
       window.__timelines["close"] = tl;
     })();

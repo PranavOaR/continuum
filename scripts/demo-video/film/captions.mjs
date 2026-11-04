@@ -30,9 +30,21 @@ const stamp = (s) => {
   return `${pad(Math.floor(ms / 3_600_000))}:${pad(Math.floor(ms / 60_000) % 60)}:${pad(Math.floor(ms / 1000) % 60)}.${pad(ms % 1000, 3)}`
 }
 
+// The script marks delivery for the voice, not for reading: stress in capitals ("ZERO") and fillers ("um").
+// Captions show the words as written prose.
+const FILLER = /^(um|uh|erm),?$/i
+const EMPHASIS = /^[A-Z]{3,}\b/
+const toCaption = (words) =>
+  words.flatMap((w, i) => {
+    if (FILLER.test(w.text)) return []
+    const text = EMPHASIS.test(w.text) ? w.text.toLowerCase() : w.text
+    // "and, um, it" reads as "and it" once the filler is gone.
+    return [{ ...w, text: FILLER.test(words[i + 1]?.text ?? '') ? text.replace(/,$/, '') : text }]
+  })
+
 const cues = []
 for (const { line, offset } of clips) {
-  const words = timing.lines[line].words.map((w) => ({ text: w.w, start: w.s + offset, end: w.e + offset }))
+  const words = toCaption(timing.lines[line].words.map((w) => ({ text: w.w, start: w.s + offset, end: w.e + offset })))
   let current = []
   const flush = () => {
     if (current.length === 0) return
