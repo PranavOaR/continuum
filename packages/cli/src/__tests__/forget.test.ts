@@ -17,7 +17,7 @@ describe('continuum forget', () => {
     await cli(repo.root, ['init'])
     const result = await cli(repo.root, ['forget', '--path', 'notes/'])
     expect(result.code).toBe(EXIT_OK)
-    expect(result.out).toContain('Forgot everything about notes/')
+    expect(result.out).toContain('Forgot notes/:')
     expect(readFileSync(join(repo.root, '.continuum/context.db')).toString('latin1')).not.toContain('salary-review')
     expect((await cli(repo.root, ['forget', '--path', 'notes/'])).out).toContain('Nothing recorded matches')
   })

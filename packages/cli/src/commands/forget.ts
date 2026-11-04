@@ -11,7 +11,7 @@ function parseForget(args: readonly string[]): { scope: Scope; rewrite: HistoryR
   if (args.length !== 2 || !value) return { error: 'say what to forget' }
   if (flag === '--path') {
     try {
-      return { scope: 'path', rewrite: forgetPath(normalizePath(value)), what: `everything about ${value}` }
+      return { scope: 'path', rewrite: forgetPath(normalizePath(value)), what: value }
     } catch (error) {
       if (error instanceof InvalidForgetPathError) return { error: error.message }
       throw error

@@ -33,7 +33,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 | Command | What it does |
 |---|---|
 | `config` | Shows settings. `config agent-checks off` stops recording agent-run checks; `config prompts on` records what you type to agents, redacted; `config receipts off` hides the line Claude Code shows after a reply that recorded something. |
-| `forget` | Permanently removes recorded data: `--path <p>`, `--session <id>` or `--before <date>`. |
+| `forget` | Permanently removes recorded data: a file or folder's changes, its place in checks, decisions and commits, and its name in any text (`--path <p>`; those decisions and checks stay), what a session said and was asked (`--session <id>`), or the prompts, notes and check output from before a date (`--before <date>`). |
 | `export <file>` · `import <file>` | Moves the whole history between clones or machines as JSON. |
 | `compact` | Folds events older than 30 days into a checkpoint (`--keep-days <n>`). |
 
