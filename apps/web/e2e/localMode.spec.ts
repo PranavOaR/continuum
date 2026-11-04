@@ -79,7 +79,12 @@ test.beforeAll(async () => {
   noteHook({ hook_event_name: 'SessionStart', source: 'startup' })
   noteHook({ hook_event_name: 'Stop', last_assistant_message: 'Outlined the release notes. Next: add the migration section.' })
 
-  server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0', '.', emptyRepo, noteRepo], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'] })
+  server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0', '.', emptyRepo, noteRepo], {
+    cwd: ROOT,
+    // No Claude Code settings, so a Continuum plugin enabled on this machine does not count as connected here.
+    env: { ...process.env, CLAUDE_CONFIG_DIR: join(repo, '.no-claude-settings') },
+    stdio: ['ignore', 'pipe', 'inherit'],
+  })
   launchUrl = await new Promise<string>((resolve, reject) => {
     let output = ''
     server?.stdout?.on('data', (chunk: Buffer) => {
@@ -138,13 +143,13 @@ test('the overview shows every repository worked on recently, task or not', asyn
 
 test('live screens carry none of the demo or prototype wording', async ({ page }) => {
   const slug = (path: string) => (path.split('/').at(-1) as string).toLowerCase().replace(/[^a-z0-9]+/g, '-')
-  const FORBIDDEN = ['simulated', 'Demo user', 'Demo workspace', 'would read', 'Mock data', 'demo dataset', 'prototype', 'Dark is the default']
+  const FORBIDDEN = ['simulated', 'demo user', 'demo workspace', 'would read', 'mock data', 'demo dataset', 'prototype', 'dark is the default']
   for (const path of ['/app', '/app/projects', `/app/projects/${slug(repo)}`, `/app/projects/${slug(emptyRepo)}`, `/app/projects/${slug(noteRepo)}`, '/app/activity', '/app/memory', '/app/handoffs', '/app/settings']) {
     await page.goto(`${url}${path}`)
     await expect(page.getByRole('main')).toBeVisible()
     await page.waitForLoadState('networkidle')
     const text = await page.locator('body').innerText()
-    for (const phrase of FORBIDDEN) expect(text, `${path} says "${phrase}"`).not.toContain(phrase)
+    for (const phrase of FORBIDDEN) expect(text.toLowerCase(), `${path} says "${phrase}"`).not.toContain(phrase)
     // A project no agent has worked in names no agent (the Activity page may still list "Other agent" as a filter).
     if (path.startsWith('/app/projects/')) expect(text, `${path} names an agent that never ran`).not.toContain('Other agent')
   }
@@ -187,6 +192,19 @@ test('prepare handoff builds from the recorded task', async ({ page }) => {
   const dialog = page.getByRole('dialog')
   await expect(dialog.getByRole('combobox', { name: 'Task' })).toHaveValue(/^load-config-from-env-/)
   await expect(dialog.getByText('The app reads its config from the environment', { exact: false }).first()).toBeVisible()
+})
+
+test('a copied handoff of real records never calls itself a demo', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  const name = repo.split('/').at(-1) as string
+  await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
+  await page.getByRole('button', { name: 'Prepare Handoff', exact: true }).first().click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Prepare Handoff', exact: true }).click()
+  await page.getByRole('button', { name: 'Copy Context' }).click()
+  await expect(page.getByText('Context copied.', { exact: false })).toBeVisible()
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  expect(copied).toContain('# Continuum handoff context')
+  expect(copied).not.toMatch(/mock data|demo/i)
 })
 
 test('handoff history starts empty instead of showing demo samples', async ({ page }) => {

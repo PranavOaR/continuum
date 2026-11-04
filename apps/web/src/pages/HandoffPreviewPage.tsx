@@ -12,6 +12,7 @@ import { getAgent } from '@continuum/core'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useTimeFormat } from '../hooks/useTimeFormat'
 import { useWorkspace } from '../hooks/useWorkspace'
+import { useIsLive } from '../state/dataMode'
 import { useHandoffs } from '../state/handoffs'
 import { useToast } from '../state/toasts'
 import type { Handoff } from '@continuum/core'
@@ -41,6 +42,7 @@ function ClipboardFallback({ text, reason, onClose }: { text: string | null; rea
 function HandoffPreview({ handoff }: { handoff: Handoff }) {
   const { data: workspace, error, isLoading } = useWorkspace(handoff.projectId)
   const { setHandoffStatus } = useHandoffs()
+  const isLive = useIsLive()
   const notify = useToast()
   const format = useTimeFormat()
   const [fallback, setFallback] = useState<{ text: string; reason: string } | null>(null)
@@ -48,11 +50,11 @@ function HandoffPreview({ handoff }: { handoff: Handoff }) {
   const context = useMemo(() => {
     if (!workspace) return undefined
     try {
-      return buildHandoffContext({ workspace, ...handoff })
+      return buildHandoffContext({ workspace, ...handoff, isSampleData: !isLive })
     } catch (buildError) {
       return buildError instanceof Error ? buildError : new Error('Could not build handoff context.')
     }
-  }, [workspace, handoff])
+  }, [workspace, handoff, isLive])
 
   if (isLoading) return <LoadingBlock rows={4} label="Loading handoff" />
   if (error || !workspace) return <ErrorState title="Could not load the project for this handoff" description={error?.message} />

@@ -69,8 +69,8 @@ function HandoffForm({ initial, onDone, onBlockerChange }: { initial: HandoffDia
 
   const context = useMemo(() => {
     if (!workspace.data || !task) return undefined
-    return tryBuildContext({ workspace: workspace.data, taskId: task.id, sourceAgent, targetAgent, includedContext: included })
-  }, [workspace.data, task, sourceAgent, targetAgent, included])
+    return tryBuildContext({ workspace: workspace.data, taskId: task.id, sourceAgent, targetAgent, includedContext: included, isSampleData: !isLive })
+  }, [workspace.data, task, sourceAgent, targetAgent, included, isLive])
 
   const changeSource = (agent: AgentType) => {
     setSourceAgent(agent)
