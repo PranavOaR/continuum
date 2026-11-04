@@ -1,6 +1,6 @@
 # Continuum roadmap
 
-Status, 3 November 2026, at the 0.3.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has the first phase of the November plan: a new user's first hour. [Next](#next) lists the phases still to come.
+Status, 4 November 2026. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin; the latest published release of both is 0.2.1. The work marked 0.3.0 below is finished on `main` and waiting for that release. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan is built, and so is the first phase of the November plan: a new user's first hour. [Next](#next) lists the phases still to come.
 
 ## Guiding principles
 
@@ -11,7 +11,7 @@ Status, 3 November 2026, at the 0.3.0 release. Continuum is published on npm as 
 
 ---
 
-## Shipped
+## Built
 
 | Area | What shipped |
 |---|---|
@@ -23,6 +23,8 @@ Status, 3 November 2026, at the 0.3.0 release. Continuum is published on npm as 
 | **Privacy** | `forget` (rewrites and vacuums the database), `.continuumignore`, built-in redaction with the repository's own patterns on every capture path, and `export` / `import`. An unreadable config or `.continuumignore` stops capture instead of being ignored. |
 | **Dashboard** | Task editing ("set by you"), behind the access token and a CSRF token. Every connected repository in one dashboard. A live getting-started checklist. A command palette. axe checks on live screens in both themes. |
 | **First hour** (0.3.0) | The overview lists repositories with recent work, not only those with an open task, and each shows its latest session. Copy on live screens follows the real state, and an end-to-end check fails on demo or prototype wording. Briefings name agents and, with no task, open with the next step the latest note named. A one-line receipt after each Claude Code reply that recorded something. `serve` opens the browser; `setup` ends with the command that does. The project page fits a phone. `doctor --report` for issues. |
+| **Verification** (0.3.0) | Each check shows how many of its covered files changed since it ran, and `Command changed` with the earlier command, in the Verification panel and the file drawer. |
+| **Release automation** | Actions pinned to commit SHAs, npm trusted publishing, the plugin repository updated by the release workflow, a strict Content-Security-Policy on the website, and one getting-started guide. |
 | **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health). The plugin repository accepts private vulnerability reports. |
 
 ## Next
@@ -35,12 +37,11 @@ What the dashboard shows is exactly what agents receive, and you can correct it 
 
 | # | Item | Done when | Size |
 |---|---|---|---|
-| 1 | **Clearer verification.** Each check shows `COMMAND CHANGED` when it applies, when it last ran, and how many covered files changed since. | Shown in the Verification panel and the file drawer. | S |
-| 2 | **Briefings instead of handoffs.** The Handoffs page becomes Briefings: the exact text an agent receives (`/api/projects/:id/briefing`), with a copy button and its size in tokens. The text the browser builds itself (`buildHandoffContext`) and its browser-only history go. | A test proves the copied text equals `continuum handoff` for the same repository. | L |
-| 3 | **Create and correct from the dashboard.** Create a task; add a decision or known issue; mark one resolved or still valid. Each is recorded as set by you, through the CSRF-protected write. | Journeys cover each action, and the next briefing shows the change. | L |
-| 4 | **Repository settings in the dashboard.** Agent checks, prompt capture and redaction patterns, with a preview of what a pattern would mask. Unusable patterns are refused. | Saving a bad pattern is refused with its reason; a good one masks the sample. | M |
-| 5 | **Full activity history.** Page back through every event by sequence number, filtered by agent, type and date. Today the feed stops at the newest 200. | A store with 10,000 events can be paged to its first event. | M |
-| 6 | **Decisions on the right task.** `record_decision` attaches to the calling session's task, not the repository's current one, so two agents working at once don't cross. First: does Claude Code tell an MCP server which session is calling? | A test with two parallel sessions keeps each decision on its own task. | M |
+| 1 | **Briefings instead of handoffs.** The Handoffs page becomes Briefings: the exact text an agent receives (`/api/projects/:id/briefing`), with a copy button and its size in tokens. The text the browser builds itself (`buildHandoffContext`) and its browser-only history go. | A test proves the copied text equals `continuum handoff` for the same repository. | L |
+| 2 | **Create and correct from the dashboard.** Create a task; add a decision or known issue; mark one resolved or still valid. Each is recorded as set by you, through the CSRF-protected write. | Journeys cover each action, and the next briefing shows the change. | L |
+| 3 | **Repository settings in the dashboard.** Agent checks, prompt capture and redaction patterns, with a preview of what a pattern would mask. Unusable patterns are refused. | Saving a bad pattern is refused with its reason; a good one masks the sample. | M |
+| 4 | **Full activity history.** Page back through every event by sequence number, filtered by agent, type and date. Today the feed stops at the newest 200. | A store with 10,000 events can be paged to its first event. | M |
+| 5 | **Decisions on the right task.** `record_decision` attaches to the calling session's task, not the repository's current one, so two agents working at once don't cross. First: does Claude Code tell an MCP server which session is calling? | A test with two parallel sessions keeps each decision on its own task. | M |
 
 ### Speed and reach
 
@@ -48,10 +49,9 @@ Order follows what users report.
 
 | # | Item | Done when | Size |
 |---|---|---|---|
-| 7 | **Release hygiene.** Pin GitHub Actions to commit SHAs, publish with npm trusted publishing instead of a long-lived token, sync the plugin repository from the release workflow, add a CSP to the website, and keep one getting-started guide. | A tagged release needs no manual step. | M |
-| 8 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
-| 9 | **Windows.** WSL 2 as the supported path, documented and tested in CI. Native support (Node hooks instead of `sh`) only once people ask. | The release smoke test passes under WSL. | M |
-| 10 | **More agents.** Gemini CLI, Windsurf or JetBrains Junie, in the order users ask. | Each passes `npm run test:cross-agent`. | M each |
+| 6 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
+| 7 | **Windows.** WSL 2 as the supported path, documented and tested in CI. Native support (Node hooks instead of `sh`) only once people ask. | The release smoke test passes under WSL. | M |
+| 8 | **More agents.** Gemini CLI, Windsurf or JetBrains Junie, in the order users ask. | Each passes `npm run test:cross-agent`. | M each |
 
 ### Only once users ask
 
