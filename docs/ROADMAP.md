@@ -1,6 +1,6 @@
 # Continuum roadmap
 
-Status, 4 November 2026. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin; the latest published release of both is 0.2.1. The work marked 0.3.0 below is finished on `main` and waiting for that release. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan is built, and so is the first phase of the November plan: a new user's first hour. [Next](#next) lists the phases still to come.
+Status, 4 November 2026, at the 0.3.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has the first phase of the November plan: a new user's first hour. [Next](#next) lists the phases still to come.
 
 ## Guiding principles
 
@@ -11,7 +11,7 @@ Status, 4 November 2026. Continuum is published on npm as `getcontinuum` and as 
 
 ---
 
-## Built
+## Shipped
 
 | Area | What shipped |
 |---|---|
@@ -25,7 +25,7 @@ Status, 4 November 2026. Continuum is published on npm as `getcontinuum` and as 
 | **First hour** (0.3.0) | The overview lists repositories with recent work, not only those with an open task, and each shows its latest session. Copy on live screens follows the real state, and an end-to-end check fails on demo or prototype wording. Briefings name agents and, with no task, open with the next step the latest note named. A one-line receipt after each Claude Code reply that recorded something. `serve` opens the browser; `setup` ends with the command that does. The project page fits a phone. `doctor --report` for issues. |
 | **Verification** (0.3.0) | Each check shows how many of its covered files changed since it ran, and `Command changed` with the earlier command, in the Verification panel and the file drawer. |
 | **Release automation** | Actions pinned to commit SHAs, npm trusted publishing, the plugin repository updated by the release workflow, a strict Content-Security-Policy on the website, and one getting-started guide. |
-| **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health). The plugin repository accepts private vulnerability reports. |
+| **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health); 0.3.0 (the first hour, clearer verification, the first release run entirely by the workflow). The plugin repository accepts private vulnerability reports. |
 
 ## Next
 
