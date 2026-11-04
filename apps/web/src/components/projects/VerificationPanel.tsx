@@ -4,11 +4,51 @@ import type { VerificationRecord } from '@continuum/core'
 import { useIsLive } from '../../state/dataMode'
 import { Panel } from '../shared/Panel'
 import { EmptyState } from '../shared/States'
-import { EvidenceBadge, VerificationBadge } from '../shared/StatusBadge'
+import { CommandChangedBadge, EvidenceBadge, VerificationBadge } from '../shared/StatusBadge'
+import { coverageSummary } from './checkCoverage'
+
+/** Spells out the earlier command, so it is not only in the badge's tooltip. */
+export function PreviousCommandNote({ command }: { command: string }) {
+  return (
+    <p className="mt-1 text-[11.5px] break-all text-warning">
+      Previously ran <code className="font-mono">{command}</code>; earlier results came from that command.
+    </p>
+  )
+}
+
+function CheckRow({ record, currentRevision }: { record: VerificationRecord; currentRevision?: string }) {
+  const format = useTimeFormat()
+  const coverage = coverageSummary(record)
+
+  return (
+    <li className="rounded-md border border-line p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[13px] font-medium text-fg">{record.name}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {record.previousCommand && <CommandChangedBadge previousCommand={record.previousCommand} />}
+          <VerificationBadge status={record.status} />
+        </div>
+      </div>
+      <code className="mt-1 block font-mono text-[11.5px] break-all text-muted">{record.command}</code>
+      {record.previousCommand && <PreviousCommandNote command={record.previousCommand} />}
+      <p className="mt-2 text-[12.5px] text-muted">{record.detail}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-subtle">
+        <EvidenceBadge type={record.evidenceType} />
+        {record.lastRunAt ? <span>Last run {format(record.lastRunAt)}</span> : <span>No run recorded</span>}
+        {coverage && <span className={coverage.hasChanges ? 'text-warning' : undefined}>{coverage.text}</span>}
+        {record.lastRunRevision && (
+          <span className="font-mono">
+            at {record.lastRunRevision}
+            {currentRevision && record.lastRunRevision !== currentRevision && <span className="text-warning"> (current: {currentRevision})</span>}
+          </span>
+        )}
+      </div>
+    </li>
+  )
+}
 
 export function VerificationPanel({ records, currentRevision }: { records: VerificationRecord[]; currentRevision?: string }) {
   const isLive = useIsLive()
-  const format = useTimeFormat()
 
   return (
     <Panel id="verification" title="Verification" description="Recorded check results, tracked separately from task progress.">
@@ -21,24 +61,7 @@ export function VerificationPanel({ records, currentRevision }: { records: Verif
       ) : (
         <ul className="space-y-2.5">
           {records.map((record) => (
-            <li key={record.id} className="rounded-md border border-line p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[13px] font-medium text-fg">{record.name}</p>
-                <VerificationBadge status={record.status} />
-              </div>
-              <code className="mt-1 block font-mono text-[11.5px] break-all text-muted">{record.command}</code>
-              <p className="mt-2 text-[12.5px] text-muted">{record.detail}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-subtle">
-                <EvidenceBadge type={record.evidenceType} />
-                {record.lastRunAt ? <span>Last run {format(record.lastRunAt)}</span> : <span>No run recorded</span>}
-                {record.lastRunRevision && (
-                  <span className="font-mono">
-                    at {record.lastRunRevision}
-                    {currentRevision && record.lastRunRevision !== currentRevision && <span className="text-warning"> (current: {currentRevision})</span>}
-                  </span>
-                )}
-              </div>
-            </li>
+            <CheckRow key={record.id} record={record} currentRevision={currentRevision} />
           ))}
         </ul>
       )}

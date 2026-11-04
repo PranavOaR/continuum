@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Clearer verification in the dashboard.** Each check in the Verification panel shows how many of the files its latest run covered have changed since ("2 of 38 covered files changed since it ran"). A check whose name now runs a different command is marked **Command changed** and names the earlier command, as briefings already did. A file's drawer lists the checks that covered it, each with its result, when it last ran and whether this file changed since.
+
 ## [0.3.0] - 2026-11-03
 
 ### Changed
