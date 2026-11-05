@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { isInitialized, locateWorkspace, NotAGitRepositoryError, NotInitializedError, readRegistry, type Workspace } from '@continuum/capture'
+import { forgetMissingRepositories, isInitialized, locateWorkspace, NotAGitRepositoryError, NotInitializedError, readRegistry, type Workspace } from '@continuum/capture'
 import { createAccessToken, createChangeFeed, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
 import { basename, resolve } from 'node:path'
 import { BUILD_INFO } from '../build'
@@ -8,6 +8,8 @@ import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 export const SERVE_USAGE = 'Usage: continuum serve [--port <n>] [--no-open] [repository ...]'
 const MAX_PORT = 65_535
+/** Repositories named when saying which are gone; the rest are counted. */
+const MAX_NAMED_MISSING = 3
 
 /** The dashboard shipped next to the release bundle, or the web app built in this checkout (`npm run build`). */
 export const WEB_DIST = BUILD_INFO
@@ -47,16 +49,27 @@ async function namedWorkspaces(io: Io, paths: readonly string[]): Promise<Worksp
   return workspaces
 }
 
+/** One line however many are gone, because a test run or a cleared temp folder can leave many. */
+function missingNote(roots: readonly string[]): string {
+  const names = roots.slice(0, MAX_NAMED_MISSING).map((root) => basename(root)).join(', ')
+  const rest = roots.length - MAX_NAMED_MISSING
+  const listed = rest > 0 ? `${names} and ${rest} more` : names
+  const subject = roots.length === 1 ? 'a repository whose folder is gone' : `${roots.length} repositories whose folders are gone`
+  return `continuum: stopped listing ${subject}: ${listed}. If you moved one, run \`continuum setup <agent>\` in its new location.`
+}
+
 /**
  * With no arguments: every repository connected with `continuum setup`, plus
- * the one you are in. Registered repositories that were moved, deleted or
- * uninstalled are skipped with a note.
+ * the one you are in. Repositories whose folder is gone stop being listed;
+ * ones still there but uninstalled are skipped with a note.
  */
 async function everyConnectedWorkspace(io: Io): Promise<Workspace[]> {
   const here = await locateWorkspace(io.cwd).catch((error: unknown) => {
     if (error instanceof NotAGitRepositoryError) return null
     throw error
   })
+  const missing = await forgetMissingRepositories(io.configDir)
+  if (missing.length > 0) io.err(missingNote(missing))
   const registered = await Promise.all(
     (await readRegistry(io.configDir)).map(async ({ root }) => {
       const workspace = await locateWorkspace(root).catch(() => null)

@@ -1,6 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
+import { readRegistry, registerRepository } from '@continuum/capture'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RESTART_EXIT, serveCommand, type ServeOptions } from '../commands/serve'
@@ -127,20 +128,74 @@ describe('continuum serve with no arguments', () => {
     }
   })
 
-  it('skips a registered repository that was deleted, with a note', async () => {
+  it('stops listing repositories whose folders are gone, saying so once in one line', async () => {
     const configDir = mkdtempSync(join(tmpdir(), 'continuum-registry-'))
     dirs.push(configDir)
     const kept = sandbox({ 'a.ts': 'a' })
-    const gone = createSandbox({ 'b.ts': 'b' })
+    const gone = [createSandbox({ 'b.ts': 'b' }), createSandbox({ 'c.ts': 'c' })]
     await cli(kept.root, ['setup', 'claude-code'], { configDir })
-    await cli(gone.root, ['setup', 'claude-code'], { configDir })
-    gone.cleanup()
+    for (const repo of gone) await cli(repo.root, ['setup', 'claude-code'], { configDir })
+    for (const repo of gone) repo.cleanup()
+
+    const first = await serving(kept.root, ['--port', '0'], join(tmpdir(), 'continuum-no-such-dist'), configDir)
+    await first.stop()
+    const notes = first.lines.filter((line) => line.includes('folders are gone'))
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toContain(basename(gone[0].root))
+    expect(first.lines.filter((line) => line.includes('serving'))).toHaveLength(1)
+    expect((await readRegistry(configDir)).map((entry) => entry.root)).toEqual([realpathSync(kept.root)])
+
+    const second = await serving(kept.root, ['--port', '0'], join(tmpdir(), 'continuum-no-such-dist'), configDir)
+    await second.stop()
+    expect(second.lines.join('\n')).not.toContain('gone')
+  })
+
+  it('names at most three missing repositories', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'continuum-registry-'))
+    dirs.push(configDir)
+    const kept = sandbox({ 'a.ts': 'a' })
+    await cli(kept.root, ['setup', 'claude-code'], { configDir })
+    const missing = ['one', 'two', 'three', 'four', 'five'].map((name) => join(tmpdir(), `continuum-missing-${name}`))
+    for (const root of missing) await registerRepository(configDir, root, new Date())
+
     const server = await serving(kept.root, ['--port', '0'], join(tmpdir(), 'continuum-no-such-dist'), configDir)
+    await server.stop()
+
+    const note = server.lines.find((line) => line.includes('folders are gone'))
+    expect(note).toContain('5 repositories')
+    expect(note).toContain('and 2 more')
+    expect(note).not.toContain('continuum-missing-four')
+  })
+
+  it('keeps a repository whose folder is there but no longer set up, with a note', async () => {
+    const configDir = mkdtempSync(join(tmpdir(), 'continuum-registry-'))
+    dirs.push(configDir)
+    const kept = sandbox({ 'a.ts': 'a' })
+    const uninstalled = sandbox({ 'b.ts': 'b' })
+    await cli(kept.root, ['setup', 'claude-code'], { configDir })
+    await cli(uninstalled.root, ['setup', 'claude-code'], { configDir })
+    rmSync(join(uninstalled.root, '.continuum'), { recursive: true, force: true })
+
+    const server = await serving(kept.root, ['--port', '0'], join(tmpdir(), 'continuum-no-such-dist'), configDir)
+    await server.stop()
+
+    expect(server.lines.join('\n')).toContain('no longer set up')
+    expect(await readRegistry(configDir)).toHaveLength(2)
+  })
+
+  it('says another serve is the likely cause when the port is taken', async () => {
+    const [first, second] = [sandbox({ 'a.ts': 'a' }), sandbox({ 'b.ts': 'b' })]
+    await cli(first.root, ['init'])
+    await cli(second.root, ['init'])
+    const running = await serving(first.root, ['--port', '0', '.'], join(tmpdir(), 'continuum-no-such-dist'))
+    const port = /127\.0\.0\.1:(\d+)/.exec(running.lines.join('\n'))?.[1] as string
     try {
-      expect(server.lines.join('\n')).toContain(`skipping ${gone.root}: no longer set up`)
-      expect(server.lines.filter((line) => line.includes('serving'))).toHaveLength(1)
+      const { code, err } = await cli(second.root, ['serve', '--port', port, '--no-open', '.'])
+      expect(code).not.toBe(0)
+      expect(err).toContain('another `continuum serve`')
+      expect(err).toContain('--port')
     } finally {
-      await server.stop()
+      await running.stop()
     }
   })
 })
