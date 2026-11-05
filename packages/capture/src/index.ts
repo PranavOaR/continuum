@@ -8,7 +8,7 @@ export { MAX_EXCERPT_LINES, MAX_PATCH_LINES, uncommittedChanges, type Uncommitte
 export { CONFIG_FILE, DEFAULT_CONFIG, InvalidConfigError, readConfig, repositoryRedactor, updateConfig, type ContinuumConfig } from './config'
 export { commitsSince, MAX_COMMITS_PER_SCAN, recordedHead, type CommitInfo } from './commits'
 export { IGNORE_FILE, loadContinuumIgnore, UnreadableIgnoreFileError, type IgnorePredicate } from './continuumIgnore'
-export { defaultConfigDir, readRegistry, registerRepository, REGISTRY_FILE, unregisterRepository, type RegisteredRepository } from './registry'
+export { defaultConfigDir, forgetMissingRepositories, readRegistry, registerRepository, REGISTRY_FILE, unregisterRepository, type RegisteredRepository } from './registry'
 export { ACTIVE_SESSION_FILE, claimActiveSession, clearActiveSession, readActiveSession, type ActiveSession } from './activeSession'
 export { extractSymbols, parseSymbolRef, type SourceSymbol, type SymbolKind } from './symbols'
 export { readSymbolHashes, readWorkingTreeWithSymbols } from './symbolHashes'

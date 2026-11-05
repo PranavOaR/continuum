@@ -395,7 +395,7 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
 
 export class PortInUseError extends Error {
   constructor(port: number) {
-    super(`Port ${port} is already in use. Stop the other process or pass --port <n>.`)
+    super(`Port ${port} is already in use, probably by another \`continuum serve\`. Use the dashboard it opened, stop it, or pass --port <n>.`)
     this.name = 'PortInUseError'
   }
 }

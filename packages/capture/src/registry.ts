@@ -65,6 +65,17 @@ export async function registerRepository(configDir: string, repository: string, 
   await writeRegistry(configDir, [...repositories, { root, addedAt: at.toISOString() }])
 }
 
+/**
+ * Drops repositories whose folder is gone and returns their roots. Only the
+ * listing goes: a repository's records live inside it, and `setup` lists it again.
+ */
+export async function forgetMissingRepositories(configDir: string): Promise<string[]> {
+  const repositories = await readRegistry(configDir)
+  const missing = repositories.filter((entry) => !existsSync(entry.root))
+  if (missing.length > 0) await writeRegistry(configDir, repositories.filter((entry) => !missing.includes(entry)))
+  return missing.map((entry) => entry.root)
+}
+
 export async function unregisterRepository(configDir: string, repository: string): Promise<boolean> {
   const root = canonical(repository)
   const repositories = await readRegistry(configDir)

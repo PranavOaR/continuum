@@ -74,6 +74,8 @@ function hook(root: string, payload: Record<string, unknown>): string {
 }
 
 const root = mkdtempSync(join(tmpdir(), 'continuum-bench-hooks-'))
+// Setup registers the repository; a benchmark must not add it to your real list.
+const configDir = mkdtempSync(join(tmpdir(), 'continuum-bench-config-'))
 const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=bench', '-c', 'user.email=bench@example.invalid', ...args], { cwd: root, stdio: 'ignore' })
 try {
   git('init', '-q')
@@ -83,7 +85,7 @@ try {
   }
   git('add', '-A')
   git('commit', '-qm', 'bench')
-  execFileSync(process.execPath, [BUNDLE, 'setup', 'claude-code'], { cwd: root, stdio: 'ignore' })
+  execFileSync(process.execPath, [BUNDLE, 'setup', 'claude-code'], { cwd: root, stdio: 'ignore', env: { ...process.env, CONTINUUM_CONFIG_DIR: configDir } })
 
   const writer = ContextStore.open(join(root, '.continuum/context.db'))
   for (let start = 0; start < EVENTS; start += BATCH) writer.recordAll(Array.from({ length: Math.min(BATCH, EVENTS - start) }, (_, offset) => eventAt(start + offset)))
@@ -138,4 +140,5 @@ try {
   console.log(JSON.stringify(results, null, 2))
 } finally {
   rmSync(root, { recursive: true, force: true, maxRetries: 5 })
+  rmSync(configDir, { recursive: true, force: true })
 }
