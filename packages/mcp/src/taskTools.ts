@@ -187,7 +187,7 @@ function describe(snapshot: Snapshot): string {
 type Run = (work: (store: ContextStore, redact: Redact) => Promise<string> | string) => Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }>
 
 /** Lets an agent record what it is working on, so the next session (or agent) continues the same task. */
-export function registerTaskTools(server: McpServer, run: Run, now: () => Date, sessionId?: string): void {
+export function registerTaskTools(server: McpServer, run: Run, now: () => Date, sessionOf: (extra: { _meta?: Record<string, unknown> }) => string | undefined): void {
   server.registerTool(
     'start_task',
     {
@@ -197,9 +197,9 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date, 
       inputSchema: startTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (input) =>
+    async (input, extra) =>
       run((store, redact) => {
-        const { snapshot, isResumed } = startTask(store, input, now(), redact, sessionId)
+        const { snapshot, isResumed } = startTask(store, input, now(), redact, sessionOf(extra))
         return `${isResumed ? `Resumed the open task "${snapshot.title}" instead of starting a duplicate.` : 'Started.'} ${describe(snapshot)}`
       }),
   )
@@ -212,6 +212,6 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date, 
       inputSchema: updateTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (input) => run((store, redact) => `Updated. ${describe(updateTask(store, input, now(), redact, sessionId))}`),
+    async (input, extra) => run((store, redact) => `Updated. ${describe(updateTask(store, input, now(), redact, sessionOf(extra)))}`),
   )
 }

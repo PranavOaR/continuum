@@ -68,8 +68,11 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
   switch (payload.hook_event_name) {
     case 'SessionStart': {
       const isFresh = payload.source === undefined || FRESH_SESSION_SOURCES.has(payload.source)
-      // A session back after its end runs again; one that compacts never stopped.
-      if (!isFresh && context.knownSession) return context.endedSession ? [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent, resumed: true } }] : []
+      if (!isFresh && context.knownSession) {
+        // A resume is recorded even with no end on file: the run before it may have crashed, or its end may still be on the way. One that compacts never stopped.
+        const isBack = payload.source === 'resume' || context.endedSession
+        return isBack ? [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent, resumed: true } }] : []
+      }
       const task = context.taskId ? { taskId: context.taskId } : {}
       return [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent, ...task } }]
     }

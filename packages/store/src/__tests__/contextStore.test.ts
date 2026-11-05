@@ -1,3 +1,4 @@
+import type { ContinuumEvent } from '@continuum/core'
 import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -95,6 +96,32 @@ describe('ContextStore projection', () => {
 
     expect(store.graph.get('session:s1')?.props).toMatchObject({ startedAt, endedAt: null, taskId: 'chosen', tookUpTaskId: 'chosen', lastActivityAt: '2026-10-16T13:00:00.000Z' })
     store.close()
+  })
+
+  describe('an end that arrives after a resume', () => {
+    const at = (minute: number) => `2026-10-16T12:${String(minute).padStart(2, '0')}:00.000Z`
+    const resumed = (minute: number): ContinuumEvent => ({ type: 'session.started', payload: { sessionId: 's1', agent: 'claude-code', resumed: true }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: at(minute) })
+    const ended = (minute: number): ContinuumEvent => ({ ...ev.sessionEnd('s1', 'done'), occurredAt: at(minute) })
+
+    it('is ignored when it is older than the resume: it belongs to the earlier run', () => {
+      const store = ContextStore.open(':memory:')
+      store.record({ ...ev.sessionStart('s1'), occurredAt: at(0) })
+      store.record(resumed(10))
+      store.record(ended(9))
+
+      expect(store.graph.get('session:s1')?.props.endedAt).toBeNull()
+      store.close()
+    })
+
+    it('counts when it is newer: the resumed run has ended', () => {
+      const store = ContextStore.open(':memory:')
+      store.record({ ...ev.sessionStart('s1'), occurredAt: at(0) })
+      store.record(resumed(10))
+      store.record(ended(11))
+
+      expect(store.graph.get('session:s1')?.props.endedAt).toBe(at(11))
+      store.close()
+    })
   })
 
   it('creates the session when progress arrives first', () => {

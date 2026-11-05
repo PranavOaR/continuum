@@ -5,7 +5,7 @@ import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { currentTaskId, QUIET_SESSION_MS } from '@continuum/context'
 import type { ContinuumEvent } from '@continuum/core'
 import { afterEach, describe, expect, it } from 'vitest'
-import { callingSessionId, createContinuumServer } from '../server'
+import { callingSessionId, createContinuumServer, sessionOfCall } from '../server'
 
 const sandboxes: Sandbox[] = []
 const clients: Client[] = []
@@ -30,14 +30,14 @@ async function repository(sessionIds: readonly string[] = []) {
 }
 
 /** One agent's own connection: Claude Code runs a separate MCP server per session. */
-async function connect(repo: Sandbox, sessionId?: string) {
+async function connect(repo: Sandbox, sessionId?: string, callMeta?: () => Record<string, unknown>) {
   const server = createContinuumServer({ cwd: repo.root, version: 'test', now, ...(sessionId ? { sessionId } : {}) })
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
   const client = new Client({ name: 'test', version: '0' })
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
   clients.push(client)
   const reply = async (name: string, args: Record<string, unknown>, isRefused: boolean) => {
-    const result = await client.callTool({ name, arguments: args })
+    const result = await client.callTool({ name, arguments: args, ...(callMeta ? { _meta: callMeta() } : {}) })
     expect(result.isError === true).toBe(isRefused)
     return (result.content as { text: string }[])[0].text
   }
@@ -341,6 +341,57 @@ describe('starting a task leaves running sessions alone', () => {
   })
 })
 
+describe('Codex, which names its session on each call', () => {
+  const asCodex = (session_id: string) => () => ({ 'x-codex-turn-metadata': { session_id, thread_id: session_id }, threadId: session_id })
+
+  it('acts on the task of the session each call names, even through one server', async () => {
+    const repo = await repository(['one', 'two'])
+    let caller = 'one'
+    const shared = await connect(repo, undefined, () => asCodex(caller)())
+    const firstTask = taskIdOf(await shared('start_task', { title: 'Add sign-in' }))
+    caller = 'two'
+    const secondTask = taskIdOf(await shared('start_task', { title: 'Fix billing' }))
+
+    caller = 'one'
+    await shared('record_decision', { title: 'Use OAuth' })
+    await shared('update_task', { status: 'completed' })
+
+    expect((await decisionsByTask(repo))['Use OAuth']).toBe(firstTask)
+    expect(await statusOf(repo, firstTask)).toBe('completed')
+    expect(await statusOf(repo, secondTask)).toBe('in-progress')
+  })
+
+  it('ranks context for the session the call names', async () => {
+    const repo = await repository(['one', 'two'])
+    const [first, second] = [await connect(repo, undefined, asCodex('one')), await connect(repo, undefined, asCodex('two'))]
+    await first('start_task', { title: 'Add sign-in' })
+    await second('start_task', { title: 'Fix billing' })
+
+    expect(await first('get_context', {})).toContain('Task "Add sign-in"')
+  })
+
+  it('is kept off a task another running session took up', async () => {
+    const repo = await repository(['claude'])
+    const claude = await connect(repo, 'claude')
+    const task = taskIdOf(await claude('start_task', { title: 'Add sign-in' }))
+    await sessionStarts(repo, 'codex')
+    const codex = await connect(repo, undefined, asCodex('codex'))
+
+    await codex.refused('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('in-progress')
+  })
+
+  it('links its own session in the same write as the task', async () => {
+    const repo = await repository(['codex'])
+    const codex = await connect(repo, undefined, asCodex('codex'))
+
+    const task = taskIdOf(await codex('start_task', { title: 'Add sign-in' }))
+
+    expect((await recorded(repo)).filter((event) => event.type === 'session.task')).toMatchObject([{ source: 'mcp', payload: { sessionId: 'codex', taskId: task } }])
+  })
+})
+
 describe('a caller Continuum cannot place', () => {
   it('joins the current task until the session starts its own, as a briefing asks it to', async () => {
     const repo = await repository(['one', 'two'])
@@ -398,6 +449,21 @@ describe('a caller Continuum cannot place', () => {
     const events = await recorded(repo)
     expect(events.filter((event) => event.type === 'session.task')).toEqual([])
     expect((await decisionsByTask(repo))['A note']).toBe(task)
+  })
+})
+
+describe('sessionOfCall', () => {
+  const named = (session_id: unknown) => ({ 'x-codex-turn-metadata': { session_id } })
+
+  it('prefers the session the call names over the one the server started with', () => {
+    expect(sessionOfCall(named(' abc-123 '), 'from-env')).toBe('abc-123')
+  })
+
+  it('falls back when the undocumented field is missing or has changed shape', () => {
+    for (const meta of [undefined, {}, named(''), named('  '), named(7), { 'x-codex-turn-metadata': 'abc' }, { 'x-codex-turn-metadata': null }]) {
+      expect(sessionOfCall(meta, 'from-env')).toBe('from-env')
+      expect(sessionOfCall(meta)).toBeUndefined()
+    }
   })
 })
 

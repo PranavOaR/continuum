@@ -64,7 +64,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const { sessionId, agent, taskId, resumed } = event.payload
       const session = keys.session(sessionId)
       if (resumed) {
-        store.upsertNode(session, { hash: hashRecord('session', event.payload), props: { agent, endedAt: null, lastActivityAt: at }, at })
+        store.upsertNode(session, { hash: hashRecord('session', event.payload), props: { agent, endedAt: null, resumedAt: at, lastActivityAt: at }, at })
         return
       }
       store.upsertNode(session, { hash: hashRecord('session', event.payload), props: { agent, startedAt: at, taskId }, at })
@@ -106,6 +106,9 @@ export function project(store: Mutations, event: ContinuumEvent): void {
     case 'session.ended': {
       const session = keys.session(event.payload.sessionId)
       ensure(store, session, at)
+      // An end older than the latest resume is the earlier run's, arriving late.
+      const resumedAt = store.getNode(session)?.props.resumedAt
+      if (typeof resumedAt === 'string' && at < resumedAt) return
       store.upsertNode(session, { hash: hashRecord('session-end', event.payload), props: { endedAt: at, summary: event.payload.summary }, at })
       return
     }
