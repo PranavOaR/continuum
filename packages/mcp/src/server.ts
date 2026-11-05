@@ -180,7 +180,8 @@ export function createContinuumServer(options: ServerOptions): McpServer {
     async () =>
       guarded(() =>
         withStore(options.cwd, async (store, root) => {
-          const state = await currentState(store, root, now())
+          // Records you resolved stay out of everything an agent is told.
+          const { resolvedDecisions: _resolved, ...state } = await currentState(store, root, now())
           const unrecorded = state.files.unrecorded
           const bounded = {
             ...state,

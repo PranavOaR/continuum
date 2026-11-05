@@ -58,9 +58,9 @@ function toUiNode(snapshot: RepoSnapshot, node: GraphNode): UiNode | null {
         id: node.key,
         type: 'decision',
         label: text(node.props.title) ?? name,
-        subtitle: text(node.props.kind) ?? 'decision',
+        subtitle: node.props.review === 'resolved' ? 'resolved' : (text(node.props.kind) ?? 'decision'),
         description: text(node.props.body) ?? '',
-        evidenceType: 'agent-reported',
+        evidenceType: text(node.props.evidence) === 'user-reported' ? 'user-reported' : 'agent-reported',
       }
     case 'task':
       return {
@@ -70,7 +70,7 @@ function toUiNode(snapshot: RepoSnapshot, node: GraphNode): UiNode | null {
         label: text(node.props.title) ?? name,
         subtitle: text(node.props.status) ?? 'task',
         description: text(node.props.objective) ?? '',
-        evidenceType: 'agent-reported',
+        evidenceType: Array.isArray(node.props.userEdited) && node.props.userEdited.includes('created') ? 'user-reported' : 'agent-reported',
       }
     default:
       return null

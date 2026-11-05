@@ -156,6 +156,8 @@ function searchAll(query: string): SearchResult[] {
   return [...projects, ...tasks, ...files, ...activity].slice(0, SEARCH_RESULT_LIMIT)
 }
 
+const readOnly = () => Promise.reject<never>(new Error('The demo is read-only. Run `continuum serve` to edit your own projects.'))
+
 function sortedActivity(): ActivityEvent[] {
   return [...MOCK_ACTIVITY].sort(byNewest((event) => event.timestamp))
 }
@@ -198,9 +200,10 @@ export const mockContinuumService: ContinuumService = {
   search(query) {
     return respond(searchAll(query))
   },
-  updateTask() {
-    return Promise.reject(new Error('The demo is read-only. Run `continuum serve` to edit your own tasks.'))
-  },
+  updateTask: readOnly,
+  createTask: readOnly,
+  addMemory: readOnly,
+  reviewMemory: readOnly,
   getBriefing(projectId) {
     try {
       const { project, tasks } = buildWorkspace(projectId)

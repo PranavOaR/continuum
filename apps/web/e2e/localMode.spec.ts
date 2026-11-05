@@ -58,6 +58,7 @@ test.beforeAll(async () => {
     arguments: { title: 'Load config from env', objective: 'The app reads its config from the environment', acceptance_criteria: ['Reads APP_PORT'], steps: ['Parse env', 'Validate'] },
   })
   await mcp.callTool({ name: 'update_task', arguments: { completed_steps: ['Parse env'], next_action: 'Validate the parsed values' } })
+  await mcp.callTool({ name: 'record_decision', arguments: { title: 'Config comes from the environment', kind: 'decision', files: ['package.json'] } })
   await mcp.close()
   hook({ hook_event_name: 'SessionStart', source: 'startup' })
   write('src/app.ts', 'export const app = 2\n')
@@ -247,6 +248,99 @@ test('edits a task from the dashboard and records it as set by you', async ({ pa
   expect(handoff).toContain('[set by you] Changed in the dashboard: status, steps done')
 })
 
+const projectPage = () => `${url}/app/projects/${(repo.split('/').at(-1) as string).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+
+test('creates a task from the dashboard, and the next briefing leads with it', async ({ page }) => {
+  await page.goto(projectPage())
+  await page.getByRole('button', { name: 'New task' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New task' })
+  await dialog.getByLabel('Title').fill('Prepare the release')
+  await dialog.getByLabel('Objective').fill('Everything is ready to tag')
+  await dialog.getByLabel('Next action').fill('Update the changelog')
+  await dialog.getByRole('button', { name: 'Create task' }).click()
+
+  await expect(dialog).toBeHidden()
+  const panel = page.locator('#task')
+  await expect(panel.getByRole('heading', { name: 'Prepare the release' })).toBeVisible()
+  await expect(panel.getByText('Set by you').first()).toBeVisible()
+
+  const handoff = continuum(['handoff'])
+  expect(handoff).toContain('[set by you] "Prepare the release" (in-progress)')
+  expect(handoff).toContain('Next action: "Update the changelog"')
+})
+
+test('plans a task for later, and the briefing lists it without making it current', async ({ page }) => {
+  await page.goto(projectPage())
+  await page.getByRole('button', { name: 'New task' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New task' })
+  await dialog.getByLabel('Title').fill('Write the upgrade guide')
+  await dialog.getByLabel('When').selectOption('later')
+  await dialog.getByRole('button', { name: 'Create task' }).click()
+  await expect(dialog).toBeHidden()
+
+  const handoff = continuum(['handoff'])
+  expect(handoff).toContain('[set by you] "Prepare the release" (in-progress)')
+  expect(handoff).toContain('## Planned by you\n- "Write the upgrade guide"')
+})
+
+test('refuses a task that is already open, and keeps what was typed', async ({ page, consoleErrors }) => {
+  await page.goto(projectPage())
+  await page.getByRole('button', { name: 'New task' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New task' })
+  await dialog.getByLabel('Title').fill('prepare the RELEASE')
+  await dialog.getByRole('button', { name: 'Create task' }).click()
+  await expect(page.getByText('"prepare the RELEASE" is already an open task.')).toBeVisible()
+  await expect(dialog.getByLabel('Title')).toHaveValue('prepare the RELEASE')
+  // The refused request is the point of this test: the browser logs every 400.
+  expect(consoleErrors.splice(0)).toEqual(['Failed to load resource: the server responded with a status of 400 (Bad Request)'])
+})
+
+test('adds a decision and a known issue, and both reach the next briefing as yours', async ({ page }) => {
+  await page.goto(projectPage())
+  const panel = page.locator('#memory')
+  await panel.getByRole('button', { name: 'Add a decision or issue' }).click()
+  await panel.getByLabel('Title').fill('Releases go out on Tuesdays')
+  await panel.getByLabel('Details').fill('Support is fully staffed then.')
+  await panel.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(panel.getByText('Releases go out on Tuesdays')).toBeVisible()
+
+  await panel.getByRole('button', { name: 'Add a decision or issue' }).click()
+  await panel.getByLabel('Kind').selectOption('known-issue')
+  await panel.getByLabel('Title').fill('The tag script needs a clean tree')
+  await panel.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(panel.getByText('The tag script needs a clean tree')).toBeVisible()
+
+  const handoff = continuum(['handoff'])
+  expect(handoff).toContain('- [set by you] Decision: Releases go out on Tuesdays. Support is fully staffed then.')
+  expect(handoff).toContain('- [set by you] Known issue: The tag script needs a clean tree.')
+})
+
+test('a resolved record leaves the briefing, and reopening brings it back', async ({ page }) => {
+  await page.goto(projectPage())
+  const panel = page.locator('#memory')
+  await panel.getByRole('button', { name: 'Mark "The tag script needs a clean tree" as resolved' }).click()
+  await expect(panel.getByRole('button', { name: 'Reopen "The tag script needs a clean tree"' })).toBeVisible()
+  expect(continuum(['handoff'])).not.toContain('The tag script needs a clean tree')
+
+  await panel.getByRole('button', { name: 'Reopen "The tag script needs a clean tree"' }).click()
+  await expect(panel.getByRole('button', { name: 'Mark "The tag script needs a clean tree" as resolved' })).toBeVisible()
+  expect(continuum(['handoff'])).toContain('The tag script needs a clean tree')
+})
+
+test('saying a stale record is still valid clears its warning from the briefing', async ({ page }) => {
+  write('package.json', '{"name":"e2e-app","version":"2.0.0"}\n')
+  expect(continuum(['handoff'])).toContain('(anchored code changed since: `package.json`)')
+
+  await page.goto(projectPage())
+  await page.locator('#task').getByRole('button', { name: 'Load config from env' }).click()
+  await page.locator('#memory').getByRole('button', { name: 'Mark "Config comes from the environment" as still valid' }).click()
+  await expect(page.locator('#memory').getByText('You confirmed this still holds.')).toBeVisible()
+
+  const handoff = continuum(['handoff'])
+  expect(handoff).toContain('Config comes from the environment. (you confirmed it still holds)')
+  expect(handoff).not.toContain('anchored code changed')
+})
+
 test('a project without tasks still has a briefing to copy', async ({ page }) => {
   const name = emptyRepo.split('/').at(-1) as string
   await page.goto(`${url}/app/projects/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
@@ -271,6 +365,24 @@ test('a new project shows a getting-started checklist that ticks itself off live
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Where we left off' })).toBeVisible()
   await expect(page.locator('#getting-started')).toHaveCount(0)
+})
+
+test('the forms for adding to a project have no serious or critical axe violations', async ({ page }) => {
+  const { default: AxeBuilder } = await import('@axe-core/playwright')
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const serious = async () => {
+    const { violations } = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+    return violations
+      .filter((item) => item.impact === 'serious' || item.impact === 'critical')
+      .flatMap((item) => item.nodes.map((node) => `${item.id}: ${node.html.slice(0, 90)} [${node.any.map((check) => check.message).join('; ').slice(0, 110)}]`))
+  }
+  await page.goto(projectPage())
+  await page.getByRole('button', { name: 'Add a decision or issue' }).click()
+  await expect(page.locator('#memory').getByLabel('Title')).toBeFocused()
+  expect(await serious()).toEqual([])
+  await page.getByRole('button', { name: 'New task' }).click()
+  await expect(page.getByRole('dialog', { name: 'New task' }).getByLabel('Title')).toBeFocused()
+  expect(await serious()).toEqual([])
 })
 
 test.describe('accessibility of live screens', () => {

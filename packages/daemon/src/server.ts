@@ -5,8 +5,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
 import { pipeline } from 'node:stream'
-import { NotFoundError, type ContinuumService, type TaskChange } from '@continuum/core'
-import { InvalidTaskChangeError } from '@continuum/context'
+import { NotFoundError, type ContinuumService, type MemoryReview, type NewMemory, type NewTask, type TaskChange } from '@continuum/core'
+import { InvalidMemoryError, InvalidTaskChangeError } from '@continuum/context'
 import type { ChangeFeed } from './changeFeed'
 import { ProjectUnavailableError } from './localService'
 
@@ -18,9 +18,8 @@ const TOKEN_PARAM = 'token'
 const EVENTS_PATH = '/api/events'
 /** Header carrying the per-run CSRF token on writes from the dashboard. */
 export const CSRF_HEADER = 'x-continuum-csrf'
-/** Task edits are a few hundred bytes; anything bigger is refused unread. */
+/** The longest write is a record's text; anything bigger than it can be is refused unread. */
 const MAX_BODY_BYTES = 16 * 1024
-const TASK_ROUTE = /^\/api\/projects\/(?<project>[^/]+)\/tasks\/(?<task>[^/]+)$/
 /** A comment line now and then keeps idle connections (and proxies) from timing out. */
 const HEARTBEAT_MS = 25_000
 
@@ -261,25 +260,77 @@ function parseTaskChange(body: unknown): TaskChange | null {
   }
 }
 
-/** POST /api/projects/:id/tasks/:taskId with one TaskChange: the dashboard's only write. */
-async function handleTaskEdit(service: ContinuumService, url: URL, request: IncomingMessage, response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
-  const match = TASK_ROUTE.exec(url.pathname)
-  const projectId = match?.groups ? safeDecode(match.groups.project) : null
-  const taskId = match?.groups ? safeDecode(match.groups.task) : null
-  if (!projectId || !taskId) return fail(response, 404, 'not-found', `No API route ${url.pathname}`)
-  let change: TaskChange | null
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+const isOptionalText = (value: unknown): value is string | undefined => value === undefined || typeof value === 'string'
+const ADDABLE_KINDS = new Set(['decision', 'known-issue'])
+
+/** Only the known fields go on; lengths are checked with the rest of the rules, in @continuum/context. */
+function parseNewTask(body: unknown): NewTask | null {
+  if (!isObject(body) || typeof body.title !== 'string' || typeof body.start !== 'boolean') return null
+  const { title, start, objective, nextAction } = body
+  if (!isOptionalText(objective) || !isOptionalText(nextAction)) return null
+  return { title, start, ...(objective === undefined ? {} : { objective }), ...(nextAction === undefined ? {} : { nextAction }) }
+}
+
+function parseNewMemory(body: unknown): NewMemory | null {
+  if (!isObject(body) || typeof body.title !== 'string' || typeof body.kind !== 'string' || !ADDABLE_KINDS.has(body.kind)) return null
+  const { title, kind, body: text, taskId } = body
+  if (!isOptionalText(text) || !isOptionalText(taskId)) return null
+  return { title, kind: kind as NewMemory['kind'], ...(text === undefined ? {} : { body: text }), ...(taskId === undefined ? {} : { taskId }) }
+}
+
+function parseReview(body: unknown): MemoryReview | null {
+  return isObject(body) && (body.verdict === 'resolved' || body.verdict === 'still-valid') ? body.verdict : null
+}
+
+interface Write {
+  route: RegExp
+  /** Null when the body is not what this write accepts. */
+  run: (service: ContinuumService, params: Record<string, string>, body: unknown) => Promise<unknown> | null
+}
+
+function write<T>(route: RegExp, parse: (body: unknown) => T | null, run: (service: ContinuumService, params: Record<string, string>, input: T) => Promise<unknown>): Write {
+  return {
+    route,
+    run: (service, params, body) => {
+      const input = parse(body)
+      return input === null ? null : run(service, params, input)
+    },
+  }
+}
+
+/** Everything the dashboard can write. All of it goes through the same access, origin and CSRF checks. */
+const WRITES: readonly Write[] = [
+  write(/^\/api\/projects\/(?<project>[^/]+)\/tasks$/, parseNewTask, (service, { project }, input) => service.createTask(project, input)),
+  write(/^\/api\/projects\/(?<project>[^/]+)\/tasks\/(?<task>[^/]+)$/, parseTaskChange, (service, { project, task }, input) => service.updateTask(project, task, input)),
+  write(/^\/api\/projects\/(?<project>[^/]+)\/memory$/, parseNewMemory, (service, { project }, input) => service.addMemory(project, input)),
+  write(/^\/api\/projects\/(?<project>[^/]+)\/memory\/(?<memory>[^/]+)\/review$/, parseReview, (service, { project, memory }, input) => service.reviewMemory(project, memory, input)),
+]
+
+async function handleWrite(service: ContinuumService, url: URL, request: IncomingMessage, response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
+  const target = WRITES.find(({ route }) => route.test(url.pathname))
+  const match = target?.route.exec(url.pathname)
+  if (!target || !match?.groups) return fail(response, 404, 'not-found', `No API route ${url.pathname}`)
+  const params: Record<string, string> = {}
+  for (const [key, raw] of Object.entries(match.groups)) {
+    const decoded = safeDecode(raw)
+    if (decoded === null) return fail(response, 400, 'bad-request', 'Malformed path.')
+    params[key] = decoded
+  }
+  let body: unknown
   try {
-    change = parseTaskChange(await readJsonBody(request))
+    body = await readJsonBody(request)
   } catch (error) {
     if (error instanceof BodyError) return fail(response, error.status, 'bad-request', error.message)
     throw error
   }
-  if (!change) return fail(response, 400, 'bad-request', 'Unrecognized task change.')
   try {
-    return send(response, 200, { data: await service.updateTask(projectId, taskId, change) })
+    const result = target.run(service, params, body)
+    if (result === null) return fail(response, 400, 'bad-request', 'Unrecognized change.')
+    return send(response, 200, { data: await result })
   } catch (error) {
     if (error instanceof NotFoundError) return fail(response, 404, 'not-found', error.message)
-    if (error instanceof InvalidTaskChangeError) return fail(response, 400, 'bad-request', error.message)
+    if (error instanceof InvalidTaskChangeError || error instanceof InvalidMemoryError) return fail(response, 400, 'bad-request', error.message)
     if (error instanceof ProjectUnavailableError) return fail(response, 503, 'unavailable', error.message)
     onError?.(error)
     return fail(response, 500, 'internal', 'Continuum could not record the change. See the terminal running `continuum serve` for details.')
@@ -318,8 +369,8 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
     void (async () => {
       if (!isTrustedRequest(request, port())) return fail(response, 403, 'forbidden', 'Requests must come from the Continuum dashboard on this machine.')
       const url = new URL(request.url ?? '/', `http://${LOOPBACK}`)
-      const isWrite = request.method === 'POST' && TASK_ROUTE.test(url.pathname)
-      if (request.method !== 'GET' && request.method !== 'HEAD' && !isWrite) return fail(response, 405, 'method-not-allowed', 'Only task edits can be written; everything else is read-only.')
+      const isWrite = request.method === 'POST' && WRITES.some(({ route }) => route.test(url.pathname))
+      if (request.method !== 'GET' && request.method !== 'HEAD' && !isWrite) return fail(response, 405, 'method-not-allowed', 'Only tasks and memory records can be written; everything else is read-only.')
       const isApi = url.pathname === '/api' || url.pathname.startsWith('/api/')
       const access = authorize(request, response, url, options.token, port())
       if (access === 'redirected') return
@@ -328,7 +379,7 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
         // A browser write must name its origin (checked above) and carry the page's CSRF token.
         const csrfOk = access === 'bearer' || (request.headers.origin !== undefined && sameSecret(String(request.headers[CSRF_HEADER] ?? ''), csrfToken))
         if (!csrfOk) return fail(response, 403, 'forbidden', 'Edits must come from the dashboard page itself.')
-        return handleTaskEdit(options.service, url, request, response, options.onError)
+        return handleWrite(options.service, url, request, response, options.onError)
       }
       if (url.pathname === EVENTS_PATH) return handleEvents(request, response, options.changes)
       if (isApi) return handleApi(options.service, url, response, options.onError)

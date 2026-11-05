@@ -2,7 +2,7 @@ import { CircleCheck, CircleDashed, Compass, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import type { ProjectTask, TaskField, TaskStatus, VerificationRecord, VerificationStatus } from '@continuum/core'
 import { cn } from '../../utils/cn'
-import { PROJECT_STATUS_LABEL, VERIFICATION_LABEL } from '@continuum/core'
+import { MAX_TASK_TEXT_CHARS, PROJECT_STATUS_LABEL, VERIFICATION_LABEL } from '@continuum/core'
 import { useTaskEditor, type TaskEditor } from '../../hooks/useTaskEditor'
 import { useIsLive } from '../../state/dataMode'
 import { Button } from '../shared/Button'
@@ -12,9 +12,7 @@ import { CriterionBadge, EvidenceBadge, TaskStatusBadge } from '../shared/Status
 import { ProgressBar } from './ProjectCard'
 
 const TASK_STATUSES: TaskStatus[] = ['planned', 'in-progress', 'blocked', 'completed']
-const FIELD_LABEL: Record<TaskField, string> = { status: 'status', nextAction: 'next action', steps: 'steps', criteria: 'acceptance criteria' }
-/** Matches the daemon's limit on a next action. */
-const MAX_NEXT_ACTION_CHARS = 500
+const FIELD_LABEL: Record<Exclude<TaskField, 'created'>, string> = { status: 'status', nextAction: 'next action', steps: 'steps', criteria: 'acceptance criteria' }
 
 interface TaskPanelProps {
   tasks: ProjectTask[]
@@ -101,7 +99,7 @@ function NextActionEditor({ task, editor }: { task: ProjectTask; editor: TaskEdi
         id={`next-action-${task.id}`}
         autoFocus
         value={draft}
-        maxLength={MAX_NEXT_ACTION_CHARS}
+        maxLength={MAX_TASK_TEXT_CHARS}
         onChange={(event) => setDraft(event.target.value)}
         className="h-8 flex-1 rounded-md border border-line bg-surface px-2.5 text-[13px] text-fg focus:border-accent focus:outline-none"
       />
@@ -124,6 +122,8 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
   const editor = isLive ? taskEditor : undefined
   const criteriaDone = task.acceptanceCriteria.filter((criterion) => criterion.status === 'complete').length
   const taskVerification = verification.filter((record) => task.verificationIds.includes(record.id))
+  const isYours = task.userEdited?.includes('created') ?? false
+  const changed = task.userEdited?.filter((field) => field !== 'created') ?? []
 
   return (
     <Panel
@@ -145,7 +145,7 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
             )}
           >
             {candidate.title}
-            {candidate.id === currentTaskId && <span className="rounded bg-accent/15 px-1 text-[10px] text-accent">current</span>}
+            {candidate.id === currentTaskId && <span className="rounded bg-accent-strong px-1 text-[10px] text-accent-fg">current</span>}
           </button>
         ))}
       </div>
@@ -155,12 +155,12 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-[22px] font-normal tracking-[-0.02em] text-fg">{task.title}</h3>
             <TaskStatusBadge status={task.status} />
-            <EvidenceBadge type="agent-reported" />
+            <EvidenceBadge type={isYours ? 'user-reported' : 'agent-reported'} />
           </div>
-          {task.userEdited && task.userEdited.length > 0 && (
+          {changed.length > 0 && (
             <p className="mt-1.5 flex items-center gap-2 text-[12px] text-muted">
               <EvidenceBadge type="user-reported" />
-              <span>Changed by you: {task.userEdited.map((field) => FIELD_LABEL[field]).join(', ')}</span>
+              <span>Changed by you: {changed.map((field) => FIELD_LABEL[field]).join(', ')}</span>
             </p>
           )}
           {editor && (

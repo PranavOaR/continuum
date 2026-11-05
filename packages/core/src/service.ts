@@ -4,6 +4,9 @@ import type {
   AgentType,
   MemoryGraph,
   MemoryRecord,
+  MemoryReview,
+  NewMemory,
+  NewTask,
   Project,
   ProjectFile,
   ProjectStatus,
@@ -94,7 +97,18 @@ export interface ContinuumService {
   getBriefing(projectId: string): Promise<string>
   /** Applies one edit you made to a task and returns the task as it now stands. */
   updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask>
+  /** Creates a task as yours and returns it. Starting it pauses any other task in progress. */
+  createTask(projectId: string, task: NewTask): Promise<ProjectTask>
+  /** Adds a decision or known issue as yours and returns it. */
+  addMemory(projectId: string, record: NewMemory): Promise<MemoryRecord>
+  /** Records your verdict on a memory record and returns it as it now stands. */
+  reviewMemory(projectId: string, memoryId: string, review: MemoryReview): Promise<MemoryRecord>
 }
+
+/** Limits on what you can type into the dashboard; agents are held to the same ones through MCP. */
+export const MAX_TITLE_CHARS = 200
+export const MAX_TASK_TEXT_CHARS = 500
+export const MAX_MEMORY_BODY_CHARS = 4_000
 
 export class NotFoundError extends Error {
   constructor(entity: string, id: string) {

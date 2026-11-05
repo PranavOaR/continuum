@@ -28,8 +28,16 @@ export interface ProjectTask {
   userEdited?: TaskField[]
 }
 
-/** The parts of a task a dashboard edit can change. */
-export type TaskField = 'status' | 'nextAction' | 'steps' | 'criteria'
+/** The parts of a task a dashboard edit can change; `created` marks a task you made there. */
+export type TaskField = 'status' | 'nextAction' | 'steps' | 'criteria' | 'created'
+
+/** A task you create in the dashboard. `start` makes it current; otherwise it is planned for later. */
+export interface NewTask {
+  title: string
+  objective?: string
+  nextAction?: string
+  start: boolean
+}
 
 /** One edit made to a task in the dashboard. */
 export type TaskChange =

@@ -1,5 +1,5 @@
 import type { IdentityKey, ContentHash } from './evidenceRules'
-import type { AgentType, ChangeType, EvidenceType, MemoryKind, TaskField } from './types'
+import type { AgentType, ChangeType, EvidenceType, MemoryKind, MemoryReview, TaskField } from './types'
 
 /**
  * Immutable facts appended to a workspace's event log. Every adapter, watcher
@@ -45,9 +45,10 @@ export type CheckRecordedEvent = EventBase<
   }
 >
 
+/** Recording an existing id replaces it: this is how your review reaches the graph, so stores stay readable by older versions. */
 export type MemoryRecordedEvent = EventBase<
   'memory.recorded',
-  { id: string; kind: MemoryKind; title: string; body: string; taskId?: string; anchors: Record<IdentityKey, ContentHash> }
+  { id: string; kind: MemoryKind; title: string; body: string; taskId?: string; anchors: Record<IdentityKey, ContentHash>; review?: MemoryReview }
 >
 
 export interface RecordedCriterion {

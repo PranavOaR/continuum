@@ -44,6 +44,13 @@ export const EVIDENCE_DESCRIPTION: Record<EvidenceType, string> = {
   simulated: 'Created by this demo; no real action took place.',
 }
 
+/** How a record is labelled in text an agent reads. */
+export function evidenceTag(evidence: EvidenceType): string {
+  if (evidence === 'verified') return '[verified]'
+  if (evidence === 'agent-reported') return '[agent-reported]'
+  return evidence === 'user-reported' ? '[set by you]' : '[observed]'
+}
+
 export const CHANGE_LABEL: Record<ChangeType, string> = {
   added: 'Added',
   modified: 'Modified',

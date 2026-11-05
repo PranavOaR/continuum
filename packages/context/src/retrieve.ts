@@ -1,7 +1,7 @@
-import { CHARS_PER_TOKEN, type EvidenceType } from '@continuum/core'
+import { CHARS_PER_TOKEN, evidenceTag, type EvidenceType } from '@continuum/core'
 import { anchoredPath, type ContextStore } from '@continuum/store'
 import type { ProjectState } from './projectState'
-import type { TaskSummary } from './tasks'
+import { isYourTask, type TaskSummary } from './tasks'
 import { agoFromIso } from './time'
 
 export const DEFAULT_CONTEXT_TOKENS = 1_500
@@ -35,7 +35,6 @@ export interface ContextItem {
 
 const recency = (iso: string | null, now: Date) => (iso ? 0.5 ** (Math.max(0, now.getTime() - Date.parse(iso)) / DAY_MS / RECENCY_HALF_LIFE_DAYS) : 0.5)
 const round = (value: number) => Math.round(value * 100) / 100
-const label = (evidence: EvidenceType) => (evidence === 'verified' ? '[verified]' : evidence === 'agent-reported' ? '[agent-reported]' : evidence === 'user-reported' ? '[set by you]' : '[observed]')
 const line = (value: string, max = 240) => value.replace(/\s+/g, ' ').trim().slice(0, max)
 
 function score(relevance: number, evidence: EvidenceType, recencyWeight: number, actionable: boolean): number {
@@ -47,7 +46,7 @@ function taskItem(task: TaskSummary): ContextItem {
   const next = task.nextAction ? ` Next: ${task.nextAction}.` : ''
   return {
     kind: 'task',
-    text: line(`[agent-reported] Task "${task.title}" (${task.status}).${task.objective ? ` Objective: ${task.objective}.` : ''}${remaining}${next}`, 600),
+    text: line(`${evidenceTag(isYourTask(task) ? 'user-reported' : 'agent-reported')} Task "${task.title.replace(/"/g, "'")}" (${task.status}).${task.objective ? ` Objective: ${task.objective}.` : ''}${remaining}${next}`, 600),
     score: 2,
     why: 'the task itself always comes first',
   }
@@ -96,7 +95,7 @@ export function rankContext(store: ContextStore, state: ProjectState, options: {
     const stale = decision.status === 'anchor-changed'
     items.push({
       kind: 'decision',
-      text: line(`${label(decision.evidence)} ${decision.kind}: ${decision.title}${decision.body ? ` (${decision.body})` : ''}${stale ? ` [anchored code changed: ${decision.changed.join(', ')}]` : ''}`),
+      text: line(`${evidenceTag(decision.evidence)} ${decision.kind}: ${decision.title}${decision.body ? ` (${decision.body})` : ''}${stale ? ` [anchored code changed: ${decision.changed.join(', ')}]` : ''}`),
       score: score(relevance, decision.evidence, recency(decision.recordedAt, now), stale),
       why: `${stale ? 'its code changed; ' : ''}${relevance === RELEVANCE.linked ? 'anchored to task files' : 'project-wide'}`,
     })

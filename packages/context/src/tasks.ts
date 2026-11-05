@@ -1,4 +1,5 @@
-import type { RecordedCriterion, TaskChange, TaskField, TaskUpsertedEvent } from '@continuum/core'
+import { randomUUID } from 'node:crypto'
+import { MAX_TASK_TEXT_CHARS, MAX_TITLE_CHARS, type NewTask, type RecordedCriterion, type TaskChange, type TaskField, type TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore, GraphNode } from '@continuum/store'
 
 export type TaskStatus = 'planned' | 'in-progress' | 'blocked' | 'completed'
@@ -6,7 +7,16 @@ const ACTIVE: ReadonlySet<string> = new Set(['in-progress', 'blocked'])
 /** A task nobody has touched for this long is no longer "current": new work is not attributed to it. */
 export const STALE_TASK_MS = 14 * 24 * 60 * 60 * 1000
 const STATUSES: ReadonlySet<string> = new Set(['planned', 'in-progress', 'blocked', 'completed'])
-const TASK_FIELDS: ReadonlySet<string> = new Set(['status', 'nextAction', 'steps', 'criteria'])
+const TASK_FIELDS: ReadonlySet<string> = new Set(['status', 'nextAction', 'steps', 'criteria', 'created'])
+
+function slug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'task'
+}
+
+/** Titles that name the same task: case, spacing and punctuation aside. */
+export const sameTitle = (a: string, b: string) => slug(a) === slug(b)
+
+export const newTaskId = (title: string) => `${slug(title)}-${randomUUID().slice(0, 8)}`
 
 /** Removes one occurrence, so two steps that happen to share a name stay two steps. */
 function withoutOne(steps: readonly string[], step: string): string[] {
@@ -93,9 +103,6 @@ export function summarizeTask(store: ContextStore, node: GraphNode): TaskSummary
   }
 }
 
-/** Longest next action accepted from the dashboard; agents are held to the same limit through MCP. */
-export const MAX_NEXT_ACTION_CHARS = 500
-
 export class InvalidTaskChangeError extends Error {
   constructor(reason: string) {
     super(reason)
@@ -103,9 +110,11 @@ export class InvalidTaskChangeError extends Error {
   }
 }
 
-/** The task snapshot after one dashboard edit: every field, since each task.upserted replaces the last. */
-export function applyTaskChange(task: TaskSummary, change: TaskChange): TaskUpsertedEvent['payload'] {
-  const base: TaskUpsertedEvent['payload'] = {
+type TaskSnapshot = TaskUpsertedEvent['payload']
+
+/** Every field of a task, since each task.upserted replaces the last. */
+export function taskSnapshot(task: TaskSummary): TaskSnapshot {
+  return {
     id: task.id,
     title: task.title,
     status: task.status,
@@ -115,13 +124,52 @@ export function applyTaskChange(task: TaskSummary, change: TaskChange): TaskUpse
     completedSteps: task.completedSteps,
     remainingSteps: task.remainingSteps,
   }
+}
+
+/** Whether you made this task, for its label: what an agent says about a task is otherwise the agent's. */
+export const isYourTask = (task: TaskSummary) => task.userEdited.includes('created')
+
+function typed(value: string | undefined, name: string): string {
+  const text = value?.trim() ?? ''
+  if (text.length > MAX_TASK_TEXT_CHARS) throw new InvalidTaskChangeError(`The ${name} is longer than ${MAX_TASK_TEXT_CHARS} characters.`)
+  return text
+}
+
+/** A task typed in the dashboard, and what starting it does to the others: as with start_task, tasks in progress are paused. */
+export function createdTask(tasks: readonly TaskSummary[], input: NewTask): { task: TaskSnapshot; paused: TaskSnapshot[] } {
+  // One line: a title is quoted into briefings, and a line break there could pose as a heading.
+  const title = input.title.replace(/\s+/g, ' ').trim()
+  if (title === '') throw new InvalidTaskChangeError('A task needs a title.')
+  if (title.length > MAX_TITLE_CHARS) throw new InvalidTaskChangeError(`The title is longer than ${MAX_TITLE_CHARS} characters.`)
+  const objective = typed(input.objective, 'objective')
+  const nextAction = typed(input.nextAction, 'next action')
+  if (tasks.some((task) => task.status !== 'completed' && sameTitle(task.title, title))) throw new InvalidTaskChangeError(`"${title}" is already an open task.`)
+  return {
+    task: {
+      id: newTaskId(title),
+      title,
+      status: input.start ? 'in-progress' : 'planned',
+      ...(objective ? { objective } : {}),
+      ...(nextAction ? { nextAction } : {}),
+      acceptanceCriteria: [],
+      completedSteps: [],
+      remainingSteps: [],
+      editedFields: ['created'],
+    },
+    paused: input.start ? tasks.filter((task) => task.status === 'in-progress').map((task) => ({ ...taskSnapshot(task), status: 'planned', editedFields: ['status'] })) : [],
+  }
+}
+
+/** The task snapshot after one dashboard edit. */
+export function applyTaskChange(task: TaskSummary, change: TaskChange): TaskSnapshot {
+  const base = taskSnapshot(task)
   switch (change.kind) {
     case 'status':
       if (!STATUSES.has(change.status)) throw new InvalidTaskChangeError(`Unknown status "${String(change.status)}".`)
       return { ...base, status: change.status, editedFields: ['status'] }
     case 'next-action': {
       const next = change.nextAction?.trim() ?? ''
-      if (next.length > MAX_NEXT_ACTION_CHARS) throw new InvalidTaskChangeError(`The next action is longer than ${MAX_NEXT_ACTION_CHARS} characters.`)
+      if (next.length > MAX_TASK_TEXT_CHARS) throw new InvalidTaskChangeError(`The next action is longer than ${MAX_TASK_TEXT_CHARS} characters.`)
       const { nextAction: _previous, ...rest } = base
       return next === '' ? { ...rest, editedFields: ['nextAction'] } : { ...rest, nextAction: next, editedFields: ['nextAction'] }
     }

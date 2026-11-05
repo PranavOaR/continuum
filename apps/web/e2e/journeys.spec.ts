@@ -229,6 +229,11 @@ test('the demo shows tasks read-only: editing needs your own dashboard', async (
   await expect(panel).toBeVisible()
   await expect(panel.getByLabel('Status')).toHaveCount(0)
   await expect(panel.getByRole('button', { name: /Mark ".*" as done/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New task' })).toHaveCount(0)
+  const memory = page.locator('#memory')
+  await expect(memory).toBeVisible()
+  await expect(memory.getByRole('button', { name: 'Add a decision or issue' })).toHaveCount(0)
+  await expect(memory.getByRole('button', { name: /as resolved/ })).toHaveCount(0)
 })
 
 test.describe('the demo video', () => {

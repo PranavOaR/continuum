@@ -63,6 +63,40 @@ export function SelectField({ label, hideLabel, className, children, id, ...rest
 }
 
 
+interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
+  label: string
+  hint?: string
+  value: string
+  onChange: (value: string) => void
+  multiline?: boolean
+  'data-autofocus'?: boolean
+}
+
+const TEXT_FIELD = 'w-full rounded-md border border-line bg-surface px-3 text-[13px] text-fg placeholder:text-subtle focus:border-accent focus:outline-none'
+
+export function TextField({ label, hint, value, onChange, multiline, maxLength, required, autoFocus, ...rest }: TextFieldProps) {
+  const id = useId()
+  const hintId = useId()
+  const shared = { id, value, maxLength, required, autoFocus, 'aria-describedby': hint ? hintId : undefined, 'data-autofocus': rest['data-autofocus'] }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="label-mono text-subtle">
+        {label}
+      </label>
+      {multiline ? (
+        <textarea rows={3} className={cn(TEXT_FIELD, 'py-2')} onChange={(event) => onChange(event.target.value)} {...shared} />
+      ) : (
+        <input type="text" className={cn(TEXT_FIELD, 'h-9')} onChange={(event) => onChange(event.target.value)} {...shared} />
+      )}
+      {hint && (
+        <p id={hintId} className="text-[12px] text-subtle">
+          {hint}
+        </p>
+      )}
+    </div>
+  )
+}
+
 interface ToggleProps {
   checked: boolean
   onChange: (checked: boolean) => void

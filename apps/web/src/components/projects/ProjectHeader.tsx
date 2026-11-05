@@ -1,4 +1,4 @@
-import { Activity, Brain, Copy, Ellipsis, FileText, GitBranch, Settings } from 'lucide-react'
+import { Activity, Brain, Copy, Ellipsis, FileText, GitBranch, Plus, Settings } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTimeFormat } from '../../hooks/useTimeFormat'
@@ -8,7 +8,7 @@ import type { Project, ProjectStatus } from '@continuum/core'
 import { copyToClipboard } from '../../utils/clipboard'
 import { AgentChip } from '../shared/AgentChip'
 import { Breadcrumbs } from '../shared/Breadcrumbs'
-import { ButtonLink, IconButton } from '../shared/Button'
+import { Button, ButtonLink, IconButton } from '../shared/Button'
 import { Popover, PopoverItem } from '../shared/Popover'
 import { TaskStatusBadge } from '../shared/StatusBadge'
 
@@ -21,7 +21,7 @@ function Meta({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-export function ProjectHeader({ project, status }: { project: Project; status: ProjectStatus }) {
+export function ProjectHeader({ project, status, onNewTask }: { project: Project; status: ProjectStatus; onNewTask: () => void }) {
   const isLive = useIsLive()
   const notify = useToast()
   const navigate = useNavigate()
@@ -48,7 +48,12 @@ export function ProjectHeader({ project, status }: { project: Project; status: P
           </div>
           <p className="mt-1 max-w-2xl text-[14px] text-muted">{project.description}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {isLive && (
+            <Button icon={<Plus />} size="sm" onClick={onNewTask}>
+              New task
+            </Button>
+          )}
           <ButtonLink to={`/app/activity?project=${project.id}`} icon={<Activity />} size="sm">
             View Activity
           </ButtonLink>

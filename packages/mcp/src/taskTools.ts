@@ -1,14 +1,13 @@
-import { randomUUID } from 'node:crypto'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { currentTaskNode, isTaskNode, summarizeTask, taskSummaries, type TaskSummary } from '@continuum/context'
-import type { TaskUpsertedEvent } from '@continuum/core'
+import { currentTaskNode, isTaskNode, newTaskId, sameTitle, summarizeTask, taskSnapshot, taskSummaries, type TaskSummary } from '@continuum/context'
+import { MAX_TASK_TEXT_CHARS, type TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
 
 const MAX_ITEMS = 30
 /** Completed steps kept per task; the handoff shows the most recent anyway. */
 const MAX_COMPLETED_STEPS = 100
-const MAX_TEXT = 500
+const MAX_TEXT = MAX_TASK_TEXT_CHARS
 const item = z.string().trim().min(1).max(MAX_TEXT)
 const items = z.array(item).max(MAX_ITEMS)
 
@@ -21,25 +20,8 @@ export class TaskToolError extends Error {
 
 type Snapshot = TaskUpsertedEvent['payload']
 
-function slug(title: string): string {
-  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'task'
-}
-
 /** Masks text with the repository's redactor before it is stored. */
 type Redact = (text: string) => string
-
-function snapshotOf(task: TaskSummary): Snapshot {
-  return {
-    id: task.id,
-    title: task.title,
-    status: task.status,
-    ...(task.objective ? { objective: task.objective } : {}),
-    ...(task.nextAction ? { nextAction: task.nextAction } : {}),
-    acceptanceCriteria: task.acceptanceCriteria,
-    completedSteps: task.completedSteps,
-    remainingSteps: task.remainingSteps,
-  }
-}
 
 function event(payload: Snapshot, now: Date): TaskUpsertedEvent {
   return { type: 'task.upserted', payload, evidence: 'agent-reported', source: 'mcp', occurredAt: now.toISOString() }
@@ -66,16 +48,13 @@ type UpdateInput = z.infer<z.ZodObject<typeof updateTaskInput>>
 
 const unique = (values: readonly string[]) => [...new Set(values)]
 
-/** Titles that name the same task: case, spacing and punctuation aside. */
-const sameTitle = (a: string, b: string) => slug(a) === slug(b)
-
 /**
  * The open task the agent is continuing, resumed: an agent briefed on a task
  * often calls start_task again with its title instead of update_task. Its
  * finished steps and met criteria stay; new steps and criteria are added.
  */
 function resumed(task: TaskSummary, input: StartInput, clean: Redact): Snapshot {
-  const current = snapshotOf(task)
+  const current = taskSnapshot(task)
   const criteria = current.acceptanceCriteria ?? []
   const done = current.completedSteps ?? []
   const remaining = current.remainingSteps ?? []
@@ -106,7 +85,7 @@ export function startTask(store: ContextStore, input: StartInput, now: Date, red
     const snapshot: Snapshot = open
       ? resumed(open, input, clean)
       : {
-          id: `${slug(title)}-${randomUUID().slice(0, 8)}`,
+          id: newTaskId(title),
           title,
           status: 'in-progress',
           ...(input.objective ? { objective: clean(input.objective) } : {}),
@@ -116,7 +95,7 @@ export function startTask(store: ContextStore, input: StartInput, now: Date, red
         }
     const paused = tasks
       .filter((task) => task.status === 'in-progress' && task.id !== snapshot.id)
-      .map((task) => event({ ...snapshotOf(task), status: 'planned' }, now))
+      .map((task) => event({ ...taskSnapshot(task), status: 'planned' }, now))
     result = { snapshot, isResumed: open !== undefined }
     return [...paused, event(snapshot, now)]
   })
@@ -143,7 +122,7 @@ export function updateTask(store: ContextStore, input: UpdateInput, now: Date, r
     if (!isTaskNode(node)) {
       throw new TaskToolError(input.task_id ? `No task "${input.task_id}".` : 'No current task. Start one with start_task first.')
     }
-    const current = snapshotOf(summarizeTask(store, node))
+    const current = taskSnapshot(summarizeTask(store, node))
     const done = unique(input.completed_steps.map(clean))
     const metTexts = input.criteria_met.map(clean)
     const criteria = current.acceptanceCriteria ?? []

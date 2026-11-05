@@ -9,6 +9,7 @@ export interface Mutations {
   getNode(key: IdentityKey): GraphNode | undefined
   upsertNode(key: IdentityKey, input: UpsertInput): void
   link(from: IdentityKey, type: EdgeType, to: IdentityKey): void
+  unlink(from: IdentityKey, type: EdgeType, to: IdentityKey): void
   putObject(kind: string, value: unknown): ContentHash
   getObject(hash: ContentHash): { kind: string; value: unknown } | undefined
 }
@@ -143,7 +144,13 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const { id, taskId, anchors, ...rest } = event.payload
       const memory = keys.memory(id)
       const recordHash = store.putObject('memory', event.payload)
-      store.upsertNode(memory, { hash: recordHash, props: { ...rest, anchors, recordHash, evidence: event.evidence }, at })
+      const previous = rest.review ? store.getNode(memory) : undefined
+      // A review is your verdict on the record, not authorship of it: the text keeps its author's label and its date.
+      const origin = previous ? { evidence: previous.props.evidence ?? event.evidence, recordedAt: previous.props.recordedAt ?? previous.updatedAt } : { evidence: event.evidence }
+      store.upsertNode(memory, { hash: recordHash, props: { ...rest, anchors, recordHash, ...origin }, at })
+      for (const anchor of Object.keys((previous?.props.anchors ?? {}) as Record<IdentityKey, ContentHash>)) {
+        if (!(anchor in anchors)) store.unlink(memory, 'anchored_to', anchor)
+      }
       for (const anchor of ensureAnchors(store, anchors, at)) store.link(memory, 'anchored_to', anchor)
       if (taskId) {
         ensure(store, keys.task(taskId), at)

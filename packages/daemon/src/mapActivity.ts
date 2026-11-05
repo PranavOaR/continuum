@@ -28,6 +28,8 @@ function sessionTask(snapshot: RepoSnapshot, sessionId: string): string | undefi
 
 const withTask = (taskId: string | undefined) => (taskId ? { taskId } : {})
 
+const REVIEW_TITLE = { resolved: 'Resolved', 'still-valid': 'Still valid' } as const
+
 function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
   switch (event.type) {
     case 'file.changed': {
@@ -49,8 +51,16 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
         description: `${event.evidence === 'verified' ? '' : 'Run by an agent: '}\`${command}\` exited ${exitCode}${durationMs > 0 ? ` after ${(durationMs / 1000).toFixed(1)}s` : ''}.`,
       }
     }
-    case 'memory.recorded':
-      return { type: 'decision', title: event.payload.title, description: clip(event.payload.body) || 'Recorded by an agent.', ...withTask(event.payload.taskId) }
+    case 'memory.recorded': {
+      const { title, body, review, taskId } = event.payload
+      const fallback = review ? 'Reviewed by you.' : event.evidence === 'user-reported' ? 'Added by you.' : 'Recorded by an agent.'
+      return {
+        type: 'decision',
+        title: review ? `${REVIEW_TITLE[review]}: ${title}` : title,
+        description: clip(body) || fallback,
+        ...withTask(taskId),
+      }
+    }
     case 'session.started': {
       const agent = asAgent(event.payload.agent)
       return { type: 'session', title: `${getAgent(agent).name} session started`, description: 'A new agent session began.', agent, ...withTask(event.payload.taskId) }

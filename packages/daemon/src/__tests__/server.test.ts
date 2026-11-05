@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { NotFoundError, type ContinuumService } from '@continuum/core'
+import { NotFoundError, type ContinuumService, type MemoryRecord, type ProjectTask, type TaskField } from '@continuum/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PortInUseError, startDaemon, type RunningDaemon } from '../server'
 
@@ -30,10 +30,25 @@ const fakeService: ContinuumService = {
   updateTask: async (projectId, taskId, change) => {
     if (taskId === 'missing') throw new NotFoundError('Task', taskId)
     edits.push({ projectId, taskId, change })
-    return { id: taskId, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', userEdited: ['status'] }
+    return task(projectId, taskId, ['status'])
+  },
+  createTask: async (projectId, input) => {
+    edits.push({ projectId, input })
+    return task(projectId, 'new-1', ['created'])
+  },
+  addMemory: async (projectId, input) => {
+    edits.push({ projectId, input })
+    return memory(projectId, 'acme~memory~new')
+  },
+  reviewMemory: async (projectId, memoryId, verdict) => {
+    if (memoryId === 'missing') throw new NotFoundError('Memory record', memoryId)
+    edits.push({ projectId, memoryId, verdict })
+    return memory(projectId, memoryId)
   },
 }
 const edits: unknown[] = []
+const task = (projectId: string, id: string, userEdited: TaskField[]): ProjectTask => ({ id, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', userEdited })
+const memory = (projectId: string, id: string): MemoryRecord => ({ id, projectId, kind: 'decision', title: 't', body: '', source: 'user-note', sourceDetail: '', evidenceType: 'user-reported', relatedFileIds: [], createdAt: '' })
 
 function webBuild() {
   const dir = mkdtempSync(join(tmpdir(), 'continuum-web-'))
@@ -247,6 +262,60 @@ describe('task edits', () => {
     expect((await post(daemon, path, JSON.stringify({ kind: 'status', status: 'done-ish' }), browser(daemon))).status).toBe(400)
     expect((await post(daemon, path, 'x'.repeat(20_000), browser(daemon))).status).toBe(413)
     expect((await post(daemon, '/api/projects/acme/tasks/missing', blocked, browser(daemon))).status).toBe(404)
+  })
+
+  describe.each([
+    ['create a task', '/api/projects/acme/tasks', { title: 'Ship it', start: true }, { projectId: 'acme', input: { title: 'Ship it', start: true } }],
+    ['add to memory', '/api/projects/acme/memory', { kind: 'known-issue', title: 'Flaky', body: 'Sometimes', taskId: 'auth-1' }, { projectId: 'acme', input: { kind: 'known-issue', title: 'Flaky', body: 'Sometimes', taskId: 'auth-1' } }],
+    ['review a record', '/api/projects/acme/memory/acme~memory~d1/review', { verdict: 'resolved' }, { projectId: 'acme', memoryId: 'acme~memory~d1', verdict: 'resolved' }],
+  ])('the write to %s', (_name, route, body, recorded) => {
+    it('accepts it from the dashboard page', async () => {
+      const daemon = await startWithCsrf()
+      edits.length = 0
+      expect((await post(daemon, route, JSON.stringify(body), browser(daemon))).status).toBe(200)
+      expect(edits).toEqual([recorded])
+    })
+
+    it.each([
+      ['no CSRF token', { 'x-continuum-csrf': undefined }, 403],
+      ['no Origin header', { origin: undefined }, 403],
+      ['another origin', { origin: 'http://evil.example' }, 403],
+      ['no access cookie', { cookie: undefined }, 401],
+      ['a form content type', { 'content-type': 'application/x-www-form-urlencoded' }, 415],
+    ])('refuses it with %s', async (_reason, extra, status) => {
+      const daemon = await startWithCsrf()
+      edits.length = 0
+      expect((await post(daemon, route, JSON.stringify(body), browser(daemon, extra))).status).toBe(status)
+      expect(edits).toEqual([])
+    })
+  })
+
+  it.each([
+    ['a task without a title', '/api/projects/acme/tasks', { start: true }],
+    ['a task that does not say when', '/api/projects/acme/tasks', { title: 'x' }],
+    ['a task with a non-text objective', '/api/projects/acme/tasks', { title: 'x', start: true, objective: 1 }],
+    ['a record without a title', '/api/projects/acme/memory', { kind: 'decision' }],
+    ['a record of a kind you cannot add', '/api/projects/acme/memory', { kind: 'previous-attempt', title: 'x' }],
+    ['a record with a non-text body', '/api/projects/acme/memory', { kind: 'decision', title: 'x', body: {} }],
+    ['a record with a non-text task', '/api/projects/acme/memory', { kind: 'decision', title: 'x', taskId: 1 }],
+    ['an unknown verdict', '/api/projects/acme/memory/d1/review', { verdict: 'delete' }],
+    ['a list instead of an object', '/api/projects/acme/memory/d1/review', []],
+  ])('rejects %s before it reaches the store', async (_name, route, body) => {
+    const daemon = await startWithCsrf()
+    edits.length = 0
+    expect((await post(daemon, route, JSON.stringify(body), browser(daemon))).status).toBe(400)
+    expect(edits).toEqual([])
+  })
+
+  it('reports a record that does not exist', async () => {
+    const daemon = await startWithCsrf()
+    expect((await post(daemon, '/api/projects/acme/memory/missing/review', JSON.stringify({ verdict: 'resolved' }), browser(daemon))).status).toBe(404)
+  })
+
+  it('still refuses writes to anything else', async () => {
+    const daemon = await startWithCsrf()
+    expect((await post(daemon, '/api/projects/acme/verification', blocked, browser(daemon))).status).toBe(405)
+    expect((await post(daemon, '/api/projects/acme/memory/d1', blocked, browser(daemon))).status).toBe(405)
   })
 
   it('lets a bearer-authenticated client (the dev proxy) write without the page token', async () => {

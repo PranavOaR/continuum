@@ -4,6 +4,10 @@ import {
   type AttentionItem,
   type ContinuumService,
   type MemoryGraph,
+  type MemoryRecord,
+  type MemoryReview,
+  type NewMemory,
+  type NewTask,
   type OverviewData,
   type ProjectSummary,
   type ProjectTask,
@@ -11,10 +15,10 @@ import {
   type SearchResult,
   type TaskChange,
 } from '@continuum/core'
-import { InvalidConfigError, openWorkspace, repositoryRedactor, type Redactor } from '@continuum/capture'
-import { applyTaskChange, renderHandoff, summarizeTask } from '@continuum/context'
+import { InvalidConfigError, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
+import { applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
 import { keys } from '@continuum/store'
-import { asAgent } from './ids'
+import { asAgent, ids, storedMemoryId } from './ids'
 import { toActivity } from './mapActivity'
 import { toGraph } from './mapGraph'
 import { allChangedFileNodes, toFiles, toProject } from './mapProject'
@@ -132,8 +136,9 @@ function maskTyped(change: TaskChange, redactor: Redactor): TaskChange {
 
 /**
  * ContinuumService backed by real repositories' context stores. Everything is
- * derived from recorded evidence; the only write is a task edit you make in
- * the dashboard, recorded as user-reported.
+ * derived from recorded evidence; the only writes are what you do in the
+ * dashboard (task edits, new tasks, memory records and reviews of them), all
+ * recorded as user-reported.
  */
 export class LocalContinuumService implements ContinuumService {
   private readonly repositories: readonly Repository[]
@@ -231,25 +236,101 @@ export class LocalContinuumService implements ContinuumService {
     return toGraph(await this.snapshot(projectId))
   }
 
-  async updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask> {
+  private repository(projectId: string): Repository {
     const repository = this.repositories.find((candidate) => candidate.projectId === projectId)
     if (!repository) throw new NotFoundError('Project', projectId)
-    const { workspace, store } = await openWorkspace(repository.cwd)
+    return repository
+  }
+
+  /** What every event you cause from the dashboard shares. */
+  private byYou() {
+    return { evidence: 'user-reported', source: DASHBOARD_SOURCE, occurredAt: this.now().toISOString() } as const
+  }
+
+  private async foundTask(projectId: string, taskId: string): Promise<ProjectTask> {
+    this.invalidate()
+    const task = (await this.getWorkspace(projectId)).tasks.find((candidate) => candidate.id === taskId)
+    if (!task) throw new NotFoundError('Task', taskId)
+    return task
+  }
+
+  private async foundMemory(projectId: string, memoryId: string): Promise<MemoryRecord> {
+    this.invalidate()
+    const record = (await this.getWorkspace(projectId)).memory.find((candidate) => candidate.id === memoryId)
+    if (!record) throw new NotFoundError('Memory record', memoryId)
+    return record
+  }
+
+  async createTask(projectId: string, input: NewTask): Promise<ProjectTask> {
+    const { workspace, store } = await openWorkspace(this.repository(projectId).cwd)
+    let id = ''
+    try {
+      const redactor = await redactorFor(projectId, workspace.root)
+      const masked = {
+        ...input,
+        title: redactor.redact(input.title),
+        ...(input.objective === undefined ? {} : { objective: redactor.redact(input.objective) }),
+        ...(input.nextAction === undefined ? {} : { nextAction: redactor.redact(input.nextAction) }),
+      }
+      store.transact(() => {
+        const { task, paused } = createdTask(taskSummaries(store), masked)
+        id = task.id
+        return [...paused, task].map((payload) => ({ type: 'task.upserted', payload, ...this.byYou() }))
+      })
+    } finally {
+      store.close()
+    }
+    return this.foundTask(projectId, id)
+  }
+
+  async addMemory(projectId: string, input: NewMemory): Promise<MemoryRecord> {
+    const { workspace, store } = await openWorkspace(this.repository(projectId).cwd)
+    let id = ''
+    try {
+      const redactor = await redactorFor(projectId, workspace.root)
+      const payload = newMemory({ ...input, title: redactor.redact(input.title), ...(input.body === undefined ? {} : { body: redactor.redact(input.body) }) })
+      id = payload.id
+      store.transact(() => {
+        if (input.taskId && !isTaskNode(store.graph.get(keys.task(input.taskId)))) throw new NotFoundError('Task', input.taskId)
+        return [{ type: 'memory.recorded', payload, ...this.byYou() }]
+      })
+    } finally {
+      store.close()
+    }
+    return this.foundMemory(projectId, ids.memory(projectId, id))
+  }
+
+  async reviewMemory(projectId: string, memoryId: string, review: MemoryReview): Promise<MemoryRecord> {
+    const { workspace, store } = await openWorkspace(this.repository(projectId).cwd)
+    const id = storedMemoryId(projectId, memoryId)
+    try {
+      const tree = await readWorkingTreeWithSymbols(store, workspace.root)
+      store.transact(() => {
+        const node = id === null ? undefined : store.graph.get(keys.memory(id))
+        if (!node || node.kind !== 'memory') throw new NotFoundError('Memory record', memoryId)
+        if (review === 'resolved' && isResolved(node)) return []
+        return [{ type: 'memory.recorded', payload: reviewedMemory(store, node, review, liveHashes(store, tree)), ...this.byYou() }]
+      })
+    } finally {
+      store.close()
+    }
+    return this.foundMemory(projectId, memoryId)
+  }
+
+  async updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask> {
+    const { workspace, store } = await openWorkspace(this.repository(projectId).cwd)
     try {
       const masked = maskTyped(change, await redactorFor(projectId, workspace.root))
       store.transact(() => {
         const node = store.graph.get(keys.task(taskId))
         if (!node || node.kind !== 'task') throw new NotFoundError('Task', taskId)
         const payload = applyTaskChange(summarizeTask(store, node), masked)
-        return [{ type: 'task.upserted', payload, evidence: 'user-reported', source: DASHBOARD_SOURCE, occurredAt: this.now().toISOString() }]
+        return [{ type: 'task.upserted', payload, ...this.byYou() }]
       })
     } finally {
       store.close()
     }
-    this.invalidate()
-    const task = (await this.getWorkspace(projectId)).tasks.find((candidate) => candidate.id === taskId)
-    if (!task) throw new NotFoundError('Task', taskId)
-    return task
+    return this.foundTask(projectId, taskId)
   }
 
   async getBriefing(projectId: string): Promise<string> {
