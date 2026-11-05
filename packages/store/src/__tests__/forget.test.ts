@@ -123,6 +123,19 @@ describe('forget, hardened', () => {
     expect(rawBytes(path).toLowerCase()).not.toContain(SECRET)
   })
 
+  it('keeps the task a session took up whole in a checkpoint, as it does every other task id', () => {
+    const { store } = fileStore()
+    store.record(on(1, ev.file('readme', 'h-readme')))
+    store.record(on(2, ev.sessionStart('s1')))
+    store.record(on(2, { type: 'session.task', payload: { sessionId: 's1', taskId: 'update-readme-1a2b' }, evidence: 'observed', source: 'mcp', occurredAt: '' }))
+    store.record(on(9, ev.sessionStart('later')))
+    store.compact(new Date('2026-10-05T00:00:00Z'))
+
+    store.rewriteHistory(forgetPath('readme'))
+
+    expect(store.graph.get('session:s1')?.props.tookUpTaskId).toBe('update-readme-1a2b')
+  })
+
   it('scrubs the forgotten path from check names folded into a checkpoint', () => {
     const { path, store } = fileStore()
     store.record(on(1, ev.file(SECRET, 'h-1')))

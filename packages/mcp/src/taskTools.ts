@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { isTaskNode, newTaskId, openSessionId, sameTitle, sessionWorksOn, summarizeTask, taskNodeOfSession, taskSnapshot, taskSummaries, type TaskSummary } from '@continuum/context'
+import { anotherSessionHoldsTask, isTaskNode, newTaskId, openSessionId, sameTitle, sessionWorksOn, summarizeTask, taskNodeOfSession, taskSnapshot, taskSummaries, type TaskSummary } from '@continuum/context'
 import { MAX_TASK_TEXT_CHARS, type SessionTaskEvent, type TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
 
@@ -46,7 +46,7 @@ export const startTaskInput = {
 }
 
 export const updateTaskInput = {
-  task_id: z.string().trim().min(1).max(100).optional().describe('Defaults to the current task'),
+  task_id: z.string().trim().min(1).max(100).optional().describe('Defaults to your own task, otherwise the current one'),
   status: z.enum(['planned', 'in-progress', 'blocked', 'completed']).optional(),
   next_action: z.string().trim().max(MAX_TEXT).optional().describe('The single next thing to do; an empty string clears it'),
   completed_steps: items.default([]).describe('Steps just finished; removed from the remaining steps if listed there'),
@@ -83,14 +83,15 @@ function resumed(task: TaskSummary, input: StartInput, clean: Redact): Snapshot 
 /**
  * Makes a task current: an unfinished task with the same title is resumed,
  * otherwise a new one is created. Other in-progress tasks are paused (back to
- * planned) so an abandoned task cannot keep absorbing new work; blocked tasks
- * stay blocked.
+ * planned) so an abandoned task cannot keep absorbing new work; a task another
+ * running session took up is not abandoned, and blocked tasks stay blocked.
  */
 export function startTask(store: ContextStore, input: StartInput, now: Date, redact: Redact, sessionId?: string): { snapshot: Snapshot; isResumed: boolean } {
   const clean = (value: string) => redact(value.trim())
   const title = clean(input.title)
   let result: { snapshot: Snapshot; isResumed: boolean } | undefined
   store.transact(() => {
+    const caller = openSessionId(store, sessionId)
     const tasks = taskSummaries(store)
     const open = tasks.find((task) => task.status !== 'completed' && sameTitle(task.title, title))
     const snapshot: Snapshot = open
@@ -105,7 +106,7 @@ export function startTask(store: ContextStore, input: StartInput, now: Date, red
           remainingSteps: unique(input.steps.map(clean)),
         }
     const paused = tasks
-      .filter((task) => task.status === 'in-progress' && task.id !== snapshot.id)
+      .filter((task) => task.status === 'in-progress' && task.id !== snapshot.id && !anotherSessionHoldsTask(store, caller, task.id, now))
       .map((task) => event({ ...taskSnapshot(task), status: 'planned' }, now))
     result = { snapshot, isResumed: open !== undefined }
     return [...paused, event(snapshot, now), ...sessionLink(store, sessionId, snapshot.id, now)]
@@ -123,17 +124,32 @@ function hasChanges(input: UpdateInput): boolean {
   )
 }
 
+/**
+ * Keeps a session off a task another running session took up, whether it was
+ * given that task when it started or fell back to it. It joins by naming the
+ * task, by id or by starting one with its title; one update without a name
+ * would otherwise make the task its own. The other session may have stopped
+ * without saying so, so this says what is known. No title here: a hook reads
+ * task ids out of tool replies, and a title can look like one.
+ */
+function refuseAnothersTask(store: ContextStore, caller: string | undefined, task: Snapshot, now: Date): void {
+  if (!caller || sessionWorksOn(store, caller, task.id) || !anotherSessionHoldsTask(store, caller, task.id, now)) return
+  throw new TaskToolError(`Not updated: this task belongs to another session that has not ended. If you are continuing that work, pass task_id "${task.id}". If this is separate work, use start_task.`)
+}
+
 /** Applies a partial update to a task as one new snapshot, read and written under the store lock. */
 export function updateTask(store: ContextStore, input: UpdateInput, now: Date, redact: Redact, sessionId?: string): Snapshot {
   const clean = (value: string) => redact(value.trim())
   if (!hasChanges(input)) throw new TaskToolError('Nothing to update: pass a status, next_action, completed_steps, remaining_steps or criteria_met.')
   let next: Snapshot | undefined
   store.transact(() => {
-    const node = input.task_id ? store.graph.get(`task:${input.task_id}`) : taskNodeOfSession(store, openSessionId(store, sessionId), now)
+    const caller = openSessionId(store, sessionId)
+    const node = input.task_id ? store.graph.get(`task:${input.task_id}`) : taskNodeOfSession(store, caller, now)
     if (!isTaskNode(node)) {
       throw new TaskToolError(input.task_id ? `No task "${input.task_id}".` : 'No current task. Start one with start_task first.')
     }
     const current = taskSnapshot(summarizeTask(store, node))
+    if (!input.task_id) refuseAnothersTask(store, caller, current, now)
     const done = unique(input.completed_steps.map(clean))
     const metTexts = input.criteria_met.map(clean)
     const criteria = current.acceptanceCriteria ?? []
@@ -192,7 +208,7 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date, 
     {
       title: 'Update task',
       description:
-        'Update the current task (or task_id): status, next action, steps finished, remaining steps, acceptance criteria met. Call it when you finish a step, get blocked, or stop working, so the next session knows exactly where things stand. Starting another task pauses this one; a task untouched for 14 days stops being current.',
+        'Update the current task (or task_id): status, next action, steps finished, remaining steps, acceptance criteria met. Call it when you finish a step, get blocked, or stop working, so the next session knows exactly where things stand. Starting another task pauses this one, unless another running session took it up; a task untouched for 14 days stops being current.',
       inputSchema: updateTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },

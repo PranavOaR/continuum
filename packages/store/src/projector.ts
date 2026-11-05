@@ -61,8 +61,12 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       return
     }
     case 'session.started': {
-      const { sessionId, agent, taskId } = event.payload
+      const { sessionId, agent, taskId, resumed } = event.payload
       const session = keys.session(sessionId)
+      if (resumed) {
+        store.upsertNode(session, { hash: hashRecord('session', event.payload), props: { agent, endedAt: null, lastActivityAt: at }, at })
+        return
+      }
       store.upsertNode(session, { hash: hashRecord('session', event.payload), props: { agent, startedAt: at, taskId }, at })
       if (taskId) {
         ensure(store, keys.task(taskId), at)
@@ -81,7 +85,7 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const session = keys.session(sessionId)
       ensure(store, session, at)
       ensure(store, keys.task(taskId), at)
-      store.upsertNode(session, { hash: hashRecord('session-task', event.payload), props: { taskId, lastActivityAt: at }, at })
+      store.upsertNode(session, { hash: hashRecord('session-task', event.payload), props: { taskId, tookUpTaskId: taskId, lastActivityAt: at }, at })
       store.link(session, 'worked_on', keys.task(taskId))
       return
     }

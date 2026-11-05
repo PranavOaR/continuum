@@ -203,6 +203,7 @@ async function ingestInto(workspace: Workspace, payload: HookPayload, agent: Hoo
         redact,
         revision,
         knownSession: store.graph.has(keys.session(payload.session_id)),
+        endedSession: Boolean(store.graph.get(keys.session(payload.session_id))?.props.endedAt),
         agent,
         edits,
         // The MCP server usually got there first, in the same write as the task.

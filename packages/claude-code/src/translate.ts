@@ -27,6 +27,8 @@ export interface TranslateContext {
   revision: string | null
   /** Whether the store already knows this session (resume and compact reuse the id). */
   knownSession: boolean
+  /** Whether that known session reported its end. */
+  endedSession?: boolean
   /** Which agent's hooks sent this payload. Defaults to Claude Code. */
   agent?: HookAgent
   /** Files the payload's tool call changed, inside what scans capture. */
@@ -66,7 +68,8 @@ export function translateHook(payload: HookPayload, context: TranslateContext): 
   switch (payload.hook_event_name) {
     case 'SessionStart': {
       const isFresh = payload.source === undefined || FRESH_SESSION_SOURCES.has(payload.source)
-      if (!isFresh && context.knownSession) return []
+      // A session back after its end runs again; one that compacts never stopped.
+      if (!isFresh && context.knownSession) return context.endedSession ? [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent, resumed: true } }] : []
       const task = context.taskId ? { taskId: context.taskId } : {}
       return [{ ...base, type: 'session.started', evidence: 'observed', payload: { sessionId, agent, ...task } }]
     }

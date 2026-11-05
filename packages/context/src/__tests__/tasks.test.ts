@@ -3,7 +3,7 @@ import { ContextStore } from '@continuum/store'
 import { describe, expect, it } from 'vitest'
 import { renderHandoff } from '../handoff'
 import { projectState } from '../projectState'
-import { currentTaskId, STALE_TASK_MS, taskSummaries } from '../tasks'
+import { anotherSessionHoldsTask, currentTaskId, sessionWorksOn, STALE_TASK_MS, taskSummaries } from '../tasks'
 import { CURRENT_FILES, NOW, seededStore, tree } from './fixtures'
 
 let minute = 0
@@ -91,5 +91,61 @@ describe('tasks', () => {
     const store = seededStore()
     store.record(task({ id: 'done', title: 'Done', status: 'completed' }))
     expect(renderHandoff(projectState(store, tree(CURRENT_FILES), NOW), { now: NOW })).not.toContain('## Current task')
+  })
+})
+
+describe('anotherSessionHoldsTask', () => {
+  const HOUR = 60 * 60_000
+  const at = (offset: number) => new Date(NOW.getTime() + offset).toISOString()
+  const started = (sessionId: string, taskId?: string): ContinuumEvent => ({ type: 'session.started', payload: { sessionId, agent: 'claude-code', ...(taskId ? { taskId } : {}) }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: at(0) })
+  const tookUp = (sessionId: string, taskId: string): ContinuumEvent => ({ type: 'session.task', payload: { sessionId, taskId }, evidence: 'observed', source: 'mcp', occurredAt: at(0) })
+  const ended = (sessionId: string): ContinuumEvent => ({ type: 'session.ended', payload: { sessionId }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: at(0) })
+  const storeWith = (...events: ContinuumEvent[]) => {
+    const store = ContextStore.open(':memory:')
+    store.recordAll([task({ id: 't', title: 'T', status: 'in-progress' }), ...events])
+    return store
+  }
+  const isHeld = (store: ContextStore, caller: string | undefined, now = NOW) => anotherSessionHoldsTask(store, caller, 't', now)
+
+  it('is true of a running session that took the task up', () => {
+    expect(isHeld(storeWith(started('a'), tookUp('a', 't'), started('b')), 'b')).toBe(true)
+  })
+
+  it('is not the caller itself', () => {
+    expect(isHeld(storeWith(started('a'), tookUp('a', 't')), 'a')).toBe(false)
+  })
+
+  it('is not a session merely given the task when it started', () => {
+    const store = storeWith(started('a', 't'), started('b'))
+    expect(isHeld(store, 'b')).toBe(false)
+    expect(sessionWorksOn(store, 'a', 't')).toBe(false)
+  })
+
+  it('is not a session that has moved on to another task', () => {
+    expect(isHeld(storeWith(started('a'), tookUp('a', 't'), tookUp('a', 'other'), started('b')), 'b')).toBe(false)
+  })
+
+  it('is not a session that has ended', () => {
+    expect(isHeld(storeWith(started('a'), tookUp('a', 't'), ended('a'), started('b')), 'b')).toBe(false)
+  })
+
+  it('stops counting a session an hour after it was last heard from, since a crash reports no end', () => {
+    const store = storeWith(started('a'), tookUp('a', 't'), started('b'))
+    expect(isHeld(store, 'b', new Date(NOW.getTime() + HOUR))).toBe(true)
+    expect(isHeld(store, 'b', new Date(NOW.getTime() + HOUR + 1))).toBe(false)
+  })
+
+  it('hears from a session through its reports on the task, which reach the task and not the session', () => {
+    const report: ContinuumEvent = { ...task({ id: 't', title: 'T', status: 'in-progress', nextAction: 'Next' }), occurredAt: at(HOUR - 1000) }
+    expect(isHeld(storeWith(started('a'), tookUp('a', 't'), started('b'), report), 'b', new Date(NOW.getTime() + HOUR + 1000))).toBe(true)
+  })
+
+  it('counts a session resumed after it ended', () => {
+    const resumed: ContinuumEvent = { type: 'session.started', payload: { sessionId: 'a', agent: 'claude-code', resumed: true }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: at(HOUR) }
+    expect(isHeld(storeWith(started('a'), tookUp('a', 't'), ended('a'), resumed, started('b')), 'b', new Date(NOW.getTime() + 2 * HOUR))).toBe(true)
+  })
+
+  it('is false for a caller that cannot name its session: the one on the task may be its own', () => {
+    expect(isHeld(storeWith(started('a'), tookUp('a', 't')), undefined)).toBe(false)
   })
 })

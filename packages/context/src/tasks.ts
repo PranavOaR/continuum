@@ -6,6 +6,8 @@ export type TaskStatus = 'planned' | 'in-progress' | 'blocked' | 'completed'
 const ACTIVE: ReadonlySet<string> = new Set(['in-progress', 'blocked'])
 /** A task nobody has touched for this long is no longer "current": new work is not attributed to it. */
 export const STALE_TASK_MS = 14 * 24 * 60 * 60 * 1000
+/** A session not heard from for this long no longer counts as running: one that crashed never reports its end, and some agents report none. */
+export const QUIET_SESSION_MS = 60 * 60 * 1000
 const STATUSES: ReadonlySet<string> = new Set(['planned', 'in-progress', 'blocked', 'completed'])
 const TASK_FIELDS: ReadonlySet<string> = new Set(['status', 'nextAction', 'steps', 'criteria', 'created'])
 
@@ -93,16 +95,33 @@ export function openSessionId(store: ContextStore, sessionId: string | undefined
   return session && !session.props.endedAt ? sessionId : undefined
 }
 
-/** Whether this is the task the session last took up. */
+/** Whether this is the task the session last took up itself. The one it was given when it started does not count: nobody chose it. */
 export function sessionWorksOn(store: ContextStore, sessionId: string, taskId: string): boolean {
-  return store.graph.get(keys.session(sessionId))?.props.taskId === taskId
+  return store.graph.get(keys.session(sessionId))?.props.tookUpTaskId === taskId
 }
 
 /**
- * The task a session's work belongs to: the one it took up itself, while that
- * task is unfinished; otherwise the repository's current task. Two agents in
- * one repository therefore keep their work apart. A caller that cannot name
- * its session (not every agent can) gets the current task.
+ * Whether another running session took this task up itself. A caller that
+ * cannot name its session is told no, since that session may be its own.
+ */
+export function anotherSessionHoldsTask(store: ContextStore, sessionId: string | undefined, taskId: string, now: Date = new Date()): boolean {
+  const task = store.graph.get(keys.task(taskId))
+  if (!sessionId || !task) return false
+  // Reports reach the task and not the session, so a long turn may leave no other trace.
+  const lastHeard = (session: GraphNode) => Math.max(Date.parse(String(session.props.lastActivityAt)), Date.parse(task.updatedAt))
+  const isRunning = (session: GraphNode) => !session.props.endedAt && now.getTime() - lastHeard(session) <= QUIET_SESSION_MS
+  return store.graph
+    .neighbors(task.key, { direction: 'in', types: ['worked_on'] })
+    .filter((key) => key !== keys.session(sessionId))
+    .map((key) => store.graph.get(key))
+    .some((session) => session?.props.tookUpTaskId === taskId && isRunning(session))
+}
+
+/**
+ * The task a session's work belongs to: the one it took up or was given when
+ * it started, while that task is unfinished; otherwise the repository's current
+ * task. Two agents in one repository therefore keep their work apart. A caller
+ * that cannot name its session (not every agent can) gets the current task.
  */
 export function taskNodeOfSession(store: ContextStore, sessionId: string | undefined, now?: Date): GraphNode | undefined {
   const own = sessionId ? store.graph.get(keys.session(sessionId))?.props.taskId : undefined

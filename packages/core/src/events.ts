@@ -16,7 +16,8 @@ interface EventBase<TType extends string, TPayload> {
   revision?: string
 }
 
-export type SessionStartedEvent = EventBase<'session.started', { sessionId: string; agent: AgentType; taskId?: string }>
+/** With `resumed`, the same session back after it ended: it runs again, and what it was doing and when it began still stand. */
+export type SessionStartedEvent = EventBase<'session.started', { sessionId: string; agent: AgentType; taskId?: string; resumed?: boolean }>
 /** The agent's latest account of where it is (e.g. its last message in a turn). Agent-reported, never verified. */
 export type SessionProgressEvent = EventBase<'session.progress', { sessionId: string; note: string }>
 export type SessionEndedEvent = EventBase<'session.ended', { sessionId: string; summary?: string }>

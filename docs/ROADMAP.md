@@ -27,6 +27,7 @@ Status, 5 November 2026, after the 0.3.0 release. Continuum is published on npm 
 | **Release automation** | Actions pinned to commit SHAs, npm trusted publishing, the plugin repository updated by the release workflow, a strict Content-Security-Policy on the website, and one getting-started guide. |
 | **Briefings** (next release) | The Handoffs page became Briefings: the text `continuum handoff` prints, with a copy button and its size in tokens, and a test proving the two match. The handoff text the browser built for itself and its browser-only history are gone. |
 | **Correct it yourself** (next release) | Create a task (now or later), add a decision or known issue, and mark a record resolved or still valid from the dashboard. Each is labelled set by you and reaches the next briefing, through the same CSRF-protected write as task edits. |
+| **Two agents at once** (next release) | `record_decision`, `update_task` and `get_context` act on the calling session's task, so two Claude Code sessions in one repository don't cross. Claude Code gives its MCP server `CLAUDE_CODE_SESSION_ID`, the same id its hooks report, including after `--resume`, and a resumed session counts as running again. `update_task` has to name a task another running session took up, and `start_task` no longer pauses that task. Codex and other agents are not held back this way yet: see item 1. |
 | **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health); 0.3.0 (the first hour, clearer verification, the first release run entirely by the workflow). The plugin repository accepts private vulnerability reports. |
 
 ## Next
@@ -35,11 +36,11 @@ In order. Each item is one pull request, tests first; sizes are rough, for one d
 
 ### Memory you can ask
 
-An agent can reach everything recorded, on the task it is really working on.
+An agent can reach everything recorded.
 
 | # | Item | Done when | Size |
 |---|---|---|---|
-| 1 | **Decisions on the right task.** `record_decision` and `update_task` act on the calling session's task, not the repository's newest, so two agents working at once don't cross. Claude Code gives its MCP server `CLAUDE_CODE_SESSION_ID`, the same id its hooks report, including after `--resume`. Codex 0.149 gives its server no session variable, so other agents keep today's behaviour until one does. | A test with two parallel sessions keeps each decision on its own task. | M |
+| 1 | **Codex sessions keep to their own tasks too.** Codex 0.149 gives its MCP server no session variable, but names the session on every tool call, in `_meta["x-codex-turn-metadata"].session_id`, the same id its hooks report. Read it per call, falling back to today's behaviour when it's missing, since the field is not documented. | A Codex session is refused a task another running session took up. | S |
 | 2 | **Search memory.** A `search_memory` MCP tool, `continuum search`, and query text in `get_context`. SQLite's FTS5 works in `node:sqlite`, so this needs no embeddings and adds nothing to the install. Today `get_context` ignores the words in a query, and an on-topic decision from another task always ranks low. The dashboard's search covers tasks, files and activity, but not memory records. | An old decision on another task is found by a word in its body. | M |
 | 3 | **`continuum why <file or symbol>`.** The decisions, tasks and checks behind a piece of code, from links already recorded. | Lists every record anchored to it, each with its evidence label. | S–M |
 
