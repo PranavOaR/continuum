@@ -6,8 +6,8 @@
 //
 // It uses real Claude Code and Codex sessions (your accounts), in a throwaway
 // repository; nothing is written outside it (Codex trust is passed per run).
-import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFile, execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -24,6 +24,17 @@ const repo = mkdtempSync(join(tmpdir(), 'continuum-cross-agent-'))
 const configDir = mkdtempSync(join(tmpdir(), 'continuum-cross-agent-config-'))
 const env = { ...process.env, CONTINUUM_CONFIG_DIR: configDir }
 const run = (command, commandArgs, options = {}) => execFileSync(command, commandArgs, { cwd: repo, env, encoding: 'utf8', timeout: AGENT_TIMEOUT_MS, ...options })
+const codexRun = (prompt) => run('codex', [
+  'exec', ...(codexModel ? ['-m', codexModel] : []), '-C', repo, '-s', 'workspace-write',
+  '-c', `projects."${repo}".trust_level="trusted"`, '--dangerously-bypass-hook-trust',
+  prompt,
+])
+const readEvents = () => {
+  const db = new DatabaseSync(join(repo, '.continuum/context.db'), { readOnly: true })
+  const rows = db.prepare('SELECT type, source, payload FROM events ORDER BY seq').all().map((row) => ({ ...row, payload: JSON.parse(row.payload) }))
+  db.close()
+  return rows
+}
 const failures = []
 const check = (name, ok, detail = '') => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}${!ok && detail ? `: ${detail}` : ''}`)
@@ -50,18 +61,12 @@ try {
   ])
 
   console.log('Codex: continue from the briefing alone.')
-  run('codex', [
-    'exec', ...(codexModel ? ['-m', codexModel] : []), '-C', repo, '-s', 'workspace-write',
-    '-c', `projects."${repo}".trust_level="trusted"`, '--dangerously-bypass-hook-trust',
-    'Continue the task you were briefed on at the start of this session. When it is done, call the continuum MCP tool update_task with status "completed". Reply in one sentence.',
-  ])
+  codexRun('Continue the task you were briefed on at the start of this session. When it is done, call the continuum MCP tool update_task with status "completed". Reply in one sentence.')
 
   const math = readFileSync(join(repo, 'math.js'), 'utf8')
   check('the code is fixed by the two agents together', /a \+ b/.test(math) && /a \* b/.test(math), math)
 
-  const db = new DatabaseSync(join(repo, '.continuum/context.db'), { readOnly: true })
-  const events = db.prepare('SELECT type, source, payload FROM events ORDER BY seq').all().map((row) => ({ ...row, payload: JSON.parse(row.payload) }))
-  db.close()
+  const events = readEvents()
   const sessions = new Map(events.filter((event) => event.type === 'session.started').map((event) => [event.payload.sessionId, event.payload.agent]))
   const taskOf = (agent) => events.find((event) => event.type === 'session.task' && sessions.get(event.payload.sessionId) === agent)?.payload.taskId
   const claudeTask = taskOf('claude-code')
@@ -71,6 +76,31 @@ try {
   check('each agent’s edit is attributed to it', editedBy('claude-code').includes('math.js') && editedBy('codex').includes('math.js'), JSON.stringify({ claude: editedBy('claude-code'), codex: editedBy('codex') }))
   const last = events.filter((event) => event.type === 'task.upserted' && event.payload.id === claudeTask).at(-1)
   check('the task ends completed', last?.payload.status === 'completed', JSON.stringify(last?.payload))
+
+  console.log('Two at once: Claude Code keeps a task while Codex tries to complete it.')
+  const claudeStarted = join(repo, 'claude-started')
+  const codexDone = join(repo, 'codex-done')
+  let claudeStopped = false
+  const claude = new Promise((resolve, reject) => {
+    execFile('claude', [
+      '-p',
+      `Do these steps in order and nothing else. 1) Call the continuum MCP tool start_task with title "Held by Claude". 2) Run this exact shell command: touch ${claudeStarted}; until [ -f ${codexDone} ]; do sleep 1; done 3) Reply with the single word done.`,
+      '--allowedTools', 'Bash', 'mcp__continuum__start_task',
+    ], { cwd: repo, env, timeout: AGENT_TIMEOUT_MS }, (error) => {
+      claudeStopped = true
+      if (error) reject(error)
+      else resolve()
+    })
+  })
+  const deadline = Date.now() + AGENT_TIMEOUT_MS
+  while (!existsSync(claudeStarted) && !claudeStopped && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 1000))
+  if (!existsSync(claudeStarted)) throw new Error('Claude Code stopped before it was holding the task, so this scenario proves nothing.')
+  const refusal = codexRun('Call the continuum MCP tool update_task with status "completed" and no task_id, once. Do not retry it, whatever it returns. Reply with the exact text the tool returned.')
+  writeFileSync(codexDone, '')
+  await claude
+  const held = readEvents().filter((event) => event.type === 'task.upserted' && event.payload.title === 'Held by Claude').at(-1)
+  check('Codex is refused the task Claude Code holds', /has not ended/.test(refusal), refusal.slice(-300))
+  check('that task stays in progress', held?.payload.status === 'in-progress', JSON.stringify(held?.payload))
 } catch (error) {
   check('the run completed', false, error instanceof Error ? (error.stderr || error.message) : String(error))
 } finally {

@@ -20,10 +20,12 @@ const MAX_ANCHORED_FILES = 50
 /**
  * Claude Code starts one MCP server per session with this set, to the id its
  * hooks report, also after --resume. It is fixed at the start, and child
- * processes inherit it, so it is only a hint: see openSessionId. Codex sets
- * nothing like it (0.149).
+ * processes inherit it, so it is only a hint: see openSessionId.
  */
 const SESSION_ID_ENV = 'CLAUDE_CODE_SESSION_ID'
+
+/** Codex sets no variable (0.149) but names the session on each call, under this `_meta` key. It is undocumented, so anything else falls back. */
+const CODEX_TURN_META = 'x-codex-turn-metadata'
 
 export interface ServerOptions {
   /** Directory the agent works in; the repository is resolved from it on every call. */
@@ -37,6 +39,15 @@ export interface ServerOptions {
 /** The agent session this process serves, if its client named one. */
 export function callingSessionId(env: NodeJS.ProcessEnv = process.env): string | undefined {
   return env[SESSION_ID_ENV]?.trim() || undefined
+}
+
+type CallExtra = { _meta?: Record<string, unknown> }
+
+/** The session behind one tool call: the one the call names, otherwise the one this server started with. */
+export function sessionOfCall(meta: Readonly<Record<string, unknown>> | undefined, serverSession?: string): string | undefined {
+  const turn = meta?.[CODEX_TURN_META]
+  const id = typeof turn === 'object' && turn !== null ? (turn as { session_id?: unknown }).session_id : undefined
+  return (typeof id === 'string' && id.trim()) || serverSession
 }
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean }
@@ -140,6 +151,7 @@ const recordDecisionInput = {
  */
 export function createContinuumServer(options: ServerOptions): McpServer {
   const now = options.now ?? (() => new Date())
+  const sessionOf = (extra: CallExtra) => sessionOfCall(extra._meta, options.sessionId)
   const server = new McpServer({ name: SERVER_NAME, version: options.version })
 
   server.registerTool(
@@ -154,13 +166,13 @@ export function createContinuumServer(options: ServerOptions): McpServer {
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async ({ task_id, budget_tokens }) =>
+    async ({ task_id, budget_tokens }, extra) =>
       guarded(() =>
         withStore(options.cwd, async (store, root) => {
           const at = now()
           const state = await currentState(store, root, at)
           if (task_id && !state.tasks.some((task) => task.id === task_id)) throw new ToolInputError(`No task "${task_id}".`)
-          const taskId = task_id ?? taskIdOfSession(store, openSessionId(store, options.sessionId), at)
+          const taskId = task_id ?? taskIdOfSession(store, openSessionId(store, sessionOf(extra)), at)
           return ok(renderContext(rankContext(store, state, { now: at, ...(taskId ? { taskId } : {}) }), budget_tokens ?? DEFAULT_CONTEXT_TOKENS))
         }),
       ),
@@ -216,14 +228,14 @@ export function createContinuumServer(options: ServerOptions): McpServer {
       inputSchema: recordDecisionInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async ({ title, body, kind, files }) =>
+    async ({ title, body, kind, files }, extra) =>
       guarded(() =>
         withStore(options.cwd, async (store, root, { redact }) => {
           const anchors = await anchorsFor(root, options.cwd, files)
           const id = randomUUID()
           // Decisions belong to the task this session is working on, read under the same lock that records them.
           store.transact(() => {
-            const taskId = taskIdOfSession(store, openSessionId(store, options.sessionId), now())
+            const taskId = taskIdOfSession(store, openSessionId(store, sessionOf(extra)), now())
             const event: MemoryRecordedEvent = {
               type: 'memory.recorded',
               payload: { id, kind, title: redact(title), body: redact(body), anchors, ...(taskId ? { taskId } : {}) },
@@ -239,7 +251,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
       ),
   )
 
-  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, _root, { redact }) => ok(await work(store, redact)))), now, options.sessionId)
+  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, _root, { redact }) => ok(await work(store, redact)))), now, sessionOf)
 
   return server
 }
