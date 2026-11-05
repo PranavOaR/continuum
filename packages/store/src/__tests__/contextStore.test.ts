@@ -84,6 +84,19 @@ describe('ContextStore projection', () => {
     store.close()
   })
 
+  it('opens a resumed session again, keeping when it began and what it took up', () => {
+    const store = ContextStore.open(':memory:')
+    store.record(ev.sessionStart('s1', 'given'))
+    const startedAt = store.graph.get('session:s1')?.props.startedAt
+    store.record({ type: 'session.task', payload: { sessionId: 's1', taskId: 'chosen' }, evidence: 'observed', source: 'mcp', occurredAt: '2026-10-16T12:00:00.000Z' })
+    store.record(ev.sessionEnd('s1', 'done'))
+
+    store.record({ type: 'session.started', payload: { sessionId: 's1', agent: 'claude-code', resumed: true }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: '2026-10-16T13:00:00.000Z' })
+
+    expect(store.graph.get('session:s1')?.props).toMatchObject({ startedAt, endedAt: null, taskId: 'chosen', tookUpTaskId: 'chosen', lastActivityAt: '2026-10-16T13:00:00.000Z' })
+    store.close()
+  })
+
   it('creates the session when progress arrives first', () => {
     const store = ContextStore.open(':memory:')
     store.record(ev.sessionProgress('late', 'note'))

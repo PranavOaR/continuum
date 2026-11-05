@@ -130,6 +130,18 @@ describe('LocalContinuumService', () => {
     expect(activity.find((event) => event.type === 'file-change')).toMatchObject({ agent: 'claude-code', fileId: 'acme~file~src/auth.ts' })
   })
 
+  it('says a session resumed, not that a new one started', async () => {
+    const { repo, service: local } = await service()
+    const store = openStore(join(repo.root, '.continuum/context.db'))
+    store.record({ type: 'session.task', payload: { sessionId: 's1', taskId: 'its-task' }, evidence: 'observed', source: 'mcp', occurredAt: new Date(NOW.getTime() + 1000).toISOString() })
+    store.record({ type: 'session.started', payload: { sessionId: 's1', agent: 'claude-code', resumed: true }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: new Date(NOW.getTime() + 2000).toISOString() })
+    store.close()
+
+    const [latest] = await local.listActivity()
+
+    expect(latest).toMatchObject({ type: 'session', title: 'Claude Code session resumed', agent: 'claude-code', taskId: 'its-task' })
+  })
+
   it('summarizes the overview with attention items for failing and stale evidence', async () => {
     const { repo, service: local } = await service()
     repo.write('src/db.ts', 'db v2')

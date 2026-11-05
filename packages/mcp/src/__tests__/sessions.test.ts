@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { initWorkspace, openWorkspace, scanRepository } from '@continuum/capture'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
+import { currentTaskId, QUIET_SESSION_MS } from '@continuum/context'
 import type { ContinuumEvent } from '@continuum/core'
 import { afterEach, describe, expect, it } from 'vitest'
 import { callingSessionId, createContinuumServer } from '../server'
@@ -35,11 +36,28 @@ async function connect(repo: Sandbox, sessionId?: string) {
   const client = new Client({ name: 'test', version: '0' })
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
   clients.push(client)
-  return async (name: string, args: Record<string, unknown>) => {
+  const reply = async (name: string, args: Record<string, unknown>, isRefused: boolean) => {
     const result = await client.callTool({ name, arguments: args })
-    expect(result.isError).not.toBe(true)
+    expect(result.isError === true).toBe(isRefused)
     return (result.content as { text: string }[])[0].text
   }
+  return Object.assign((name: string, args: Record<string, unknown>) => reply(name, args, false), { refused: (name: string, args: Record<string, unknown>) => reply(name, args, true) })
+}
+
+/** What the SessionStart hook records: a session starting now is given the current task. */
+async function sessionStarts(repo: Sandbox, sessionId: string) {
+  const { store } = await openWorkspace(repo.root)
+  const at = now()
+  const taskId = currentTaskId(store, at)
+  store.transact(() => [{ type: 'session.started', evidence: 'observed', source: 'adapter:claude-code', occurredAt: at.toISOString(), payload: { sessionId, agent: 'claude-code', ...(taskId ? { taskId } : {}) } }])
+  store.close()
+}
+
+/** What the SessionStart hook records for a session that comes back after ending. */
+async function resumeSession(repo: Sandbox, sessionId: string) {
+  const { store } = await openWorkspace(repo.root)
+  store.transact(() => [{ type: 'session.started', evidence: 'observed', source: 'adapter:claude-code', occurredAt: now().toISOString(), payload: { sessionId, agent: 'claude-code', resumed: true } }])
+  store.close()
 }
 
 async function endSession(repo: Sandbox, sessionId: string) {
@@ -124,6 +142,202 @@ describe('two sessions working at once', () => {
     await first('record_decision', { title: 'A later note' })
 
     expect((await decisionsByTask(repo))['A later note']).toBe(secondTask)
+  })
+})
+
+async function secondSessionArrives() {
+  const repo = await repository(['one'])
+  const first = await connect(repo, 'one')
+  const task = taskIdOf(await first('start_task', { title: 'Add sign-in' }))
+  await sessionStarts(repo, 'two')
+  return { repo, first, second: await connect(repo, 'two'), task }
+}
+
+describe('a session resumed after it ended', () => {
+  it('acts on its own task again, not the newest one', async () => {
+    const repo = await repository(['one', 'two'])
+    const [first, second] = [await connect(repo, 'one'), await connect(repo, 'two')]
+    const own = taskIdOf(await first('start_task', { title: 'Add sign-in' }))
+    const newest = taskIdOf(await second('start_task', { title: 'Fix billing' }))
+    await endSession(repo, 'one')
+    await resumeSession(repo, 'one')
+
+    await first('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, own)).toBe('completed')
+    expect(await statusOf(repo, newest)).toBe('in-progress')
+  })
+
+  it('keeps another session off its task again', async () => {
+    const { repo, second, task } = await secondSessionArrives()
+    await endSession(repo, 'one')
+    await resumeSession(repo, 'one')
+
+    await second.refused('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('in-progress')
+  })
+})
+
+describe('a session given a task another running session took up', () => {
+  it('is refused, and told which task and how to go on', async () => {
+    const { repo, second, task } = await secondSessionArrives()
+
+    const reply = await second.refused('update_task', { status: 'completed' })
+
+    expect(reply).toContain('has not ended')
+    expect(reply).toContain('start_task')
+    expect(reply).toContain(`task_id "${task}"`)
+    expect(await statusOf(repo, task)).toBe('in-progress')
+  })
+
+  it('stays refused while that session reports on the task, however long its turn', async () => {
+    const { repo, first, second, task } = await secondSessionArrives()
+    tick += QUIET_SESSION_MS / 1000 - 60
+    await first('update_task', { next_action: 'Still at it' })
+    tick += 120
+
+    await second.refused('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('in-progress')
+  })
+
+  it('is refused anything else too, since one update would otherwise make the task its own', async () => {
+    const { repo, second, task } = await secondSessionArrives()
+
+    await second.refused('update_task', { next_action: 'Something of mine' })
+
+    expect((await recorded(repo)).filter((event) => event.type === 'session.task').map((event) => event.payload)).toEqual([{ sessionId: 'one', taskId: task }])
+  })
+
+  it('may update it by naming it, and then it is that session’s task too', async () => {
+    const { repo, second, task } = await secondSessionArrives()
+
+    await second('update_task', { task_id: task, next_action: 'Take over the callback' })
+    await second('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('completed')
+  })
+
+  it('can start its own task, and the other session’s stays in progress', async () => {
+    const { repo, first, second, task } = await secondSessionArrives()
+
+    const own = taskIdOf(await second('start_task', { title: 'Fix billing' }))
+    await second('update_task', { status: 'completed' })
+    await first('update_task', { next_action: 'Write the callback' })
+
+    expect(await statusOf(repo, own)).toBe('completed')
+    expect(await statusOf(repo, task)).toBe('in-progress')
+  })
+
+  it('does not stop the session that took the task up', async () => {
+    const { repo, first, task } = await secondSessionArrives()
+
+    await first('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('completed')
+  })
+
+  it('carries on once that session has ended, which is an ordinary handoff', async () => {
+    const { repo, second, task } = await secondSessionArrives()
+    await endSession(repo, 'one')
+
+    await second('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('completed')
+  })
+
+  it('carries on once that session has gone quiet, since a crash reports no end', async () => {
+    const { repo, second, task } = await secondSessionArrives()
+    tick += QUIET_SESSION_MS / 1000 + 1
+
+    await second('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('completed')
+  })
+
+  it('gives a task nobody took up to the first session that reports on it', async () => {
+    const repo = await repository()
+    const { store } = await openWorkspace(repo.root)
+    store.transact(() => [{ type: 'task.upserted', evidence: 'user-reported', source: 'cli', occurredAt: now().toISOString(), payload: { id: 'yours', title: 'Yours', status: 'in-progress' } }])
+    store.close()
+    await sessionStarts(repo, 'one')
+    await sessionStarts(repo, 'two')
+    const [first, second] = [await connect(repo, 'one'), await connect(repo, 'two')]
+
+    await first('update_task', { next_action: 'Mine' })
+    await second.refused('update_task', { next_action: 'Mine too' })
+    await second('update_task', { task_id: 'yours', next_action: 'Shared' })
+
+    expect(await statusOf(repo, 'yours')).toBe('in-progress')
+  })
+
+  it('never stops a caller that names no session: the session on the task may be its own', async () => {
+    const repo = await repository(['one'])
+    const first = await connect(repo, 'one')
+    const task = taskIdOf(await first('start_task', { title: 'Add sign-in' }))
+    const unnamed = await connect(repo)
+
+    await unnamed('update_task', { status: 'completed' })
+
+    expect(await statusOf(repo, task)).toBe('completed')
+  })
+})
+
+describe('starting a task leaves running sessions alone', () => {
+  it('pauses nothing another running session took up', async () => {
+    const repo = await repository(['one', 'two'])
+    const [first, second] = [await connect(repo, 'one'), await connect(repo, 'two')]
+    const task = taskIdOf(await first('start_task', { title: 'Add sign-in' }))
+
+    await second('start_task', { title: 'Fix billing' })
+
+    expect(await statusOf(repo, task)).toBe('in-progress')
+  })
+
+  it('still pauses the caller’s own earlier task', async () => {
+    const repo = await repository(['one'])
+    const first = await connect(repo, 'one')
+    const task = taskIdOf(await first('start_task', { title: 'Add sign-in' }))
+
+    await first('start_task', { title: 'Fix billing' })
+
+    expect(await statusOf(repo, task)).toBe('planned')
+  })
+
+  it('still pauses a task whose session has ended', async () => {
+    const repo = await repository(['one', 'two'])
+    const [first, second] = [await connect(repo, 'one'), await connect(repo, 'two')]
+    const task = taskIdOf(await first('start_task', { title: 'Add sign-in' }))
+    await endSession(repo, 'one')
+
+    await second('start_task', { title: 'Fix billing' })
+
+    expect(await statusOf(repo, task)).toBe('planned')
+  })
+
+  // Past /clear the server still holds the old id, and the session on a task may be this one under its new id.
+  it('still pauses everything for a session that has ended', async () => {
+    const repo = await repository(['one', 'two'])
+    const [first, second] = [await connect(repo, 'one'), await connect(repo, 'two')]
+    await first('start_task', { title: 'Add sign-in' })
+    const task = taskIdOf(await second('start_task', { title: 'Fix billing' }))
+    await endSession(repo, 'one')
+
+    await first('start_task', { title: 'Write the docs' })
+
+    expect(await statusOf(repo, task)).toBe('planned')
+  })
+
+  it('still pauses everything for a caller that names no session', async () => {
+    const repo = await repository(['one'])
+    const first = await connect(repo, 'one')
+    const task = taskIdOf(await first('start_task', { title: 'Add sign-in' }))
+    const unnamed = await connect(repo)
+
+    await unnamed('start_task', { title: 'Fix billing' })
+
+    expect(await statusOf(repo, task)).toBe('planned')
   })
 })
 

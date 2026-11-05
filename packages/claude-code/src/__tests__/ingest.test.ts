@@ -263,6 +263,18 @@ describe('ingestHook per-session tasks', () => {
     expect(withStore(storePath, (store) => [...store.events()].filter((event) => event.type === 'session.task'))).toHaveLength(1)
   })
 
+  // Codex names no session to its MCP server, so only this hook can record it taking up the task it was briefed on.
+  it('records a session taking up the task it was given when it started', async () => {
+    const { repo, storePath } = await initialized()
+    withStore(storePath, (store) => store.record({ type: 'task.upserted', payload: { id: 'task-1', title: 'A', status: 'in-progress' }, evidence: 'agent-reported', source: 'mcp', occurredAt: NOW.toISOString() }))
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+    const report = hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'mcp__continuum__update_task', tool_input: {}, tool_response: [{ type: 'text', text: 'Task task-1: "A" is completed.' }] })
+
+    await ingestHook(report, { now: () => NOW })
+
+    expect(withStore(storePath, (store) => [...store.events()].filter((event) => event.type === 'session.task'))).toMatchObject([{ payload: { sessionId: 'sess-1', taskId: 'task-1' } }])
+  })
+
   const startTask = (title: string, id: string) => ({
     hook_event_name: 'PostToolUse',
     tool_name: 'mcp__continuum__start_task',
@@ -287,6 +299,27 @@ describe('ingestHook per-session tasks', () => {
       expect(store.graph.neighbors('task:docs-2', { direction: 'out', types: ['touches'] })).not.toContain('file:src/a.ts')
       expect(store.graph.get('session:agent-a')?.props.taskId).toBe('auth-1')
     })
+  })
+})
+
+describe('ingestHook for a session that comes back', () => {
+  it('opens a session resumed after it ended', async () => {
+    const { repo, storePath } = await initialized()
+    const later = new Date(NOW.getTime() + 60_000)
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+    await ingestHook(hook(repo, { hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' }), { now: () => NOW })
+
+    const outcome = await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'resume' }), { now: () => later })
+
+    expect(outcome).toMatchObject({ status: 'recorded', events: 1 })
+    expect(withStore(storePath, (store) => store.graph.get('session:sess-1')?.props)).toMatchObject({ endedAt: null, startedAt: NOW.toISOString(), lastActivityAt: later.toISOString() })
+  })
+
+  it('records nothing when a running session compacts', async () => {
+    const { repo } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+
+    expect(await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'compact' }), { now: () => NOW })).toMatchObject({ status: 'recorded', events: 0 })
   })
 })
 

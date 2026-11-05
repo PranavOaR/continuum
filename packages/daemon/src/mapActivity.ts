@@ -63,6 +63,7 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
     }
     case 'session.started': {
       const agent = asAgent(event.payload.agent)
+      if (event.payload.resumed) return { type: 'session', title: `${getAgent(agent).name} session resumed`, description: 'A session that had ended picked up again.', agent, ...withTask(sessionTask(snapshot, event.payload.sessionId)) }
       return { type: 'session', title: `${getAgent(agent).name} session started`, description: 'A new agent session began.', agent, ...withTask(event.payload.taskId) }
     }
     case 'session.progress': {

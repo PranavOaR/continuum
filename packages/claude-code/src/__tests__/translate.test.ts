@@ -60,6 +60,11 @@ describe('translateHook', () => {
     expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'resume' }), context())).toHaveLength(1)
   })
 
+  it('opens a known session again when it comes back after ending', () => {
+    const resumed = { type: 'session.started', evidence: 'observed', payload: { sessionId: 'sess-1', agent: 'claude-code', resumed: true } }
+    expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'resume' }), context({ knownSession: true, endedSession: true }))).toMatchObject([resumed])
+  })
+
   it('ends sessions', () => {
     expect(translateHook(payload({ hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' }), context({ revision: null }))).toEqual([
       { type: 'session.ended', evidence: 'observed', source: 'adapter:claude-code', occurredAt: NOW.toISOString(), payload: { sessionId: 'sess-1' } },

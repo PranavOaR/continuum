@@ -7,7 +7,7 @@ import { anchoredPath } from './keys'
 export const FORGOTTEN = '[forgotten]'
 
 /** Keys whose values are identifiers or hashes, never free text: they are removed or kept whole, not scrubbed. */
-const STRUCTURAL_KEYS = new Set(['path', 'contentHash', 'sessionId', 'taskId', 'id', 'hash', 'coverage', 'lastRunHash', 'recordHash', 'changedBy', 'files', 'ranAgainst', 'anchors'])
+const STRUCTURAL_KEYS = new Set(['path', 'contentHash', 'sessionId', 'taskId', 'tookUpTaskId', 'id', 'hash', 'coverage', 'lastRunHash', 'recordHash', 'changedBy', 'files', 'ranAgainst', 'anchors'])
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
