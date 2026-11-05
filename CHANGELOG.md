@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-11-05
 
 ### Added
 - **A banner when Continuum starts.** `continuum`, `setup`, `start` and `serve` open with the Continuum wordmark in block letters, the version and a reminder that everything stays on this machine. It shows only to someone at a terminal 68 columns or wider: agents, pipes, CI and `mcp` output are unchanged, `NO_COLOR` turns its colour off, and `serve` shows it once, not again after an automatic restart.
