@@ -35,7 +35,6 @@ export function DemoVideo() {
           className="block aspect-video w-full bg-surface focus:outline-none"
           src={DEMO_VIDEO.src}
           poster={DEMO_VIDEO.poster}
-          aria-describedby="demo-video-caption"
           controls={state === 'started'}
           playsInline
           preload="metadata"
@@ -63,7 +62,6 @@ export function DemoVideo() {
           </div>
         )}
       </div>
-      <figcaption id="demo-video-caption" className="mt-3 max-w-[720px] text-[13.5px] leading-[1.55] text-muted">{DEMO_VIDEO.caption}</figcaption>
     </figure>
   )
 }
