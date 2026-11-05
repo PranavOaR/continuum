@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { MAX_TASK_TEXT_CHARS, MAX_TITLE_CHARS, type NewTask, type RecordedCriterion, type TaskChange, type TaskField, type TaskUpsertedEvent } from '@continuum/core'
-import type { ContextStore, GraphNode } from '@continuum/store'
+import { keys, type ContextStore, type GraphNode } from '@continuum/store'
 
 export type TaskStatus = 'planned' | 'in-progress' | 'blocked' | 'completed'
 const ACTIVE: ReadonlySet<string> = new Set(['in-progress', 'blocked'])
@@ -81,6 +81,37 @@ export function currentTaskNode(store: ContextStore, now: Date = new Date()): Gr
 
 export function currentTaskId(store: ContextStore, now?: Date): string | undefined {
   return currentTaskNode(store, now)?.key.slice('task:'.length)
+}
+
+/**
+ * The id, while that session is still running. An MCP server is given its
+ * session once, when it starts, and outlives it: after /clear it keeps the old
+ * id while hooks report a new one.
+ */
+export function openSessionId(store: ContextStore, sessionId: string | undefined): string | undefined {
+  const session = sessionId ? store.graph.get(keys.session(sessionId)) : undefined
+  return session && !session.props.endedAt ? sessionId : undefined
+}
+
+/** Whether this is the task the session last took up. */
+export function sessionWorksOn(store: ContextStore, sessionId: string, taskId: string): boolean {
+  return store.graph.get(keys.session(sessionId))?.props.taskId === taskId
+}
+
+/**
+ * The task a session's work belongs to: the one it took up itself, while that
+ * task is unfinished; otherwise the repository's current task. Two agents in
+ * one repository therefore keep their work apart. A caller that cannot name
+ * its session (not every agent can) gets the current task.
+ */
+export function taskNodeOfSession(store: ContextStore, sessionId: string | undefined, now?: Date): GraphNode | undefined {
+  const own = sessionId ? store.graph.get(keys.session(sessionId))?.props.taskId : undefined
+  const task = typeof own === 'string' ? store.graph.get(keys.task(own)) : undefined
+  return isTaskNode(task) && task.props.status !== 'completed' ? task : currentTaskNode(store, now)
+}
+
+export function taskIdOfSession(store: ContextStore, sessionId: string | undefined, now?: Date): string | undefined {
+  return taskNodeOfSession(store, sessionId, now)?.key.slice('task:'.length)
 }
 
 export function summarizeTask(store: ContextStore, node: GraphNode): TaskSummary {

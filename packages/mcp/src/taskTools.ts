@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { currentTaskNode, isTaskNode, newTaskId, sameTitle, summarizeTask, taskSnapshot, taskSummaries, type TaskSummary } from '@continuum/context'
-import { MAX_TASK_TEXT_CHARS, type TaskUpsertedEvent } from '@continuum/core'
+import { isTaskNode, newTaskId, openSessionId, sameTitle, sessionWorksOn, summarizeTask, taskNodeOfSession, taskSnapshot, taskSummaries, type TaskSummary } from '@continuum/context'
+import { MAX_TASK_TEXT_CHARS, type SessionTaskEvent, type TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
 
 const MAX_ITEMS = 30
@@ -25,6 +25,17 @@ type Redact = (text: string) => string
 
 function event(payload: Snapshot, now: Date): TaskUpsertedEvent {
   return { type: 'task.upserted', payload, evidence: 'agent-reported', source: 'mcp', occurredAt: now.toISOString() }
+}
+
+/**
+ * Links the calling session to a task in the same write as the task: the hook
+ * that also reports this runs in the background, and the agent's next call
+ * could overtake it. A session no hook has reported, or one that has ended, gets no link.
+ */
+function sessionLink(store: ContextStore, sessionId: string | undefined, taskId: string, now: Date): SessionTaskEvent[] {
+  const caller = openSessionId(store, sessionId)
+  if (!caller || sessionWorksOn(store, caller, taskId)) return []
+  return [{ type: 'session.task', payload: { sessionId: caller, taskId }, evidence: 'observed', source: 'mcp', occurredAt: now.toISOString() }]
 }
 
 export const startTaskInput = {
@@ -75,7 +86,7 @@ function resumed(task: TaskSummary, input: StartInput, clean: Redact): Snapshot 
  * planned) so an abandoned task cannot keep absorbing new work; blocked tasks
  * stay blocked.
  */
-export function startTask(store: ContextStore, input: StartInput, now: Date, redact: Redact): { snapshot: Snapshot; isResumed: boolean } {
+export function startTask(store: ContextStore, input: StartInput, now: Date, redact: Redact, sessionId?: string): { snapshot: Snapshot; isResumed: boolean } {
   const clean = (value: string) => redact(value.trim())
   const title = clean(input.title)
   let result: { snapshot: Snapshot; isResumed: boolean } | undefined
@@ -97,7 +108,7 @@ export function startTask(store: ContextStore, input: StartInput, now: Date, red
       .filter((task) => task.status === 'in-progress' && task.id !== snapshot.id)
       .map((task) => event({ ...taskSnapshot(task), status: 'planned' }, now))
     result = { snapshot, isResumed: open !== undefined }
-    return [...paused, event(snapshot, now)]
+    return [...paused, event(snapshot, now), ...sessionLink(store, sessionId, snapshot.id, now)]
   })
   return result as { snapshot: Snapshot; isResumed: boolean }
 }
@@ -113,12 +124,12 @@ function hasChanges(input: UpdateInput): boolean {
 }
 
 /** Applies a partial update to a task as one new snapshot, read and written under the store lock. */
-export function updateTask(store: ContextStore, input: UpdateInput, now: Date, redact: Redact): Snapshot {
+export function updateTask(store: ContextStore, input: UpdateInput, now: Date, redact: Redact, sessionId?: string): Snapshot {
   const clean = (value: string) => redact(value.trim())
   if (!hasChanges(input)) throw new TaskToolError('Nothing to update: pass a status, next_action, completed_steps, remaining_steps or criteria_met.')
   let next: Snapshot | undefined
   store.transact(() => {
-    const node = input.task_id ? store.graph.get(`task:${input.task_id}`) : currentTaskNode(store, now)
+    const node = input.task_id ? store.graph.get(`task:${input.task_id}`) : taskNodeOfSession(store, openSessionId(store, sessionId), now)
     if (!isTaskNode(node)) {
       throw new TaskToolError(input.task_id ? `No task "${input.task_id}".` : 'No current task. Start one with start_task first.')
     }
@@ -139,7 +150,7 @@ export function updateTask(store: ContextStore, input: UpdateInput, now: Date, r
       completedSteps: [...(current.completedSteps ?? []), ...done.filter((step) => !(current.completedSteps ?? []).includes(step))].slice(-MAX_COMPLETED_STEPS),
       remainingSteps: remaining.filter((step) => !done.includes(step)),
     }
-    return [event(next, now)]
+    return [event(next, now), ...sessionLink(store, sessionId, next.id, now)]
   })
   return next as Snapshot
 }
@@ -160,7 +171,7 @@ function describe(snapshot: Snapshot): string {
 type Run = (work: (store: ContextStore, redact: Redact) => Promise<string> | string) => Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }>
 
 /** Lets an agent record what it is working on, so the next session (or agent) continues the same task. */
-export function registerTaskTools(server: McpServer, run: Run, now: () => Date): void {
+export function registerTaskTools(server: McpServer, run: Run, now: () => Date, sessionId?: string): void {
   server.registerTool(
     'start_task',
     {
@@ -172,7 +183,7 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date):
     },
     async (input) =>
       run((store, redact) => {
-        const { snapshot, isResumed } = startTask(store, input, now(), redact)
+        const { snapshot, isResumed } = startTask(store, input, now(), redact, sessionId)
         return `${isResumed ? `Resumed the open task "${snapshot.title}" instead of starting a duplicate.` : 'Started.'} ${describe(snapshot)}`
       }),
   )
@@ -185,6 +196,6 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date):
       inputSchema: updateTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (input) => run((store, redact) => `Updated. ${describe(updateTask(store, input, now(), redact))}`),
+    async (input) => run((store, redact) => `Updated. ${describe(updateTask(store, input, now(), redact, sessionId))}`),
   )
 }
