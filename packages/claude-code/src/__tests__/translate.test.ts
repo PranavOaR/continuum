@@ -54,8 +54,7 @@ describe('translateHook', () => {
     }
   })
 
-  it('does not restart a known session on resume or compact, but records an unknown one', () => {
-    expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'resume' }), context({ knownSession: true }))).toEqual([])
+  it('does not restart a known session on compact, but records an unknown one', () => {
     expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'compact' }), context({ knownSession: true }))).toEqual([])
     expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'resume' }), context())).toHaveLength(1)
   })
@@ -63,6 +62,11 @@ describe('translateHook', () => {
   it('opens a known session again when it comes back after ending', () => {
     const resumed = { type: 'session.started', evidence: 'observed', payload: { sessionId: 'sess-1', agent: 'claude-code', resumed: true } }
     expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'resume' }), context({ knownSession: true, endedSession: true }))).toMatchObject([resumed])
+    expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'compact' }), context({ knownSession: true, endedSession: true }))).toMatchObject([resumed])
+  })
+
+  it('marks a resume even when no end was recorded, as after a crash or before a late end arrives', () => {
+    expect(translateHook(payload({ hook_event_name: 'SessionStart', source: 'resume' }), context({ knownSession: true }))).toMatchObject([{ payload: { resumed: true } }])
   })
 
   it('ends sessions', () => {
