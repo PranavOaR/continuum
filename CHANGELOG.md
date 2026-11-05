@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **A banner when Continuum starts.** `continuum`, `setup`, `start` and `serve` open with the Continuum wordmark in block letters, the version and a reminder that everything stays on this machine. It shows only to someone at a terminal 68 columns or wider: agents, pipes, CI and `mcp` output are unchanged, `NO_COLOR` turns its colour off, and `serve` shows it once, not again after an automatic restart.
 - **Create and correct from the dashboard.** New task starts a task now or plans it for later; starting one pauses the task in progress, as an agent's `start_task` does. The memory panel adds a decision or known issue to the task on screen. Each record has **Resolved**, which takes it out of briefings, `get_context` and the attention list while keeping it on the page to reopen, and **Still valid**, which vouches for it against today's code, so a stale warning clears and the next change to that code raises it again. What you write is labelled set by you in the dashboard and in what agents read; reviewing an agent's record records your verdict beside it and leaves its text under the agent's label. Everything you type is masked by the repository's redaction rules before it is stored, and goes through the same access and CSRF checks as task edits. Records added here anchor to no code.
 
 ### Changed

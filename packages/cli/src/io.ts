@@ -14,6 +14,8 @@ export interface Io {
   configDir: string
   /** Claude Code's user settings directory, read to see whether the Continuum plugin is enabled. */
   claudeConfigDir: string
+  /** Lines that open a command starting Continuum; empty unless someone is reading at a terminal. */
+  banner?: readonly string[]
   /** Raw streams for child-process output (`run`); default to the process's own. */
   stdout?: Writable
   stderr?: Writable

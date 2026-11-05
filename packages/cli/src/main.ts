@@ -19,6 +19,7 @@ import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
 import { uninstallCommand } from './commands/uninstall'
+import { printBanner } from './banner'
 import { VERSION } from './build'
 import { selfInvocation } from './invocation'
 import { serveWorkerOptions } from './supervisor'
@@ -161,6 +162,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
   }
   const [name, ...args] = parsed.rest
   if (parsed.help || !name) {
+    printBanner(io)
     io.out(HELP)
     return parsed.help ? EXIT_OK : EXIT_USAGE
   }
