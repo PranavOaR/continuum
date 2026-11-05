@@ -13,6 +13,10 @@
 - A record that belongs to no task shows with every task in the memory panel.
 - The overview's fourth card counts what needs attention, in place of pending handoffs. Each project has one View Briefing button in place of Prepare Handoff.
 
+### Fixed
+- **Two Claude Code sessions that each start a task no longer cross.** `record_decision`, `update_task` and `get_context` used the repository's newest task, so a decision could land on the other agent's task, and `update_task` without a `task_id` could mark the other agent's task complete. Each now acts on the task its own session started. A session that has not started one still joins the repository's current task, as its briefing asks, and so does one past `/clear` until it starts a task. Other agents keep the old behaviour for now: Codex does not tell its MCP server which session is calling.
+- The activity feed no longer adds "Session took up a task" on every `update_task` for a task the session already has.
+
 ## [0.3.0] - 2026-11-04
 
 ### Changed

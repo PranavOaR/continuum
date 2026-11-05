@@ -4,7 +4,7 @@ import { isAbsolute, join, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, UnreadableIgnoreFileError, type Redactor } from '@continuum/capture'
-import { currentTaskId, DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, projectState, rankContext, renderContext, renderHandoff, type ProjectState } from '@continuum/context'
+import { DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, openSessionId, projectState, rankContext, renderContext, renderHandoff, taskIdOfSession, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
 import { registerTaskTools, TaskToolError } from './taskTools'
@@ -17,12 +17,26 @@ const MIN_CONTEXT_TOKENS = 200
 const MAX_CONTEXT_TOKENS = 8_000
 const MAX_LISTED_UNRECORDED = 50
 const MAX_ANCHORED_FILES = 50
+/**
+ * Claude Code starts one MCP server per session with this set, to the id its
+ * hooks report, also after --resume. It is fixed at the start, and child
+ * processes inherit it, so it is only a hint: see openSessionId. Codex sets
+ * nothing like it (0.149).
+ */
+const SESSION_ID_ENV = 'CLAUDE_CODE_SESSION_ID'
 
 export interface ServerOptions {
   /** Directory the agent works in; the repository is resolved from it on every call. */
   cwd: string
   version: string
   now?: () => Date
+  /** The session this server works for, when its client says; tools then act on that session's task. */
+  sessionId?: string
+}
+
+/** The agent session this process serves, if its client named one. */
+export function callingSessionId(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return env[SESSION_ID_ENV]?.trim() || undefined
 }
 
 type ToolResult = { content: { type: 'text'; text: string }[]; isError?: boolean }
@@ -146,7 +160,8 @@ export function createContinuumServer(options: ServerOptions): McpServer {
           const at = now()
           const state = await currentState(store, root, at)
           if (task_id && !state.tasks.some((task) => task.id === task_id)) throw new ToolInputError(`No task "${task_id}".`)
-          return ok(renderContext(rankContext(store, state, { now: at, ...(task_id ? { taskId: task_id } : {}) }), budget_tokens ?? DEFAULT_CONTEXT_TOKENS))
+          const taskId = task_id ?? taskIdOfSession(store, openSessionId(store, options.sessionId), at)
+          return ok(renderContext(rankContext(store, state, { now: at, ...(taskId ? { taskId } : {}) }), budget_tokens ?? DEFAULT_CONTEXT_TOKENS))
         }),
       ),
   )
@@ -206,9 +221,9 @@ export function createContinuumServer(options: ServerOptions): McpServer {
         withStore(options.cwd, async (store, root, { redact }) => {
           const anchors = await anchorsFor(root, options.cwd, files)
           const id = randomUUID()
-          // Decisions belong to the task being worked on, read under the same lock that records them.
+          // Decisions belong to the task this session is working on, read under the same lock that records them.
           store.transact(() => {
-            const taskId = currentTaskId(store, now())
+            const taskId = taskIdOfSession(store, openSessionId(store, options.sessionId), now())
             const event: MemoryRecordedEvent = {
               type: 'memory.recorded',
               payload: { id, kind, title: redact(title), body: redact(body), anchors, ...(taskId ? { taskId } : {}) },
@@ -224,7 +239,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
       ),
   )
 
-  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, _root, { redact }) => ok(await work(store, redact)))), now)
+  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, _root, { redact }) => ok(await work(store, redact)))), now, options.sessionId)
 
   return server
 }

@@ -20,7 +20,7 @@ import {
   coverage,
   type Workspace,
 } from '@continuum/capture'
-import { currentTaskId, projectState, renderHandoff, sinceYouLeft } from '@continuum/context'
+import { projectState, renderHandoff, sessionWorksOn, sinceYouLeft, taskIdOfSession } from '@continuum/context'
 import { ContextStore, keys, normalizePath } from '@continuum/store'
 import { agentCheckOf } from './agentCheck'
 import { editedFiles, parseHookPayload, reportedTaskId, SHELL_TOOL, withVsCodeDefaults, type HookAgent, type HookPayload } from './hookPayload'
@@ -135,17 +135,6 @@ async function resolveEdits(root: string, payload: HookPayload): Promise<FileEdi
 
 const withTask = (taskId: string | undefined) => (taskId ? { taskId } : {})
 
-/**
- * The task this session's work belongs to: the one it took up itself, while
- * that task is unfinished; otherwise the repository's current task. Two agents
- * in one repository therefore keep their edits apart.
- */
-function taskFor(store: ContextStore, sessionId: string, now: Date): string | undefined {
-  const own = store.graph.get(keys.session(sessionId))?.props.taskId
-  if (typeof own === 'string' && store.graph.get(keys.task(own))?.props.status !== 'completed') return own
-  return currentTaskId(store, now)
-}
-
 async function sessionStartContext(store: ContextStore, root: string, sessionId: string, now: Date, agent: HookAgent): Promise<string | undefined> {
   const previous = projectState(store, await readWorkingTreeWithSymbols(store, root), now, { excludeSessionId: sessionId })
   if (previous.sessions.length === 0 && previous.checks.length === 0 && previous.decisions.length === 0 && previous.tasks.length === 0) return undefined
@@ -216,9 +205,10 @@ async function ingestInto(workspace: Workspace, payload: HookPayload, agent: Hoo
         knownSession: store.graph.has(keys.session(payload.session_id)),
         agent,
         edits,
-        ...(sessionTaskId ? { sessionTaskId } : {}),
+        // The MCP server usually got there first, in the same write as the task.
+        ...(sessionTaskId && !sessionWorksOn(store, payload.session_id, sessionTaskId) ? { sessionTaskId } : {}),
         ...(prompt ? { prompt } : {}),
-        ...withTask(taskFor(store, payload.session_id, now)),
+        ...withTask(taskIdOfSession(store, payload.session_id, now)),
       }),
     )
     const additionalContext =

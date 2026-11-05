@@ -249,6 +249,20 @@ describe('ingestHook for checks the agent runs', () => {
 })
 
 describe('ingestHook per-session tasks', () => {
+  it('adds no second link when the MCP server already linked the session to the task', async () => {
+    const { repo, storePath } = await initialized()
+    await ingestHook(hook(repo, { hook_event_name: 'SessionStart', source: 'startup' }), { now: () => NOW })
+    const report = hook(repo, { hook_event_name: 'PostToolUse', tool_name: 'mcp__continuum__update_task', tool_input: {}, tool_response: [{ type: 'text', text: 'Task task-1: "A" is in-progress.' }] })
+    withStore(storePath, (store) =>
+      store.transact(() => [{ type: 'session.task', evidence: 'observed', source: 'mcp', occurredAt: NOW.toISOString(), payload: { sessionId: 'sess-1', taskId: 'task-1' } }]),
+    )
+
+    const outcome = await ingestHook(report, { now: () => NOW })
+
+    expect(outcome).toMatchObject({ status: 'recorded', events: 0 })
+    expect(withStore(storePath, (store) => [...store.events()].filter((event) => event.type === 'session.task'))).toHaveLength(1)
+  })
+
   const startTask = (title: string, id: string) => ({
     hook_event_name: 'PostToolUse',
     tool_name: 'mcp__continuum__start_task',
