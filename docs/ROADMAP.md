@@ -1,6 +1,6 @@
 # Continuum roadmap
 
-Status, 4 November 2026, at the 0.3.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has the first phase of the November plan: a new user's first hour. [Next](#next) lists the phases still to come.
+Status, 5 November 2026, after the 0.3.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has the first phase of the November plan: a new user's first hour. [Next](#next) lists the phases still to come.
 
 ## Guiding principles
 
@@ -31,7 +31,32 @@ Status, 4 November 2026, at the 0.3.0 release. Continuum is published on npm as 
 
 ## Next
 
-In order. Each item is one pull request, tests first; sizes are rough, for one developer (S up to a day, M two to three days, L about a week).
+In order. Each item is one pull request, tests first; sizes are rough, for one developer (S up to a day, M two to three days, L about a week). The first three phases come from gaps found in the code, because there are no user reports yet; reports reorder everything below.
+
+### Memory you can ask
+
+An agent can reach everything recorded, on the task it is really working on.
+
+| # | Item | Done when | Size |
+|---|---|---|---|
+| 1 | **Decisions on the right task.** `record_decision` and `update_task` act on the calling session's task, not the repository's newest, so two agents working at once don't cross. Claude Code gives its MCP server `CLAUDE_CODE_SESSION_ID`, the same id its hooks report, including after `--resume`. Codex 0.149 gives its server no session variable, so other agents keep today's behaviour until one does. | A test with two parallel sessions keeps each decision on its own task. | M |
+| 2 | **Search memory.** A `search_memory` MCP tool, `continuum search`, and query text in `get_context`. SQLite's FTS5 works in `node:sqlite`, so this needs no embeddings and adds nothing to the install. Today `get_context` ignores the words in a query, and an on-topic decision from another task always ranks low. The dashboard's search covers tasks, files and activity, but not memory records. | An old decision on another task is found by a word in its body. | M |
+| 3 | **`continuum why <file or symbol>`.** The decisions, tasks and checks behind a piece of code, from links already recorded. | Lists every record anchored to it, each with its evidence label. | S–M |
+
+### Evidence at the finish
+
+Honest evidence at the moment it matters: when work is called done.
+
+| # | Item | Done when | Size |
+|---|---|---|---|
+| 4 | **Warn when closing unverified work.** An agent marking a task complete while a check is failed or out of date gets a warning in the tool's reply. It never blocks. | The reply names the check. | S |
+| 5 | **Stale-decision check.** `continuum check` for a pre-commit hook lists decisions whose anchored code just changed, so an agent quietly undoing one is caught before it lands. | It names the decision and the symbol. | M |
+
+### Follows you
+
+| # | Item | Done when | Size |
+|---|---|---|---|
+| 6 | **Personal profile.** Your preferences, kept on this machine and labelled set by you, reach every repository. "Use pnpm" should not need repeating. | A new repository's first briefing includes them. | M |
 
 ### Trust and control
 
@@ -39,9 +64,8 @@ What the dashboard shows is exactly what agents receive, and you can correct it 
 
 | # | Item | Done when | Size |
 |---|---|---|---|
-| 1 | **Repository settings in the dashboard.** Agent checks, prompt capture and redaction patterns, with a preview of what a pattern would mask. Unusable patterns are refused. | Saving a bad pattern is refused with its reason; a good one masks the sample. | M |
-| 2 | **Full activity history.** Page back through every event by sequence number, filtered by agent, type and date. Today the feed stops at the newest 200. | A store with 10,000 events can be paged to its first event. | M |
-| 3 | **Decisions on the right task.** `record_decision` attaches to the calling session's task, not the repository's current one, so two agents working at once don't cross. First: does Claude Code tell an MCP server which session is calling? | A test with two parallel sessions keeps each decision on its own task. | M |
+| 7 | **Repository settings in the dashboard.** Agent checks, prompt capture and redaction patterns, with a preview of what a pattern would mask. Unusable patterns are refused. | Saving a bad pattern is refused with its reason; a good one masks the sample. | M |
+| 8 | **Full activity history.** Page back through every event by sequence number, filtered by agent, type and date. Today the feed stops at the newest 200. | A store with 10,000 events can be paged to its first event. | M |
 
 ### Speed and reach
 
@@ -49,13 +73,17 @@ Order follows what users report.
 
 | # | Item | Done when | Size |
 |---|---|---|---|
-| 4 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
-| 5 | **Windows.** WSL 2 as the supported path, documented and tested in CI. Native support (Node hooks instead of `sh`) only once people ask. | The release smoke test passes under WSL. | M |
-| 6 | **More agents.** Gemini CLI, Windsurf or JetBrains Junie, in the order users ask. | Each passes `npm run test:cross-agent`. | M each |
+| 9 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
+| 10 | **Windows.** WSL 2 as the supported path, documented and tested in CI. Native support (Node hooks instead of `sh`) only once people ask. | The release smoke test passes under WSL. | M |
+| 11 | **More agents.** Gemini CLI, Windsurf or JetBrains Junie, in the order users ask. | Each passes `npm run test:cross-agent`. | M each |
 
 ### Only once users ask
 
 - **Teams**, after at least five separate requests: decisions shared through an opt-in file in the repository, reviewed in pull requests, with everything else staying local.
-- **Semantic search over memory**: `get_context` covers most needs, and local embeddings would add size and setup to every install.
+- **Semantic search over memory**: full-text search (item 2) comes first, and local embeddings would add size and setup to every install.
+
+### Not planned
+
+- **Document or code retrieval (RAG).** Agents already read the repository themselves. Continuum holds what the code can't tell them: decisions, attempts and evidence.
 
 The demo film's pipeline is described in [`scripts/demo-video/README.md`](../scripts/demo-video/README.md).
