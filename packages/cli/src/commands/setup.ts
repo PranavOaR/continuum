@@ -13,6 +13,7 @@ import {
   type Invocation,
   type SetupResult,
 } from '@continuum/claude-code'
+import { printBanner } from '../banner'
 import { PLUGIN_AND_SETUP, PLUGIN_AND_SETUP_FIX, UNSUPPORTED_PLATFORM, WINDOWS_FIX } from '../doctor'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -115,6 +116,7 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
     store.close()
   }
   await registerRepository(io.configDir, workspace.root, io.now())
+  printBanner(io)
   io.out(`Connected ${target.name} to Continuum in ${workspace.root}${created ? ' (and initialized Continuum)' : ''}:`)
   report(io, result)
   io.out('')

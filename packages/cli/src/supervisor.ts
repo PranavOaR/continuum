@@ -1,7 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createAccessToken } from '@continuum/daemon'
 import { RESTART_EXIT, type ServeOptions } from './commands/serve'
+import { terminalBanner } from './banner'
 import { openInBrowser } from './browser'
+import { VERSION } from './build'
 import { codeFingerprint } from './codeVersion'
 
 /** Set in a serve worker's environment: it runs the dashboard; its parent restarts it after updates. */
@@ -66,6 +68,8 @@ export async function superviseServe(
   write: (text: string) => void = (text) => process.stdout.write(text),
   /** Someone at a terminal ran it: scripts, CI and tests never get a browser window. */
   canOpenBrowser: boolean = Boolean(process.stdout.isTTY) && !process.env.CI,
+  /** Printed here because a worker's stdout is a pipe to this process, so it can never see a terminal. */
+  banner: readonly string[] = terminalBanner(process.stdout, process.env, VERSION),
 ): Promise<number> {
   const env = { ...process.env, [WORKER_ENV]: '1' }
   const secrets: WorkerSecrets = { token: createAccessToken(), csrfToken: createAccessToken() }
@@ -83,6 +87,8 @@ export async function superviseServe(
   process.on('SIGTERM', onTerminate)
   let restartedAt: number | null = null
   let retries = 0
+  // Above the first thing a worker prints, so a start that fails shows only its error and a restart stays quiet.
+  let showBanner = true
   try {
     for (;;) {
       const worker = spawnWorker(args, env)
@@ -95,6 +101,10 @@ export async function superviseServe(
         if (!port) {
           output += text
           port = /http:\/\/127\.0\.0\.1:(\d+)\/app/.exec(output)?.[1]
+        }
+        if (showBanner) {
+          showBanner = false
+          write(banner.map((line) => `${line}\n`).join(''))
         }
         write(text)
       })

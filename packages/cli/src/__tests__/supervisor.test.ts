@@ -30,6 +30,44 @@ function fakeWorker(port: number, exitCode: number, beforeExit: () => void = () 
 }
 
 describe('superviseServe', () => {
+  it('prints the banner once, above the dashboard link, even across restarts', async () => {
+    const exits = [RESTART_EXIT, 0]
+    let started = 0
+    let written = ''
+    await superviseServe(
+      ['serve'],
+      () => {
+        started += 1
+        return fakeWorker(51234, exits[started - 1]).child
+      },
+      (text) => {
+        written += text
+      },
+      false,
+      ['-- banner --'],
+    )
+    expect(started).toBe(2)
+    expect(written.startsWith('-- banner --\n')).toBe(true)
+    expect(written.split('-- banner --')).toHaveLength(2)
+  })
+
+  it('prints no banner for a worker that fails before saying anything', async () => {
+    let written = ''
+    const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), kill: () => true })
+    setTimeout(() => child.emit('exit', 1, null), 5)
+    const code = await superviseServe(
+      ['serve'],
+      () => child as unknown as ChildProcess,
+      (text) => {
+        written += text
+      },
+      false,
+      ['-- banner --'],
+    )
+    expect(code).toBe(1)
+    expect(written).toBe('')
+  })
+
   it('restarts the worker on the same port with the same tokens, sent over IPC rather than the environment', async () => {
     const workers: FakeWorker[] = []
     const calls: { args: readonly string[]; env: NodeJS.ProcessEnv }[] = []

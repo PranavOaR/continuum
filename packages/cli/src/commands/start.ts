@@ -1,4 +1,5 @@
 import { DEFAULT_POLL_MS, startCapture } from '@continuum/capture'
+import { printBanner } from '../banner'
 import { formatChange } from '../format'
 import { EXIT_OK, type Io } from '../io'
 import { openWorkspace } from '@continuum/capture'
@@ -14,6 +15,7 @@ function untilAborted(signal: AbortSignal): Promise<void> {
 /** Captures repository changes in the foreground until interrupted. */
 export async function startCommand(io: Io): Promise<number> {
   const { workspace, store } = await openWorkspace(io.cwd)
+  printBanner(io)
   let initial = true
   try {
     const capture = await startCapture(store, workspace.root, {

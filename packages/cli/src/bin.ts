@@ -2,7 +2,8 @@
 import './warnings'
 import { defaultConfigDir } from '@continuum/capture'
 import { defaultClaudeConfigDir } from '@continuum/claude-code'
-import { commandName, handlesInterrupts, main } from './main'
+import { terminalBanner } from './banner'
+import { commandName, handlesInterrupts, main, VERSION } from './main'
 import { superviseServe, WORKER_ENV } from './supervisor'
 
 async function readStdin(): Promise<string> {
@@ -51,6 +52,7 @@ process.exitCode = supervise
       readStdin,
       configDir: defaultConfigDir(),
       claudeConfigDir: defaultClaudeConfigDir(),
+      banner: terminalBanner(process.stdout, process.env, VERSION),
     })
 
 // The IPC channel to the supervisor would otherwise keep a finished worker alive, and its restart would never come.
