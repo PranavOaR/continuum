@@ -159,6 +159,9 @@ describe('the hooks setup writes', () => {
   })
 })
 
+/** PowerShell and node each start cold on a CI runner: a few seconds per hook run. */
+const POWERSHELL_TIMEOUT_MS = 30_000
+
 describe('VS Code hooks on Windows', () => {
   it('give every hook a PowerShell command, which VS Code runs on Windows in place of the POSIX one', async () => {
     const { root } = repo()
@@ -187,7 +190,7 @@ describe('VS Code hooks on Windows', () => {
     const start = { hook_event_name: 'SessionStart', session_id: 's', cwd: join(root, 'café'), note: "it's \"quoted\" — ✓" }
     expect(powershell(await hook(root, 'SessionStart'), start).trim()).toBe('briefed')
     expect(received(root)).toEqual(start)
-  })
+  }, POWERSHELL_TIMEOUT_MS)
 
   it.runIf(process.platform === 'win32')('record only the tools Continuum records', async () => {
     const { root } = repo()
@@ -197,5 +200,5 @@ describe('VS Code hooks on Windows', () => {
     const edit = { hook_event_name: 'PostToolUse', session_id: 's', tool_name: 'create_file', tool_input: { filePath: join(root, 'b.ts') } }
     expect(powershell(command, edit)).toBe('')
     expect(received(root)).toEqual(edit)
-  })
+  }, POWERSHELL_TIMEOUT_MS)
 })

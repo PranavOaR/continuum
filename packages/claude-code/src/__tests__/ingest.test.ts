@@ -382,7 +382,8 @@ describe('ingestHook prompts', () => {
       // Windows starts only an .exe from PATH without a shell: a copy of node that runs the stand-in first.
       writeFileSync(join(bin, 'broken-git.cjs'), 'process.stderr.write("You have not agreed to the Xcode license agreements.\\n"); process.exit(69)\n')
       copyFileSync(process.execPath, join(bin, 'git.exe'))
-      process.env.NODE_OPTIONS = `--require "${join(bin, 'broken-git.cjs')}"`
+      // NODE_OPTIONS treats backslashes as escapes: forward slashes are a Windows path too.
+      process.env.NODE_OPTIONS = `--require "${join(bin, 'broken-git.cjs').replaceAll('\\', '/')}"`
     } else {
       writeFileSync(join(bin, 'git'), '#!/bin/sh\necho "You have not agreed to the Xcode license agreements." >&2\nexit 69\n')
       chmodSync(join(bin, 'git'), 0o755)

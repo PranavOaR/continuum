@@ -33,7 +33,7 @@ export function createSandbox(files: Record<string, string> = {}): Sandbox {
       git('add', '--all')
       git('commit', '--quiet', '--allow-empty', '-m', message)
     },
-    // Retried: on Windows a git that a failed scan started can still hold the folder for a moment.
-    cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }),
+    // Retried: on Windows a git that a failed scan started, or a virus scan of new files, can hold the folder for a while.
+    cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }),
   }
 }

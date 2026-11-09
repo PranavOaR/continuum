@@ -28,6 +28,8 @@ function repositoryRoot(start) {
 /** Reads the payload before exiting: leaving it unread breaks Claude Code's write to the hook (EPIPE). */
 function skip() {
   process.stdin.on('end', () => process.exit(0))
+  // A closed or broken stdin is still nothing to record.
+  process.stdin.on('error', () => process.exit(0))
   process.stdin.resume()
 }
 
@@ -38,11 +40,12 @@ const fallback = guarded ? args.slice(1) : args
 if (guarded && !existsSync(join(repositoryRoot(process.env.CLAUDE_PROJECT_DIR || process.cwd()), '.continuum'))) {
   skip()
 } else if (existsSync(BUNDLE)) {
+  // The bundle reads its subcommand from process.argv, as if node had started it directly.
   process.argv = [process.argv[0], BUNDLE, ...fallback.slice(-1)]
   await import(pathToFileURL(BUNDLE).href)
 } else {
-  // npx is a .cmd shim on Windows, which only a shell can start.
-  const { status, error } = spawnSync(fallback[0], fallback.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
+  // npx is a .cmd shim on Windows, which only a shell can start; its parts (npx, -y, package@version, subcommand) need no quoting.
+  const { status, error } = process.platform === 'win32' ? spawnSync(fallback.join(' '), { stdio: 'inherit', shell: true }) : spawnSync(fallback[0], fallback.slice(1), { stdio: 'inherit' })
   if (error) process.stderr.write(`continuum: could not start ${fallback[0]}: ${error.message}\n`)
   process.exit(status ?? 1)
 }
