@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join } from 'node:path'
 import { Writable } from 'node:stream'
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -90,6 +93,27 @@ describe('runCheck', () => {
     const result = await runCheck(store, { root: repo.root, command: NODE, args: ['-e', script], name: 'mutating', ...quiet() })
     expect(result.status).toBe('out-of-date')
     expect(store.checkStatus('mutating')).toEqual({ status: 'out-of-date', changed: ['file:src/a.ts'] })
+  })
+
+  it('starts a tool installed as a .cmd shim on Windows, such as npm, with its arguments intact', async () => {
+    const { repo, store } = setup()
+    // A stand-in tool on PATH that prints its arguments: a shell script elsewhere, a .cmd shim on Windows.
+    const bin = mkdtempSync(join(tmpdir(), 'continuum-tool-'))
+    writeFileSync(join(bin, 'print-args.js'), 'process.stdout.write(JSON.stringify(process.argv.slice(2)))')
+    writeFileSync(join(bin, 'fake-tool'), `#!/bin/sh\nexec "${NODE}" "${join(bin, 'print-args.js')}" "$@"\n`, { mode: 0o755 })
+    writeFileSync(join(bin, 'fake-tool.cmd'), `@"${NODE}" "%~dp0print-args.js" %*\r\n`)
+    const path = process.env.PATH
+    process.env.PATH = `${bin}${delimiter}${path}`
+    try {
+      const out = sink()
+      const args = ['run', 'test -- --grep "login works"', 'a&b', '100%']
+      const result = await runCheck(store, { root: repo.root, command: 'fake-tool', args, stdout: out.stream, stderr: sink().stream })
+      expect(result.exitCode).toBe(0)
+      expect(JSON.parse(out.text())).toEqual(args)
+    } finally {
+      process.env.PATH = path
+      rmSync(bin, { recursive: true, force: true })
+    }
   })
 
   it('records nothing when the command does not exist', async () => {
