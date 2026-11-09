@@ -16,6 +16,7 @@ import { DemoVideo } from '../components/site/DemoVideo'
 import { InstallCommand } from '../components/site/InstallCommand'
 import { GET_STARTED } from '../components/site/siteContent'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useScrollToTop } from '../hooks/useScrollToTop'
 
 
 const PROBLEMS = [
@@ -148,6 +149,7 @@ function ClosingCta() {
 
 export function LandingPage() {
   useDocumentTitle('')
+  useScrollToTop()
   const activeId = useScrollSpy(SPY_IDS)
   // Arriving at /#section from another page: scroll there now, again once images have loaded and
   // shifted the layout, and whenever the hash changes.
