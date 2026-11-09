@@ -1,23 +1,17 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0] - 2026-11-09
 
 ### Added
 - **Windows.** Continuum runs on native Windows, with no WSL. `setup` no longer refuses there, and `doctor` no longer fails. For Claude Code, Codex, Cursor and VS Code, setup writes `cmd /c npx -y getcontinuum@<version>`, since agents cannot start npx's `.cmd` shim without a shell; because that line works only on Windows, those files are kept out of git. CI runs the unit tests and the release smoke test on Windows, macOS and Linux.
+- **A banner when Continuum starts.** `continuum`, `setup`, `start` and `serve` open with the Continuum wordmark in block letters, the version and a reminder that everything stays on this machine. It shows only to someone at a terminal 68 columns or wider: agents, pipes, CI and `mcp` output are unchanged, `NO_COLOR` turns its colour off, and `serve` shows it once, not again after an automatic restart.
+- **Create and correct from the dashboard.** New task starts a task now or plans it for later; starting one pauses the task in progress. The memory panel adds a decision or known issue to the task on screen. Each record has **Resolved**, which takes it out of briefings, `get_context` and the attention list while keeping it on the page to reopen, and **Still valid**, which vouches for it against today's code, so a stale warning clears and the next change to that code raises it again. What you write is labelled set by you in the dashboard and in what agents read; reviewing an agent's record records your verdict beside it and leaves its text under the agent's label. Everything you type is masked by the repository's redaction rules before it is stored, and goes through the same access and CSRF checks as task edits. Records added here anchor to no code.
 
 ### Changed
 - **The Claude Code plugin no longer needs `sh`.** Its hooks and MCP server start a small launcher with `node`, with no shell, which skips at once in a repository without a `.continuum` store and otherwise runs the plugin's copy of the CLI in the same process. A hook in a repository without Continuum now takes about 40 ms instead of 10 ms on a Mac; Continuum's own hooks are as fast as before.
 - **VS Code hooks carry a PowerShell command** beside the POSIX one, and VS Code runs it on Windows. PowerShell cannot hand the payload to a background program, so on Windows file edits and task updates are recorded before Copilot moves on (other tools still start nothing).
 - `serve` opens the dashboard in your browser on Windows too.
 - `continuum run -- npm test` starts tools that Windows installs as `.cmd` shims, such as npm, npx and pnpm, with every argument passed through intact (through cross-spawn).
-
-## [0.4.0] - 2026-11-05
-
-### Added
-- **A banner when Continuum starts.** `continuum`, `setup`, `start` and `serve` open with the Continuum wordmark in block letters, the version and a reminder that everything stays on this machine. It shows only to someone at a terminal 68 columns or wider: agents, pipes, CI and `mcp` output are unchanged, `NO_COLOR` turns its colour off, and `serve` shows it once, not again after an automatic restart.
-- **Create and correct from the dashboard.** New task starts a task now or plans it for later; starting one pauses the task in progress. The memory panel adds a decision or known issue to the task on screen. Each record has **Resolved**, which takes it out of briefings, `get_context` and the attention list while keeping it on the page to reopen, and **Still valid**, which vouches for it against today's code, so a stale warning clears and the next change to that code raises it again. What you write is labelled set by you in the dashboard and in what agents read; reviewing an agent's record records your verdict beside it and leaves its text under the agent's label. Everything you type is masked by the repository's redaction rules before it is stored, and goes through the same access and CSRF checks as task edits. Records added here anchor to no code.
-
-### Changed
 - `continuum serve` stops listing connected repositories whose folders are gone, and says so once in one line, instead of repeating a `skipping` line for each on every start and advising a `setup` that could not work. If you moved one, run `setup` in its new location. A port already in use now names another `continuum serve` as the likely cause.
 - **The Handoffs page is now Briefings.** It shows the text `continuum handoff` prints for a project, with a copy button and its estimated size in tokens, and it says how the shorter version agents get at session start differs. Connected agents were already briefed automatically, so the handoff text the browser built for itself, with its status tracking and history, is gone, and so are the agent and context defaults in Settings. Old links open the new page, and your other preferences are kept. The stored handoff history is deleted from your browser the next time the dashboard opens, and it cannot be brought back; a briefing is always rebuilt from the records. Settings now has one reset, for preferences.
 - What you write now reads as yours everywhere: ranked context, the memory graph and the "since you left" section of a briefing used to call every task and record agent-reported.
