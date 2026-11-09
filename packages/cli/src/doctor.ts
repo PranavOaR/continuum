@@ -136,9 +136,12 @@ async function checkIgnoreFile(root: string): Promise<Finding | null> {
 }
 
 /** Absolute paths a hook or server command depends on, including file: URLs such as the tsx loader. */
+/** A switch such as cmd's `/c` (setup's Windows invocation is `cmd /c npx …`), which looks like an absolute path but is not a file. */
+const COMMAND_SWITCH = /^\/[a-z]$/i
+
 function referencedPaths(entry: { command?: unknown; args?: unknown }): string[] {
   const parts = [entry.command, ...(Array.isArray(entry.args) ? entry.args : [])].filter((part): part is string => typeof part === 'string')
-  return parts.flatMap((part) => (part.startsWith('file:') ? [fileURLToPath(part)] : isAbsolute(part) ? [part] : []))
+  return parts.flatMap((part) => (part.startsWith('file:') ? [fileURLToPath(part)] : isAbsolute(part) && !COMMAND_SWITCH.test(part) ? [part] : []))
 }
 
 const sameCommand = (entry: { command?: unknown; args?: unknown }, invocation: Invocation, subcommand: string) =>

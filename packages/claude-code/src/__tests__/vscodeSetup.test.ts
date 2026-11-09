@@ -167,7 +167,7 @@ describe('VS Code hooks on Windows', () => {
     const { root } = repo()
     await setupVsCode(root, NPX)
     for (const [event, [handler]] of Object.entries(readJson(root, VSCODE_HOOKS_FILE).hooks as Record<string, { powershell: string }[]>)) {
-      expect(handler.powershell, event).toContain("& 'npx' '-y' 'getcontinuum@0.2.0' 'ingest' '--agent' 'vscode'")
+      expect(handler.powershell, event).toContain("[Diagnostics.ProcessStartInfo]::new('npx', '-y getcontinuum@0.2.0 ingest --agent vscode')")
     }
   })
 
@@ -182,7 +182,8 @@ describe('VS Code hooks on Windows', () => {
     await setupVsCode(root, recorder(root))
     return readJson(root, VSCODE_HOOKS_FILE).hooks[event][0].powershell as string
   }
-  const powershell = (command: string, payload: unknown) => execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], { input: JSON.stringify(payload), encoding: 'utf8' })
+  // Hidden, with no console, as VS Code starts hooks: PowerShell then cannot be told to use UTF-8, which is what garbled payloads.
+  const powershell = (command: string, payload: unknown) => execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], { input: JSON.stringify(payload), encoding: 'utf8', windowsHide: true })
   const received = (root: string) => (existsSync(join(root, 'received.json')) ? JSON.parse(readFileSync(join(root, 'received.json'), 'utf8')) : null)
 
   it.runIf(process.platform === 'win32')('hand the payload to Continuum intact, and its briefing back', async () => {

@@ -73,18 +73,27 @@ const inBackground = (ingest: string, filter?: string) =>
 /** PowerShell quoting: a single-quoted string is literal, with ' written twice. */
 const psQuote = (part: string) => `'${part.replaceAll("'", "''")}'`
 
-/** Windows PowerShell reads stdin and talks to programs in the console's code page; the payload and briefing are UTF-8. Setting the console fails without one. */
-const PS_UTF8 = '$u = [Text.UTF8Encoding]::new($false); try { [Console]::InputEncoding = $u; [Console]::OutputEncoding = $u } catch {}; $OutputEncoding = $u'
+/** Windows command-line quoting for ProcessStartInfo arguments: a part with a space or quote is wrapped, inner quotes escaped. */
+const windowsArg = (part: string) => (/[\s"]/.test(part) ? `"${part.replaceAll('"', '\\"')}"` : part)
 
 /**
- * The same hooks for PowerShell, which VS Code runs on Windows in place of `command`. They pipe
- * the payload ($input) to Continuum. PowerShell cannot hand stdin to a background program, so
- * recording runs before the hook returns, and only for the tools it records.
+ * The same hooks for PowerShell, which VS Code runs on Windows in place of `command`. The payload
+ * goes to Continuum as the bytes VS Code sent: PowerShell re-encodes text it reads or pipes in the
+ * console's code page, which turns C:\Users\José into a folder that does not exist. PowerShell
+ * cannot leave a program running in the background, so recording runs before the hook returns,
+ * and only for the tools it records.
  */
 function powershellHook(invocation: Invocation, { filter, quiet }: { filter?: string; quiet?: boolean } = {}): string {
-  const ingest = `& ${[invocation.command, ...invocation.args, 'ingest', '--agent', 'vscode'].map(psQuote).join(' ')}${quiet ? ' | Out-Null' : ''}`
-  if (!filter) return `${PS_UTF8}; $input | ${ingest}`
-  return `${PS_UTF8}; $p = $input | Out-String; if ($p -notmatch ${psQuote(filter)}) { exit 0 }; $p | ${ingest}`
+  const args = [...invocation.args, 'ingest', '--agent', 'vscode'].map(windowsArg).join(' ')
+  return [
+    '$m = [IO.MemoryStream]::new(); [Console]::OpenStandardInput().CopyTo($m); $b = $m.ToArray()',
+    ...(filter ? [`if ([Text.Encoding]::UTF8.GetString($b) -notmatch ${psQuote(filter)}) { exit 0 }`] : []),
+    `$s = [Diagnostics.ProcessStartInfo]::new(${psQuote(invocation.command)}, ${psQuote(args)})`,
+    `$s.UseShellExecute = $false; $s.RedirectStandardInput = $true${quiet ? '; $s.RedirectStandardOutput = $true' : ''}`,
+    '$p = [Diagnostics.Process]::Start($s); $p.StandardInput.BaseStream.Write($b, 0, $b.Length); $p.StandardInput.Close()',
+    ...(quiet ? ['$null = $p.StandardOutput.ReadToEnd()'] : []),
+    '$p.WaitForExit(); exit $p.ExitCode',
+  ].join('; ')
 }
 
 function ourHooks(invocation: Invocation): Record<string, Json[]> {
