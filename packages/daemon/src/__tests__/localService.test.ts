@@ -2,7 +2,7 @@ import type { Sandbox } from '@continuum/capture/testing'
 import { NotFoundError } from '@continuum/core'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectIds } from '../ids'
 import { LocalContinuumService, ProjectUnavailableError } from '../localService'
@@ -26,7 +26,7 @@ describe('LocalContinuumService', () => {
     const [summary] = await local.listProjects()
     expect(summary.project).toMatchObject({
       id: 'acme',
-      repositoryName: repo.root.split('/').at(-1),
+      repositoryName: basename(repo.root),
       branch: 'main',
       stack: ['Node.js', 'TypeScript'],
       lastActiveAgent: 'claude-code',

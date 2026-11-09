@@ -174,7 +174,8 @@ try {
   hook({ hook_event_name: 'PostToolUse', session_id: 'smoke-1', tool_name: 'Write', tool_input: { file_path: join(repo, 'a.txt') } })
   hook({ hook_event_name: 'SessionEnd', session_id: 'smoke-1', reason: 'exit' })
   const briefing = hook({ hook_event_name: 'SessionStart', session_id: 'smoke-2', source: 'startup' })
-  check('the next session is briefed on the last one', briefing.includes('a.txt'), briefing.slice(0, 300))
+  // Credited to the session, not merely seen as a change outside agent sessions: that needs the edit's path and the repository root to agree (on Windows, C:\\… against git's C:/…).
+  check('the next session is briefed on the last one', briefing.includes('Files it changed: `a.txt`'), briefing.slice(0, 600))
   check('status reads the store', /\d+ tracked files?/.test(runCli(['status'], repo)))
 
   const tools = await mcpTools(cli, repo)

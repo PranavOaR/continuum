@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { initWorkspace, scanRepository } from '@continuum/capture'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { ContextStore } from '@continuum/store'
@@ -372,19 +372,28 @@ describe('ingestHook prompts', () => {
 
   it('reports git that cannot run in a Continuum repository instead of skipping it', async () => {
     const { repo } = await initialized()
-    const { chmodSync, writeFileSync } = await import('node:fs')
+    const { chmodSync, copyFileSync, writeFileSync } = await import('node:fs')
     const { readHookHealth } = await import('@continuum/capture')
     // Like macOS's /usr/bin/git before the Xcode license is accepted.
     const bin = mkdtempSync(join(tmpdir(), 'continuum-broken-git-'))
     dirs.push(bin)
-    writeFileSync(join(bin, 'git'), '#!/bin/sh\necho "You have not agreed to the Xcode license agreements." >&2\nexit 69\n')
-    chmodSync(join(bin, 'git'), 0o755)
-    const path = process.env.PATH
-    process.env.PATH = `${bin}:${path}`
+    const { PATH: path, NODE_OPTIONS: nodeOptions } = process.env
+    if (process.platform === 'win32') {
+      // Windows starts only an .exe from PATH without a shell: a copy of node that runs the stand-in first.
+      writeFileSync(join(bin, 'broken-git.cjs'), 'process.stderr.write("You have not agreed to the Xcode license agreements.\\n"); process.exit(69)\n')
+      copyFileSync(process.execPath, join(bin, 'git.exe'))
+      process.env.NODE_OPTIONS = `--require "${join(bin, 'broken-git.cjs')}"`
+    } else {
+      writeFileSync(join(bin, 'git'), '#!/bin/sh\necho "You have not agreed to the Xcode license agreements." >&2\nexit 69\n')
+      chmodSync(join(bin, 'git'), 0o755)
+    }
+    process.env.PATH = `${bin}${delimiter}${path}`
     try {
       expect((await ingestHook(hook(repo, { hook_event_name: 'Stop', last_assistant_message: 'done' }), { now: () => NOW })).status).toBe('ignored')
     } finally {
       process.env.PATH = path
+      if (nodeOptions === undefined) delete process.env.NODE_OPTIONS
+      else process.env.NODE_OPTIONS = nodeOptions
     }
     const health = await readHookHealth(repo.root, 'claude-code')
     expect(health.isFailing).toBe(true)
