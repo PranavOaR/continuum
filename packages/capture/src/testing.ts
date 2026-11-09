@@ -15,6 +15,21 @@ export interface Sandbox {
   cleanup(): void
 }
 
+/** Errors Windows raises while another process (a git that a failed scan started, a virus scan of new files) still holds a folder. */
+const WINDOWS_BUSY = new Set(['EBUSY', 'EPERM'])
+
+/**
+ * Deletes a test folder. On Windows a folder something else still holds cannot be deleted; after a
+ * few tries it is left in the temp folder, which Windows cleans, rather than failing the test.
+ */
+function removeTemporary(root: string): void {
+  try {
+    rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  } catch (error) {
+    if (process.platform !== 'win32' || !WINDOWS_BUSY.has((error as NodeJS.ErrnoException).code ?? '')) throw error
+  }
+}
+
 export function createSandbox(files: Record<string, string> = {}): Sandbox {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'continuum-sandbox-')))
   const git = (...args: string[]) => execFileSync('git', [...GIT_IDENTITY, ...args], { cwd: root, encoding: 'utf8' }).trim()
@@ -33,7 +48,6 @@ export function createSandbox(files: Record<string, string> = {}): Sandbox {
       git('add', '--all')
       git('commit', '--quiet', '--allow-empty', '-m', message)
     },
-    // Retried: on Windows a git that a failed scan started, or a virus scan of new files, can hold the folder for a while.
-    cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }),
+    cleanup: () => removeTemporary(root),
   }
 }
