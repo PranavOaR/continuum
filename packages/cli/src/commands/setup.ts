@@ -14,8 +14,8 @@ import {
   type SetupResult,
 } from '@continuum/claude-code'
 import { printBanner } from '../banner'
-import { PLUGIN_AND_SETUP, PLUGIN_AND_SETUP_FIX, UNSUPPORTED_PLATFORM, WINDOWS_FIX } from '../doctor'
-import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE, type Io } from '../io'
+import { PLUGIN_AND_SETUP, PLUGIN_AND_SETUP_FIX } from '../doctor'
+import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 interface Target {
   name: string
@@ -81,13 +81,14 @@ function report(io: Io, result: SetupResult): void {
   for (const file of result.files) io.out(`  ${file.action.padEnd(9)} ${file.path}${file.note ? `: ${file.note}` : ''}`)
 }
 
+/** The npx command an invocation runs, as someone would type it (without Windows' `cmd /c`), or null when it runs no npx. */
+function npxCommand({ command, args }: Invocation): string[] | null {
+  const parts = command === 'cmd' && args[0] === '/c' ? args.slice(1) : [command, ...args]
+  return parts[0] === 'npx' ? parts : null
+}
+
 /** Connects (or disconnects) an agent to Continuum for this repository only. */
-export async function setupCommand(io: Io, args: readonly string[], invocation: Invocation, platform: NodeJS.Platform = process.platform): Promise<number> {
-  if (platform === UNSUPPORTED_PLATFORM) {
-    io.err('continuum: Windows is not supported yet: the hooks agents run need a POSIX shell.')
-    io.err(WINDOWS_FIX)
-    return EXIT_FAILURE
-  }
+export async function setupCommand(io: Io, args: readonly string[], invocation: Invocation): Promise<number> {
   const [targetName, ...flags] = args
   const remove = flags.length === 1 && flags[0] === '--remove'
   const target = targetName && Object.hasOwn(TARGETS, targetName) ? TARGETS[targetName] : undefined
@@ -121,13 +122,16 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
   report(io, result)
   io.out('')
   for (const line of target.next(invocation)) io.out(line)
+  const npx = npxCommand(invocation)
   io.out(
     invocation.portable
       ? `The configuration runs Continuum through npx, so you can commit ${target.shared} to share it with your team.`
-      : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
+      : npx
+        ? 'The configuration runs Continuum through `cmd /c npx`, which works only on Windows, so it is kept out of git.'
+        : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
   )
   // The same command the agent's config runs, so it names this exact package and version.
-  io.out(`See what Continuum records: ${invocation.portable ? [invocation.command, ...invocation.args, 'serve'].join(' ') : 'continuum serve'}`)
+  io.out(`See what Continuum records: ${npx ? [...npx, 'serve'].join(' ') : 'continuum serve'}`)
   if (targetName === 'claude-code' && (await isContinuumPluginEnabled(workspace.root, io.claudeConfigDir))) {
     io.err(`continuum: ${PLUGIN_AND_SETUP}.`)
     io.err(PLUGIN_AND_SETUP_FIX)

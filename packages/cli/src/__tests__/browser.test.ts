@@ -26,8 +26,18 @@ describe('openInBrowser', () => {
     const page = runs[0].args[0]
     expect(page).toMatch(/\.html$/)
     expect(readFileSync(page, 'utf8')).toContain(`url=${LAUNCH}`)
-    expect(statSync(page).mode & 0o777).toBe(0o600)
-    expect(statSync(dirname(page)).mode & 0o777).toBe(0o700)
+    // Windows has no permission bits; its temp folder is private to the user.
+    if (process.platform !== 'win32') {
+      expect(statSync(page).mode & 0o777).toBe(0o600)
+      expect(statSync(dirname(page)).mode & 0o777).toBe(0o700)
+    }
+  })
+
+  it('opens the page with explorer.exe on Windows', async () => {
+    const { runs, launcher } = recording()
+    await openInBrowser(LAUNCH, { platform: 'win32', launcher, cleanupAfterMs: 0 })
+    expect(runs[0].command).toBe('explorer.exe')
+    expect(runs[0].args[0]).toMatch(/dashboard\.html$/)
   })
 
   it('removes the redirect page afterwards', async () => {
@@ -42,6 +52,6 @@ describe('openInBrowser', () => {
     const failed = recording(new Error('xdg-open was not found'))
     await expect(openInBrowser(LAUNCH, { platform: 'linux', launcher: failed.launcher, cleanupAfterMs: 0 })).rejects.toThrow('xdg-open was not found')
     expect(existsSync(failed.runs[0].args[0])).toBe(false)
-    await expect(openInBrowser(LAUNCH, { platform: 'win32', launcher: recording().launcher })).rejects.toThrow(/win32/)
+    await expect(openInBrowser(LAUNCH, { platform: 'aix', launcher: recording().launcher })).rejects.toThrow(/aix/)
   })
 })

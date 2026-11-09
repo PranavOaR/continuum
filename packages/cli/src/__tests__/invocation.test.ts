@@ -28,6 +28,12 @@ describe('stableNodePath', () => {
     expect(stableNodePath(execPath, [otherBin, stableBin].join(delimiter))).toBe(join(stableBin, 'node'))
   })
 
+  it('looks for node.exe on Windows', () => {
+    const { execPath, stableBin, otherBin } = layout()
+    symlinkSync(execPath, join(stableBin, 'node.exe'))
+    expect(stableNodePath(execPath, [otherBin, stableBin].join(delimiter), 'win32')).toBe(join(stableBin, 'node.exe'))
+  })
+
   it('keeps the exact path when no PATH node is the same binary', () => {
     const { execPath, otherBin } = layout()
     expect(stableNodePath(execPath, otherBin)).toBe(execPath)
@@ -49,6 +55,11 @@ describe('selfInvocation', () => {
   it('runs an installed package through npx at its exact version, portable across machines', () => {
     const entry = join('/home/u/.npm/_npx/abc/node_modules/@scope/continuum/continuum.js')
     expect(selfInvocation(build, entry)).toEqual({ command: 'npx', args: ['-y', '@scope/continuum@1.2.3'], portable: true })
+  })
+
+  it('wraps npx in cmd /c on Windows, where agents cannot start the npx.cmd shim without a shell', () => {
+    const entry = 'C:\\Users\\u\\AppData\\Local\\npm-cache\\_npx\\abc\\node_modules\\@scope\\continuum\\continuum.js'
+    expect(selfInvocation(build, entry, 'win32')).toEqual({ command: 'cmd', args: ['/c', 'npx', '-y', '@scope/continuum@1.2.3'], portable: false })
   })
 
   it('runs a local bundle by its absolute path', () => {

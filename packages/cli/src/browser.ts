@@ -6,8 +6,8 @@ import { join } from 'node:path'
 /** Starts `command` and resolves once it has started; it is never waited on. */
 export type Launcher = (command: string, args: readonly string[]) => Promise<void>
 
-/** How each platform opens a file in the default browser. */
-const OPENERS: Partial<Record<NodeJS.Platform, string>> = { darwin: 'open', linux: 'xdg-open' }
+/** How each platform opens a file in the default browser (explorer.exe hands an .html file to it, with no shell to quote for). */
+const OPENERS: Partial<Record<NodeJS.Platform, string>> = { darwin: 'open', linux: 'xdg-open', win32: 'explorer.exe' }
 /** Long enough for the browser to read the page, short enough that it does not linger. */
 const CLEANUP_AFTER_MS = 30_000
 const PRIVATE_FILE_MODE = 0o600
@@ -56,6 +56,6 @@ export async function openInBrowser(url: string, options: OpenOptions = {}): Pro
     remove()
     throw error
   }
-  // mkdtemp makes the directory owner-only; the page goes once the browser has read it.
+  // mkdtemp makes the directory owner-only (on Windows, the user's temp folder already is); the page goes once the browser has read it.
   setTimeout(remove, options.cleanupAfterMs ?? CLEANUP_AFTER_MS).unref()
 }

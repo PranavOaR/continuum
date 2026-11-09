@@ -27,10 +27,6 @@ import { hookStatuses, notArrivingFix, type HookStatus } from './hookStatus'
 export const MIN_NODE_VERSION: readonly [number, number] = [22, 13]
 const SETUP_FIX = 'Run `continuum setup claude-code` in this repository.'
 
-/** The hooks run through `sh`, and the store and watcher are tested on macOS and Linux only. */
-export const UNSUPPORTED_PLATFORM = 'win32'
-export const WINDOWS_FIX = 'Use WSL 2: install Node.js and git inside your WSL distribution, and run Continuum and your agents there.'
-
 /** The plugin and `setup claude-code` both register Continuum's hooks; with both, every hook runs twice. */
 export const PLUGIN_AND_SETUP = 'The Continuum plugin is enabled and this repository has its own Continuum hooks, so every hook runs twice'
 export const PLUGIN_AND_SETUP_FIX = 'Keep one: run `continuum setup claude-code --remove` here to use the plugin, or disable the plugin with /plugin to keep this setup.'
@@ -81,9 +77,7 @@ export function checkNode(version: string): Finding {
 }
 
 export function checkPlatform(platform: NodeJS.Platform): Finding {
-  return platform === UNSUPPORTED_PLATFORM
-    ? { status: 'fail', label: 'Windows is not supported yet', detail: 'the hooks need a POSIX shell', fix: WINDOWS_FIX }
-    : { status: 'ok', label: `Platform: ${platform}` }
+  return { status: 'ok', label: `Platform: ${platform}` }
 }
 
 async function checkGit(): Promise<Finding> {
