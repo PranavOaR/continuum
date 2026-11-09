@@ -181,7 +181,6 @@ describe('scanRepository', () => {
     const dir = mkdtempSync(join(tmpdir(), 'continuum-shared-'))
     const watcher = ContextStore.open(join(dir, 'context.db'))
     const cli = ContextStore.open(join(dir, 'context.db'))
-    stores.push(watcher, cli)
     try {
       await scanRepository(watcher, repo.root)
       repo.write('a.ts', 'a2')
@@ -189,6 +188,9 @@ describe('scanRepository', () => {
       expect((await scanRepository(watcher, repo.root)).changes).toEqual([])
       expect(watcher.eventCount()).toBe(2)
     } finally {
+      // Windows cannot delete a database that is still open.
+      watcher.close()
+      cli.close()
       rmSync(dir, { recursive: true, force: true })
     }
   })

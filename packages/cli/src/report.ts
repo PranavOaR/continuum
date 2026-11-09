@@ -154,7 +154,7 @@ async function setUpWorkspace(cwd: string) {
   }
 }
 
-const realpathOr = (path: string) => (existsSync(path) ? realpathSync(path) : path)
+const realpathOr = (path: string) => (existsSync(path) ? realpathSync.native(path) : path)
 
 /** Runs doctor and gathers what the report shows, then renders it scrubbed. */
 export async function buildReport(env: DoctorEnvironment & { version: string; arch: string; home?: string }): Promise<string> {

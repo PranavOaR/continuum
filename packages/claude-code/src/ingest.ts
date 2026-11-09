@@ -106,7 +106,7 @@ function canonical(absolute: string): string {
   const missing: string[] = []
   while (existing !== dirname(existing)) {
     try {
-      return join(realpathSync(existing), ...missing)
+      return join(realpathSync.native(existing), ...missing)
     } catch {
       missing.unshift(basename(existing))
       existing = dirname(existing)

@@ -25,7 +25,7 @@ function layout() {
 describe('stableNodePath', () => {
   it('prefers a PATH entry that resolves to the running node', () => {
     const { execPath, stableBin, otherBin } = layout()
-    expect(stableNodePath(execPath, [otherBin, stableBin].join(delimiter))).toBe(join(stableBin, 'node'))
+    expect(stableNodePath(execPath, [otherBin, stableBin].join(delimiter), 'linux')).toBe(join(stableBin, 'node'))
   })
 
   it('looks for node.exe on Windows', () => {
@@ -36,8 +36,8 @@ describe('stableNodePath', () => {
 
   it('keeps the exact path when no PATH node is the same binary', () => {
     const { execPath, otherBin } = layout()
-    expect(stableNodePath(execPath, otherBin)).toBe(execPath)
-    expect(stableNodePath(execPath, undefined)).toBe(execPath)
+    expect(stableNodePath(execPath, otherBin, 'linux')).toBe(execPath)
+    expect(stableNodePath(execPath, undefined, 'linux')).toBe(execPath)
   })
 })
 
@@ -47,14 +47,14 @@ describe('selfInvocation', () => {
     expect(command).toMatch(/node/)
     expect(args[0]).toBe('--import')
     expect(args[1]).toMatch(/^file:.*tsx/)
-    expect(args[2]).toMatch(/packages\/cli\/src\/bin\.ts$/)
+    expect(args[2]).toMatch(/packages[\\/]cli[\\/]src[\\/]bin\.ts$/)
   })
 
   const build = { version: '1.2.3', packageName: '@scope/continuum' }
 
   it('runs an installed package through npx at its exact version, portable across machines', () => {
     const entry = join('/home/u/.npm/_npx/abc/node_modules/@scope/continuum/continuum.js')
-    expect(selfInvocation(build, entry)).toEqual({ command: 'npx', args: ['-y', '@scope/continuum@1.2.3'], portable: true })
+    expect(selfInvocation(build, entry, 'linux')).toEqual({ command: 'npx', args: ['-y', '@scope/continuum@1.2.3'], portable: true })
   })
 
   it('wraps npx in cmd /c on Windows, where agents cannot start the npx.cmd shim without a shell', () => {
@@ -63,7 +63,7 @@ describe('selfInvocation', () => {
   })
 
   it('runs a local bundle by its absolute path', () => {
-    const { command, args, portable } = selfInvocation(build, '/work/continuum/dist/release/continuum.js')
+    const { command, args, portable } = selfInvocation(build, '/work/continuum/dist/release/continuum.js', 'linux')
     expect(command).toMatch(/node/)
     expect(args).toEqual(['/work/continuum/dist/release/continuum.js'])
     expect(portable).toBe(false)

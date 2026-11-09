@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
+import { realpathSync } from 'node:fs'
 import { lstat, realpath } from 'node:fs/promises'
-import { join, sep } from 'node:path'
+import { join, resolve, sep } from 'node:path'
 import type { ContentHash } from '@continuum/core'
 import { normalizePath } from '@continuum/store'
 import { loadContinuumIgnore } from './continuumIgnore'
@@ -61,7 +62,8 @@ export const gitOutput = git
 
 export async function findRepoRoot(cwd: string): Promise<string> {
   try {
-    return (await git(cwd, ['rev-parse', '--show-toplevel'])).trim()
+    // On Windows git answers C:/Users/…; the native realpath is the form every other path takes (C:\Users\…, no 8.3 short names).
+    return realpathSync.native(resolve((await git(cwd, ['rev-parse', '--show-toplevel'])).trim()))
   } catch (error) {
     if (error instanceof GitCommandError) throw new NotAGitRepositoryError(cwd, { cause: error })
     throw error

@@ -16,7 +16,7 @@ export interface Sandbox {
 }
 
 export function createSandbox(files: Record<string, string> = {}): Sandbox {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'continuum-sandbox-')))
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'continuum-sandbox-')))
   const git = (...args: string[]) => execFileSync('git', [...GIT_IDENTITY, ...args], { cwd: root, encoding: 'utf8' }).trim()
   const write = (path: string, content: string) => {
     mkdirSync(dirname(join(root, path)), { recursive: true })
@@ -33,6 +33,7 @@ export function createSandbox(files: Record<string, string> = {}): Sandbox {
       git('add', '--all')
       git('commit', '--quiet', '--allow-empty', '-m', message)
     },
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    // Retried: on Windows a git that a failed scan started can still hold the folder for a moment.
+    cleanup: () => rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 }),
   }
 }

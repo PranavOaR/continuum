@@ -224,7 +224,8 @@ describe('ContextStore persistence', () => {
     first.close()
   })
 
-  it('creates the database readable only by its owner', () => {
+  // Windows has no permission bits: the store lives in the user's own profile, which only they can read.
+  it.skipIf(process.platform === 'win32')('creates the database readable only by its owner', () => {
     const path = tempDb()
     ContextStore.open(path).close()
     expect(statSync(path).mode & 0o777).toBe(0o600)
