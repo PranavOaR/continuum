@@ -16,6 +16,29 @@ test('landing page keeps its design, shows the demo video and the install guide,
   await expect(page.getByText(/mock data|sample data|prototype|explore the demo/i)).toHaveCount(0)
 })
 
+test('the footer opens Docs and Privacy at their top, and leads back to Get started', async ({ page }) => {
+  const footerLink = (name: string) => page.getByRole('navigation', { name: 'Footer' }).getByRole('link', { name })
+  const atTop = () => page.waitForFunction(() => window.scrollY === 0)
+  await page.goto('/')
+  await footerLink('Docs').click()
+  await expect(page).toHaveURL(/\/docs$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Getting started' })).toBeVisible()
+  await atTop()
+  await footerLink('Privacy').click()
+  await expect(page).toHaveURL(/\/privacy$/)
+  await expect(page.getByRole('heading', { level: 1, name: 'Privacy' })).toBeVisible()
+  await atTop()
+  // The page you are on: back to its top, as the link promises.
+  await footerLink('Privacy').click()
+  await atTop()
+  await footerLink('Get started').click()
+  await expect(page).toHaveURL(/\/#get-started$/)
+  await expect(page.locator('#get-started')).toBeInViewport()
+  // Back returns to where you were, not to the top.
+  await page.goBack()
+  await expect(page).toHaveURL(/\/privacy$/)
+})
+
 test('landing page gives the setup command for the agent you pick, and copies it', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write'])
   await page.goto('/')

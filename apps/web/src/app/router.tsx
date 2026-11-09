@@ -5,6 +5,7 @@ import { AppShell } from '../components/layout/AppShell'
 import { LandingPage } from '../pages/LandingPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { OverviewPage } from '../pages/OverviewPage'
+import { SITE_PAGES } from '../site/siteRoutes'
 import { RouteError } from './RouteError'
 
 /** Code-split secondary routes; the landing page and overview load eagerly for an instant first view. */
@@ -39,6 +40,8 @@ const APP_ROUTES: RouteObject[] = [
       { path: '*', element: <NotFoundPage inApp /> },
     ],
   },
+  // The landing page's header and footer link to these.
+  ...SITE_PAGES,
   { path: '*', element: <NotFoundPage /> },
 ]
 
