@@ -1,0 +1,2 @@
+# Every file keeps LF line endings, on Windows checkouts too: tests compare text and hashes byte for byte.
+* text=auto eol=lf

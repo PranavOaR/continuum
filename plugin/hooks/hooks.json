@@ -6,10 +6,14 @@
           {
             "type": "command",
             "timeout": 20,
-            "command": "sh",
+            "command": "node",
             "args": [
-              "-c",
-              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || root=\"${CLAUDE_PROJECT_DIR:-.}\"; [ -d \"$root/.continuum\" ] || { cat >/dev/null; exit 0; }; if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'ingest'; fi; exec 'npx' '-y' 'getcontinuum@0.4.0' 'ingest'"
+              "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",
+              "--if-continuum",
+              "npx",
+              "-y",
+              "getcontinuum@0.4.0",
+              "ingest"
             ]
           }
         ]
@@ -21,10 +25,14 @@
           {
             "type": "command",
             "timeout": 10,
-            "command": "sh",
+            "command": "node",
             "args": [
-              "-c",
-              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || root=\"${CLAUDE_PROJECT_DIR:-.}\"; [ -d \"$root/.continuum\" ] || { cat >/dev/null; exit 0; }; if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'ingest'; fi; exec 'npx' '-y' 'getcontinuum@0.4.0' 'ingest'"
+              "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",
+              "--if-continuum",
+              "npx",
+              "-y",
+              "getcontinuum@0.4.0",
+              "ingest"
             ]
           }
         ]
@@ -36,10 +44,14 @@
           {
             "type": "command",
             "timeout": 10,
-            "command": "sh",
+            "command": "node",
             "args": [
-              "-c",
-              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || root=\"${CLAUDE_PROJECT_DIR:-.}\"; [ -d \"$root/.continuum\" ] || { cat >/dev/null; exit 0; }; if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'ingest'; fi; exec 'npx' '-y' 'getcontinuum@0.4.0' 'ingest'"
+              "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",
+              "--if-continuum",
+              "npx",
+              "-y",
+              "getcontinuum@0.4.0",
+              "ingest"
             ]
           }
         ]
@@ -53,10 +65,14 @@
             "type": "command",
             "async": true,
             "timeout": 30,
-            "command": "sh",
+            "command": "node",
             "args": [
-              "-c",
-              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || root=\"${CLAUDE_PROJECT_DIR:-.}\"; [ -d \"$root/.continuum\" ] || { cat >/dev/null; exit 0; }; if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'ingest'; fi; exec 'npx' '-y' 'getcontinuum@0.4.0' 'ingest'"
+              "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",
+              "--if-continuum",
+              "npx",
+              "-y",
+              "getcontinuum@0.4.0",
+              "ingest"
             ]
           }
         ]
@@ -70,10 +86,14 @@
             "type": "command",
             "async": true,
             "timeout": 30,
-            "command": "sh",
+            "command": "node",
             "args": [
-              "-c",
-              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || root=\"${CLAUDE_PROJECT_DIR:-.}\"; [ -d \"$root/.continuum\" ] || { cat >/dev/null; exit 0; }; if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'ingest'; fi; exec 'npx' '-y' 'getcontinuum@0.4.0' 'ingest'"
+              "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",
+              "--if-continuum",
+              "npx",
+              "-y",
+              "getcontinuum@0.4.0",
+              "ingest"
             ]
           }
         ]
@@ -86,10 +106,14 @@
             "type": "command",
             "async": true,
             "timeout": 30,
-            "command": "sh",
+            "command": "node",
             "args": [
-              "-c",
-              "root=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" rev-parse --show-toplevel 2>/dev/null) || root=\"${CLAUDE_PROJECT_DIR:-.}\"; [ -d \"$root/.continuum\" ] || { cat >/dev/null; exit 0; }; if [ -n \"${CLAUDE_PLUGIN_ROOT}\" ] && [ -f \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" ]; then exec node \"${CLAUDE_PLUGIN_ROOT}/bin/continuum.js\" 'ingest'; fi; exec 'npx' '-y' 'getcontinuum@0.4.0' 'ingest'"
+              "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",
+              "--if-continuum",
+              "npx",
+              "-y",
+              "getcontinuum@0.4.0",
+              "ingest"
             ]
           }
         ]

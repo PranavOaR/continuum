@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import crossSpawn from 'cross-spawn'
 import { constants } from 'node:os'
 import type { Writable } from 'node:stream'
 import { StringDecoder } from 'node:string_decoder'
@@ -104,10 +104,14 @@ function exitCodeOf(code: number | null, signal: NodeJS.Signals | null): number 
   return SIGNAL_EXIT_BASE + (signal ? (constants.signals[signal] ?? 0) : 0)
 }
 
-/** Runs the command without a shell, teeing its output to the given streams and keeping a bounded tail. */
+/**
+ * Runs the command without a shell, teeing its output to the given streams and keeping a bounded tail.
+ * On Windows, tools such as npm are .cmd shims that only cmd.exe can start: cross-spawn runs those
+ * through it with every argument escaped, and is plain spawn elsewhere.
+ */
 function execute(options: RunCheckOptions, redactor: Redactor): Promise<ProcessOutcome> {
   return new Promise((resolve, reject) => {
-    const child = spawn(options.command, options.args, { cwd: options.root, stdio: ['inherit', 'pipe', 'pipe'] })
+    const child = crossSpawn(options.command, options.args, { cwd: options.root, stdio: ['inherit', 'pipe', 'pipe'] })
     let tail = ''
     let interrupted = false
     const stop = () => {

@@ -71,7 +71,8 @@ describe('continuum doctor', () => {
   it('flags hooks that point at a Continuum that moved or was deleted', async () => {
     const repo = sandbox()
     await cli(repo.root, ['setup', 'claude-code'])
-    const settings = JSON.stringify(readSettings(repo.root)).replaceAll('/packages/cli/src/bin.ts', '/moved-away/packages/cli/src/bin.ts')
+    // Either separator: on Windows the path is C:\\…\\packages\\cli\\src\\bin.ts, its backslashes escaped in JSON.
+    const settings = JSON.stringify(readSettings(repo.root)).replace(/(\/|\\\\)packages(\/|\\\\)cli(\/|\\\\)src(\/|\\\\)bin\.ts/g, '$1moved-away$1packages$2cli$3src$4bin.ts')
     writeFileSync(join(repo.root, SETTINGS), settings)
     expect(find(await doctor(repo.root), /no longer exist/)).toMatchObject({ status: 'fail', detail: expect.stringContaining('moved-away') })
   })

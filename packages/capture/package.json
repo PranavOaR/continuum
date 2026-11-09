@@ -15,7 +15,11 @@
   "dependencies": {
     "@continuum/core": "*",
     "@continuum/store": "*",
+    "cross-spawn": "7.0.6",
     "ignore": "7.0.5"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/cross-spawn": "6.0.6"
+  }
 }

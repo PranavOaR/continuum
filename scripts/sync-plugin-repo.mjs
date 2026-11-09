@@ -32,7 +32,7 @@ const out = resolve(target)
 rmSync(join(out, 'plugin'), { recursive: true, force: true })
 cpSync(join(ROOT, 'plugin'), join(out, 'plugin'), { recursive: true })
 // The hooks run this copy with node (PLUGIN_BUNDLE in packages/claude-code/src/plugin.ts), falling back to npx without it.
-mkdirSync(join(out, 'plugin/bin'))
+mkdirSync(join(out, 'plugin/bin'), { recursive: true })
 cpSync(join(RELEASE, 'continuum.js'), join(out, 'plugin/bin/continuum.js'))
 cpSync(join(RELEASE, 'THIRD_PARTY_NOTICES.md'), join(out, 'plugin/THIRD_PARTY_NOTICES.md'))
 cpSync(join(ROOT, 'plugin-repo'), out, { recursive: true })

@@ -50,6 +50,20 @@ describe('continuum setup through npx', () => {
   })
 })
 
+describe('continuum setup through npx on Windows', () => {
+  it('keeps the cmd /c configuration out of git, and names the npx command to type', async () => {
+    const repo = sandbox()
+    const out: string[] = []
+    const io = { cwd: repo.root, out: (line: string) => out.push(line), err: () => {}, now: () => NOW, configDir: TEST_CONFIG_DIR, claudeConfigDir: TEST_CLAUDE_DIR } as unknown as Parameters<typeof setupCommand>[0]
+    const windows = { command: 'cmd', args: ['/c', 'npx', '-y', 'getcontinuum@0.1.0'], portable: false }
+    expect(await setupCommand(io, ['claude-code'], windows)).toBe(0)
+    expect(JSON.parse(readFileSync(join(repo.root, '.mcp.json'), 'utf8')).mcpServers.continuum).toEqual({ command: 'cmd', args: ['/c', 'npx', '-y', 'getcontinuum@0.1.0', 'mcp'] })
+    expect(readFileSync(join(repo.root, '.git/info/exclude'), 'utf8')).toContain('/.mcp.json')
+    expect(out).toContain('The configuration runs Continuum through `cmd /c npx`, which works only on Windows, so it is kept out of git.')
+    expect(out.at(-1)).toBe('See what Continuum records: npx -y getcontinuum@0.1.0 serve')
+  })
+})
+
 describe('continuum setup claude-code', () => {
   it('changes nothing when the repository config cannot be used', async () => {
     const repo = sandbox()

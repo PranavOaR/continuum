@@ -1,5 +1,5 @@
 import { rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { EXIT_FAILURE, EXIT_OK } from '../io'
@@ -17,10 +17,11 @@ describe('continuum export and import', () => {
     sandboxes.push(source, target)
     await cli(source.root, ['init'])
     await cli(source.root, ['run', '--name', 'unit', '--', process.execPath, '-e', '0'])
-    const file = join(source.root, '..', `${source.root.split('/').at(-1)}-export.json`)
+    const file = join(source.root, '..', `${basename(source.root)}-export.json`)
     onTestFinished(() => rmSync(file, { force: true }))
     expect((await cli(source.root, ['export', file])).code).toBe(EXIT_OK)
-    expect(statSync(file).mode & 0o777).toBe(0o600)
+    // Windows has no permission bits; elsewhere the export is readable by its owner only.
+    if (process.platform !== 'win32') expect(statSync(file).mode & 0o777).toBe(0o600)
     expect((await cli(source.root, ['export', file])).code).toBe(EXIT_FAILURE)
 
     expect((await cli(target.root, ['import', file])).code).toBe(EXIT_OK)
@@ -34,7 +35,7 @@ describe('continuum export and import', () => {
     sandboxes.push(source, target)
     await cli(source.root, ['init'])
     await cli(source.root, ['run', '--name', 'unit', '--', process.execPath, '-e', `console.log("CUST-12345")`])
-    const file = join(source.root, '..', `${source.root.split('/').at(-1)}-export.json`)
+    const file = join(source.root, '..', `${basename(source.root)}-export.json`)
     onTestFinished(() => rmSync(file, { force: true }))
     await cli(source.root, ['export', file])
 

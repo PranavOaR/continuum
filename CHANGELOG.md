@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Windows.** Continuum runs on native Windows, with no WSL. `setup` no longer refuses there, and `doctor` no longer fails. For Claude Code, Codex, Cursor and VS Code, setup writes `cmd /c npx -y getcontinuum@<version>`, since agents cannot start npx's `.cmd` shim without a shell; because that line works only on Windows, those files are kept out of git. CI runs the unit tests and the release smoke test on Windows, macOS and Linux.
+
+### Changed
+- **The Claude Code plugin no longer needs `sh`.** Its hooks and MCP server start a small launcher with `node`, with no shell, which skips at once in a repository without a `.continuum` store and otherwise runs the plugin's copy of the CLI in the same process. A hook in a repository without Continuum now takes about 40 ms instead of 10 ms on a Mac; Continuum's own hooks are as fast as before.
+- **VS Code hooks carry a PowerShell command** beside the POSIX one, and VS Code runs it on Windows. PowerShell cannot hand the payload to a background program, so on Windows file edits and task updates are recorded before Copilot moves on (other tools still start nothing).
+- `serve` opens the dashboard in your browser on Windows too.
+- `continuum run -- npm test` starts tools that Windows installs as `.cmd` shims, such as npm, npx and pnpm, with every argument passed through intact (through cross-spawn).
+
 ## [0.4.0] - 2026-11-05
 
 ### Added

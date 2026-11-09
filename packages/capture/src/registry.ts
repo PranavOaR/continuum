@@ -48,7 +48,7 @@ async function writeRegistry(configDir: string, repositories: RegisteredReposito
 /** The same repository reached through a symlink or /private on macOS is one entry, not two. */
 function canonical(root: string): string {
   try {
-    return realpathSync(root)
+    return realpathSync.native(root)
   } catch {
     return root
   }

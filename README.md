@@ -17,7 +17,7 @@ npx getcontinuum setup claude-code   # or: setup codex, setup cursor, setup vsco
 npx getcontinuum serve               # the dashboard for every connected repository
 ```
 
-Requires Node.js 22.13+ and git, on macOS or Linux. Windows is not supported yet: use WSL 2. [CHANGELOG.md](CHANGELOG.md) lists what is in each release.
+Requires Node.js 22.13+ and git, on Windows, macOS or Linux. [CHANGELOG.md](CHANGELOG.md) lists what is in each release.
 
 [![Demo: Claude Code starts a task, Codex finishes it from Continuum's briefing, and the dashboard shows one task carried across both agents. Recorded from real sessions.](https://continuumgroup.dev/demo/continuum-demo.jpg)](https://continuumgroup.dev/demo/continuum-demo.mp4)
 
@@ -43,7 +43,7 @@ npm run dev        # the dashboard on http://localhost:5173, with a labelled sam
 | `npm run bench:scan`, `npm run bench:store` | Time reading a 50,000-file working tree, and opening a store with 100,000 events (what every hook pays) |
 | `npm run bench:hooks` | Time the session-start briefing and an edit hook end to end through the release bundle (run `npm run bundle` first). The website's numbers come from here and `bench:scan` (`apps/web/src/components/site/siteStats.ts`) |
 
-CI runs all of these on every pull request, plus the release smoke test on macOS and Linux with Node 22.13 and 24. `main` is kept releasable: work happens on feature branches.
+CI runs all of these on every pull request, plus the unit tests and the release smoke test on Windows, macOS and Linux with Node 22.13 and 24. `main` is kept releasable: work happens on feature branches.
 
 ### The CLI from this checkout
 

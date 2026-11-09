@@ -70,15 +70,32 @@ const RECORDED_TOOL_PATTERN = `"tool_?[nN]ame" *: *"(${VSCODE_RECORDED_TOOLS.joi
 const inBackground = (ingest: string, filter?: string) =>
   ['p=$(cat)', ...(filter ? [`printf '%s' "$p" | grep -qE ${shellQuote(filter)} || exit 0`] : []), `printf '%s' "$p" | ${ingest} >/dev/null 2>&1 &`].join('; ')
 
+/** PowerShell quoting: a single-quoted string is literal, with ' written twice. */
+const psQuote = (part: string) => `'${part.replaceAll("'", "''")}'`
+
+/** Windows PowerShell reads stdin and talks to programs in the console's code page; the payload and briefing are UTF-8. Setting the console fails without one. */
+const PS_UTF8 = '$u = [Text.UTF8Encoding]::new($false); try { [Console]::InputEncoding = $u; [Console]::OutputEncoding = $u } catch {}; $OutputEncoding = $u'
+
+/**
+ * The same hooks for PowerShell, which VS Code runs on Windows in place of `command`. They pipe
+ * the payload ($input) to Continuum. PowerShell cannot hand stdin to a background program, so
+ * recording runs before the hook returns, and only for the tools it records.
+ */
+function powershellHook(invocation: Invocation, { filter, quiet }: { filter?: string; quiet?: boolean } = {}): string {
+  const ingest = `& ${[invocation.command, ...invocation.args, 'ingest', '--agent', 'vscode'].map(psQuote).join(' ')}${quiet ? ' | Out-Null' : ''}`
+  if (!filter) return `${PS_UTF8}; $input | ${ingest}`
+  return `${PS_UTF8}; $p = $input | Out-String; if ($p -notmatch ${psQuote(filter)}) { exit 0 }; $p | ${ingest}`
+}
+
 function ourHooks(invocation: Invocation): Record<string, Json[]> {
   const ingest = ingestLine(invocation)
   return {
     // Synchronous: its output is the briefing Copilot starts with.
-    SessionStart: [{ type: 'command', command: ingest, timeout: SESSION_START_TIMEOUT_S }],
-    PostToolUse: [{ type: 'command', command: inBackground(ingest, RECORDED_TOOL_PATTERN), timeout: BACKGROUND_TIMEOUT_S }],
+    SessionStart: [{ type: 'command', command: ingest, powershell: powershellHook(invocation), timeout: SESSION_START_TIMEOUT_S }],
+    PostToolUse: [{ type: 'command', command: inBackground(ingest, RECORDED_TOOL_PATTERN), powershell: powershellHook(invocation, { filter: RECORDED_TOOL_PATTERN, quiet: true }), timeout: BACKGROUND_TIMEOUT_S }],
     // Recorded only after `continuum config prompts on`.
-    UserPromptSubmit: [{ type: 'command', command: inBackground(ingest), timeout: BACKGROUND_TIMEOUT_S }],
-    Stop: [{ type: 'command', command: ingest, timeout: SYNC_TIMEOUT_S }],
+    UserPromptSubmit: [{ type: 'command', command: inBackground(ingest), powershell: powershellHook(invocation, { quiet: true }), timeout: BACKGROUND_TIMEOUT_S }],
+    Stop: [{ type: 'command', command: ingest, powershell: powershellHook(invocation), timeout: SYNC_TIMEOUT_S }],
   }
 }
 

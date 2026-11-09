@@ -134,6 +134,7 @@ describe('forget, hardened', () => {
     store.rewriteHistory(forgetPath('readme'))
 
     expect(store.graph.get('session:s1')?.props.tookUpTaskId).toBe('update-readme-1a2b')
+    store.close()
   })
 
   it('scrubs the forgotten path from check names folded into a checkpoint', () => {

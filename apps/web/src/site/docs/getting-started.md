@@ -1,6 +1,6 @@
 # Getting started
 
-About ten minutes. You need **Node.js 22.13 or newer**, **git**, and Claude Code, Codex, Cursor or GitHub Copilot in VS Code. It runs on macOS and Linux; on Windows, use WSL 2.
+About ten minutes. You need **Node.js 22.13 or newer**, **git**, and Claude Code, Codex, Cursor or GitHub Copilot in VS Code. It runs on Windows, macOS and Linux.
 
 ## 1. Connect a repository
 

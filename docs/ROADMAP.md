@@ -15,7 +15,7 @@ Status, 5 November 2026, after the 0.4.0 release. Continuum is published on npm 
 
 | Area | What shipped |
 |---|---|
-| **Install** | A single minified ESM bundle (about 900 KB) with the dashboard, on npm as `getcontinuum`. `setup` writes `npx -y getcontinuum@<version>`, so `.mcp.json` can be shared. A Claude Code plugin from [PranavOaR/continuum-plugin](https://github.com/PranavOaR/continuum-plugin), whose hooks run their own copy of the bundle with `node` (about 0.1 s, against 0.5 s through `npx`). `doctor`, which also reports hooks that never arrive or fail, `uninstall [--purge]`, forward-only schema migrations, and CI on macOS and Linux with Node 22.13 and 24. |
+| **Install** | A single minified ESM bundle (about 900 KB) with the dashboard, on npm as `getcontinuum`. `setup` writes `npx -y getcontinuum@<version>`, so `.mcp.json` can be shared. A Claude Code plugin from [PranavOaR/continuum-plugin](https://github.com/PranavOaR/continuum-plugin), whose hooks run their own copy of the bundle with `node` (about 0.1 s, against 0.5 s through `npx`). `doctor`, which also reports hooks that never arrive or fail, `uninstall [--purge]`, forward-only schema migrations, and CI on Windows, macOS and Linux with Node 22.13 and 24. Native Windows: hooks and MCP servers run with no POSIX shell (`cmd /c npx` from setup, a node launcher in the plugin, PowerShell hooks for VS Code). |
 | **Scale** | Clean files' hashes come from the git index, and only dirty or untracked files are hashed. Checks store content-addressed coverage manifests. `compact` folds old events into a checkpoint. The watcher falls back to polling when the OS runs out of watches. The dashboard updates over Server-Sent Events. |
 | **Capture** | Line counts and uncommitted diffs per file. Claude Code's own test, lint and build runs, with exit codes (observed). Commits. A current task per session. Opt-in prompt capture. Changes no agent session made are listed separately. |
 | **Briefings** | Decisions anchored to a symbol (`path#name`, TypeScript, JavaScript and Python), which go stale only when that symbol changes. `get_context` ranks context for a task within a token budget. "Since you left" opens a resumed session. An evaluation harness (`npm run eval`) that CI requires to score 100%. |
@@ -74,7 +74,6 @@ Order follows what users report.
 | # | Item | Done when | Size |
 |---|---|---|---|
 | 9 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
-| 10 | **Windows.** WSL 2 as the supported path, documented and tested in CI. Native support (Node hooks instead of `sh`) only once people ask. | The release smoke test passes under WSL. | M |
 | 11 | **More agents.** Gemini CLI, Windsurf or JetBrains Junie, in the order users ask. | Each passes `npm run test:cross-agent`. | M each |
 
 ### Only once users ask
