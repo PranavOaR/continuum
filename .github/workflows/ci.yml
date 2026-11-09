@@ -47,7 +47,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - run: npm test
+      # A longer timeout than Vitest's 5 s: tests that start many git processes take that long on a Windows runner.
+      - run: npm test --workspaces --if-present -- --testTimeout=30000
 
   release:
     name: Release package (${{ matrix.os }}, Node ${{ matrix.node }})
