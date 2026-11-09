@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
+import { setupCommand } from '../commands/setup'
 import { checkNode, runDoctor, type Finding } from '../doctor'
 import { selfInvocation } from '../invocation'
 import { EXIT_FAILURE, EXIT_OK, EXIT_USAGE } from '../io'
@@ -25,6 +26,7 @@ const SETTINGS = '.claude/settings.local.json'
 const readSettings = (root: string) => JSON.parse(readFileSync(join(root, SETTINGS), 'utf8'))
 const writeSettings = (root: string, value: unknown) => writeFileSync(join(root, SETTINGS), JSON.stringify(value))
 
+const io = (cwd: string) => ({ cwd, out: () => {}, err: () => {}, now: () => new Date(), configDir: TEST_CONFIG_DIR, claudeConfigDir: TEST_CLAUDE_DIR }) as unknown as Parameters<typeof setupCommand>[0]
 const doctor = (cwd: string, overrides: Partial<Parameters<typeof runDoctor>[0]> = {}) =>
   runDoctor({ cwd, nodeVersion: '24.1.0', platform: 'linux', invocation: selfInvocation(), webDist: '/nowhere', configDir: TEST_CONFIG_DIR, claudeConfigDir: TEST_CLAUDE_DIR, ...overrides })
 
@@ -57,6 +59,15 @@ describe('continuum doctor', () => {
     expect(find(findings, /not approved yet/)?.status).toBe('warn')
     expect(find(findings, /Dashboard/)?.status).toBe('warn')
     expect(find(findings, /continuum serve/)?.status).toBe('ok')
+  })
+
+  it('passes a Windows setup, whose cmd /c switch is not a missing file', async () => {
+    const repo = sandbox()
+    const windows = { command: 'cmd', args: ['/c', 'npx', '-y', 'getcontinuum@0.4.0'], portable: false }
+    expect(await setupCommand(io(repo.root), ['claude-code'], windows)).toBe(EXIT_OK)
+    const findings = await doctor(repo.root, { platform: 'win32', invocation: windows })
+    expect(findings.filter((finding) => finding.status === 'fail')).toEqual([])
+    expect(find(findings, /hooks registered/)?.status).toBe('ok')
   })
 
   it('reports an approved or declined MCP server', async () => {
