@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { anotherSessionHoldsTask, isTaskNode, newTaskId, openSessionId, sameTitle, sessionWorksOn, summarizeTask, taskNodeOfSession, taskSnapshot, taskSummaries, type TaskSummary } from '@continuum/context'
+import { anotherSessionHoldsTask, closingWarning, isTaskNode, newTaskId, openSessionId, sameTitle, sessionWorksOn, summarizeTask, taskNodeOfSession, taskSnapshot, taskSummaries, unverifiedChecks, type ProjectState, type TaskSummary } from '@continuum/context'
 import { MAX_TASK_TEXT_CHARS, type SessionTaskEvent, type TaskUpsertedEvent } from '@continuum/core'
 import type { ContextStore } from '@continuum/store'
 
@@ -184,7 +184,25 @@ function describe(snapshot: Snapshot): string {
     .join(' ')
 }
 
-type Run = (work: (store: ContextStore, redact: Redact) => Promise<string> | string) => Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }>
+/** Where the project stands against the working tree as it is now; read only when a reply needs it. */
+type ReadState = () => Promise<ProjectState>
+
+type Run = (work: (store: ContextStore, redact: Redact, readState: ReadState) => Promise<string> | string) => Promise<{ content: { type: 'text'; text: string }[]; isError?: boolean }>
+
+/**
+ * What to add to the reply when a task was just marked completed while a
+ * check on its files failed or is out of date. The task is already closed and
+ * stays closed: honest evidence at the finish must never get in the agent's way,
+ * so a state that cannot be read is said, not thrown.
+ */
+async function warningOnClose(store: ContextStore, taskId: string, readState: ReadState, now: Date): Promise<string> {
+  try {
+    const warning = closingWarning(unverifiedChecks(store, await readState(), taskId), now)
+    return warning ? ` ${warning}` : ''
+  } catch (error) {
+    return ` (Continuum could not tell whether this task's checks still hold: ${error instanceof Error ? error.message : String(error)})`
+  }
+}
 
 /** Lets an agent record what it is working on, so the next session (or agent) continues the same task. */
 export function registerTaskTools(server: McpServer, run: Run, now: () => Date, sessionOf: (extra: { _meta?: Record<string, unknown> }) => string | undefined): void {
@@ -208,10 +226,16 @@ export function registerTaskTools(server: McpServer, run: Run, now: () => Date, 
     {
       title: 'Update task',
       description:
-        'Update the current task (or task_id): status, next action, steps finished, remaining steps, acceptance criteria met. Call it when you finish a step, get blocked, or stop working, so the next session knows exactly where things stand. Starting another task pauses this one, unless another running session took it up; a task untouched for 14 days stops being current.',
+        'Update the current task (or task_id): status, next action, steps finished, remaining steps, acceptance criteria met. Call it when you finish a step, get blocked, or stop working, so the next session knows exactly where things stand. Marking a task completed while a check on its files failed or is out of date still closes it, and the reply names that check. Starting another task pauses this one, unless another running session took it up; a task untouched for 14 days stops being current.',
       inputSchema: updateTaskInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
-    async (input, extra) => run((store, redact) => `Updated. ${describe(updateTask(store, input, now(), redact, sessionOf(extra)))}`),
+    async (input, extra) =>
+      run(async (store, redact, readState) => {
+        const at = now()
+        const snapshot = updateTask(store, input, at, redact, sessionOf(extra))
+        const warning = input.status === 'completed' ? await warningOnClose(store, snapshot.id, readState, at) : ''
+        return `Updated. ${describe(snapshot)}${warning}`
+      }),
   )
 }

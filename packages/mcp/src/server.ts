@@ -280,7 +280,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
       ),
   )
 
-  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, _root, { redact }) => ok(await work(store, redact)))), now, sessionOf)
+  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, root, { redact }) => ok(await work(store, redact, () => currentState(store, root, now()))))), now, sessionOf)
 
   return server
 }
