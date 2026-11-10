@@ -9,6 +9,7 @@ import { LocalContinuumService, ProjectUnavailableError } from '../localService'
 import { detectStack, shortPath } from '../mapProject'
 import { NOW, openStore, seededRepo } from './fixtures'
 
+const HEAVY_TEST_TIMEOUT_MS = 30_000
 const sandboxes: Sandbox[] = []
 afterEach(() => {
   for (const repo of sandboxes.splice(0)) repo.cleanup()
@@ -171,7 +172,8 @@ describe('LocalContinuumService', () => {
     }
     expect(total).toBe(10_007)
     expect(oldest).toBe('Claude Code session started')
-  })
+    // Recording 10,000 events and reading 51 pages takes a few seconds, more under coverage.
+  }, HEAVY_TEST_TIMEOUT_MS)
 
   it('says a session resumed, not that a new one started', async () => {
     const { repo, service: local } = await service()
