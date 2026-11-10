@@ -92,6 +92,16 @@ describe('daemon API', () => {
     expect(JSON.parse((await raw(daemon, '/api/projects/my%20app/graph')).body).data.projectId).toBe('my app')
   })
 
+  it('serves the problem report only when serve provides one', async () => {
+    expect((await raw(await start(), '/api/report')).status).toBe(404)
+    const daemon = await startDaemon({ service: fakeService, version: 'test', token: TOKEN, port: 0, report: async () => ({ markdown: '## Continuum diagnostic report', issueUrl: 'https://github.com/PranavOaR/continuum-plugin/issues/new?body=x' }) })
+    running.push(daemon)
+    const reply = await raw(daemon, '/api/report')
+    expect(reply.status).toBe(200)
+    expect(JSON.parse(reply.body).data).toEqual({ markdown: '## Continuum diagnostic report', issueUrl: 'https://github.com/PranavOaR/continuum-plugin/issues/new?body=x' })
+    expect((await raw(daemon, '/api/report', { authorization: 'Bearer wrong' })).status).toBe(401)
+  })
+
   it('maps errors to statuses without leaking internals', async () => {
     const daemon = await start()
     const missing = await raw(daemon, '/api/projects/nope/workspace')

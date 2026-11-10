@@ -1,12 +1,15 @@
-import { HardDrive, Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
+import { ExternalLink, HardDrive, Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Button } from '../components/shared/Button'
+import { buttonClass } from '../components/shared/buttonClass'
 import { ConfirmDialog } from '../components/shared/Dialog'
 import { SelectField, Toggle } from '../components/shared/Fields'
 import { PageHeader } from '../components/shared/PageHeader'
 import { Panel } from '../components/shared/Panel'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useServiceQuery } from '../hooks/useServiceQuery'
 import { useProjects, usePreferredProjectId } from '../hooks/useWorkspace'
+import { fetchProblemReport, reportLink } from '../services/problemReport'
 import { usePreferences, type ThemePreference } from '../state/preferences'
 import { useToast } from '../state/toasts'
 import { cn } from '../utils/cn'
@@ -27,6 +30,24 @@ function SettingRow({ label, description, children }: { label: string; descripti
       </div>
       <div className="sm:w-64">{children}</div>
     </div>
+  )
+}
+
+/** A plain link, so the browser opens it as a click and no pop-up blocker steps in. */
+function ReportProblem() {
+  const isLive = useIsLive()
+  const report = useServiceQuery(isLive ? 'problem-report' : null, () => fetchProblemReport())
+  const isFilled = report.data !== undefined && reportLink(report.data) === report.data.issueUrl
+  const description = isFilled
+    ? 'Opens a new issue on GitHub with a diagnostic report filled in: versions, settings and counts, with your paths shortened and secrets masked. None of your code, prompts, tasks or decisions. Nothing is submitted until you press the button there.'
+    : 'Opens a new issue on GitHub. Include the output of `continuum doctor --report`, which shortens your paths and masks secrets.'
+  return (
+    <SettingRow label="Report a problem" description={description}>
+      <a href={reportLink(report.data)} target="_blank" rel="noreferrer" className={buttonClass('secondary', 'sm', 'w-full')}>
+        <ExternalLink aria-hidden />
+        Report a problem
+      </a>
+    </SettingRow>
   )
 }
 
@@ -120,6 +141,10 @@ export function SettingsPage() {
               )}
             </div>
           </div>
+        </Panel>
+
+        <Panel title="Help">
+          <ReportProblem />
         </Panel>
 
         <Panel title="Browser data" description="What this browser keeps for the dashboard.">

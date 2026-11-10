@@ -25,19 +25,21 @@ const spawnDetached: Launcher = (command, args) =>
 const escapeAttribute = (text: string) => text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;')
 
 /** A page that sends the browser on to `url` at once, with a link in case it does not. */
-function redirectPage(url: string): string {
+function redirectPage(url: string, label: string): string {
   const href = escapeAttribute(url)
-  return `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${href}"><title>Continuum</title><p><a href="${href}">Open the Continuum dashboard</a></p>\n`
+  return `<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${href}"><title>Continuum</title><p><a href="${href}">${escapeAttribute(label)}</a></p>\n`
 }
 
 export interface OpenOptions {
   platform?: NodeJS.Platform
   launcher?: Launcher
   cleanupAfterMs?: number
+  /** The text of the page's fallback link. */
+  label?: string
 }
 
 /**
- * Opens the dashboard's launch link in the default browser. The link carries
+ * Opens a link in the default browser. The dashboard's launch link carries
  * the access token, and a command line can be read by other users on the
  * machine (`ps`), so the browser is given a page only this user can read,
  * which redirects to the link; the page is deleted shortly after.
@@ -50,7 +52,7 @@ export async function openInBrowser(url: string, options: OpenOptions = {}): Pro
   const remove = () => rmSync(dir, { recursive: true, force: true })
   try {
     const page = join(dir, 'dashboard.html')
-    writeFileSync(page, redirectPage(url), { mode: PRIVATE_FILE_MODE })
+    writeFileSync(page, redirectPage(url, options.label ?? 'Open the Continuum dashboard'), { mode: PRIVATE_FILE_MODE })
     await (options.launcher ?? spawnDetached)(opener, [page])
   } catch (error) {
     remove()

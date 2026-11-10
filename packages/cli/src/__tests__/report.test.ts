@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { pathScrubber, renderReport, type ReportInput } from '../report'
+import { ISSUES_URL, issueUrl, MAX_ISSUE_URL_CHARS, pathScrubber, renderReport, type ReportInput } from '../report'
 
 const NOW = new Date('2026-11-02T12:00:00.000Z')
 
@@ -87,5 +87,28 @@ describe('pathScrubber', () => {
   it('applies the repository’s own redaction patterns', () => {
     const scrub = pathScrubber({ roots: [], home: '/home/ana', patterns: ['ACME-[0-9]{6}'] })
     expect(scrub('ticket ACME-123456 failed')).toBe('ticket [redacted] failed')
+  })
+})
+
+describe('issueUrl', () => {
+  it('opens a new bug report on the plugin repository with the report already in the body', () => {
+    const url = new URL(issueUrl(renderReport(input(), identity)))
+
+    expect(`${url.origin}${url.pathname}`).toBe(`${ISSUES_URL}/new`)
+    expect(url.searchParams.get('template')).toBe('bug_report.md')
+    const body = url.searchParams.get('body') ?? ''
+    expect(body).toContain('### What happened')
+    expect(body).toContain('## Continuum diagnostic report')
+    expect(body).toContain('- Continuum: 0.2.1')
+  })
+
+  it('asks for the report to be pasted when it would make the link too long for GitHub', () => {
+    const long = renderReport(input({ findings: Array.from({ length: 400 }, (_, index) => ({ status: 'fail' as const, label: `Finding number ${index} with a long label` })) }), identity)
+    const url = issueUrl(long)
+
+    expect(url.length).toBeLessThanOrEqual(MAX_ISSUE_URL_CHARS)
+    const body = new URL(url).searchParams.get('body') ?? ''
+    expect(body).toContain('continuum doctor --report')
+    expect(body).not.toContain('Finding number 399')
   })
 })

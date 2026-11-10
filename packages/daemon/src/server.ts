@@ -16,6 +16,7 @@ const MAX_QUERY_CHARS = 200
 const TOKEN_BYTES = 24
 const TOKEN_PARAM = 'token'
 const EVENTS_PATH = '/api/events'
+const REPORT_PATH = '/api/report'
 /** Header carrying the per-run CSRF token on writes from the dashboard. */
 export const CSRF_HEADER = 'x-continuum-csrf'
 /** The longest write is a record's text; anything bigger than it can be is refused unread. */
@@ -61,6 +62,14 @@ export interface DaemonOptions {
   onError?: (error: unknown) => void
   /** Pushes "something was recorded" to open dashboards; without it they refresh on a timer. */
   changes?: ChangeFeed
+  /** Builds what "Report a problem" hands to GitHub; without it the dashboard links to the issue list. */
+  report?: () => Promise<ProblemReport>
+}
+
+/** `continuum doctor --report`, and a link that opens a new issue with it filled in. */
+export interface ProblemReport {
+  markdown: string
+  issueUrl: string
 }
 
 export interface RunningDaemon {
@@ -168,6 +177,16 @@ function handleEvents(request: IncomingMessage, response: ServerResponse, change
     clearInterval(heartbeat)
     unsubscribe()
   })
+}
+
+async function handleReport(report: DaemonOptions['report'], response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
+  if (!report) return fail(response, 404, 'not-found', 'No problem report is available.')
+  try {
+    return send(response, 200, { data: await report() })
+  } catch (error) {
+    onError?.(error)
+    return fail(response, 500, 'internal', 'Continuum could not build the report. Run `continuum doctor --report` in a terminal instead.')
+  }
 }
 
 async function handleApi(service: ContinuumService, url: URL, response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
@@ -382,6 +401,7 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
         return handleWrite(options.service, url, request, response, options.onError)
       }
       if (url.pathname === EVENTS_PATH) return handleEvents(request, response, options.changes)
+      if (url.pathname === REPORT_PATH) return handleReport(options.report, response, options.onError)
       if (isApi) return handleApi(options.service, url, response, options.onError)
       if (!staticRoot) return fail(response, 404, 'not-found', 'The dashboard is not built. Run `npm run build` in the Continuum checkout.')
       return handleStatic(staticRoot, url, response, csrfToken)

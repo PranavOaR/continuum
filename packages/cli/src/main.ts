@@ -48,7 +48,8 @@ Commands
   export <file>        Write the recorded history to a JSON file (import <file> restores it)
   forget               Permanently remove recorded data: --path, --session or --before
   doctor [--report]    Check the install and this repository's setup, with fixes;
-                       --report prints a scrubbed report to attach to an issue
+                       --report prints a scrubbed report to attach to an issue,
+                       and --report --open starts that issue in your browser
   uninstall [--purge]  Disconnect every agent; --purge also deletes .continuum/
 
 Used by agents
