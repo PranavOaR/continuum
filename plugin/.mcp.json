@@ -6,7 +6,7 @@
         "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",
         "npx",
         "-y",
-        "getcontinuum@0.5.0",
+        "getcontinuum@0.6.0",
         "mcp"
       ]
     }

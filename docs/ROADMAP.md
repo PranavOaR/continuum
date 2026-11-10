@@ -1,6 +1,6 @@
 # Continuum roadmap
 
-Status, 10 November 2026, with the 0.5.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has most of the November plan: a new user's first hour, memory you can ask, evidence at the finish, a profile that follows you, and trust and control, released in 0.5.0. [Next](#next) lists what is left.
+Status, 10 November 2026, with the 0.6.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has most of the November plan: a new user's first hour, memory you can ask, evidence at the finish, a profile that follows you, and trust and control, released in 0.5.0. [Next](#next) lists what is left.
 
 ## Guiding principles
 
@@ -33,6 +33,7 @@ Status, 10 November 2026, with the 0.5.0 release. Continuum is published on npm 
 | **Follows you** (0.5.0) | A personal profile: preferences kept in Continuum's per-user folder, labelled set by you, that every repository's briefing opens with, including its first. `continuum profile` and the dashboard's Settings page edit it. |
 | **Trust and control** (0.5.0) | Repository settings in the dashboard, with a preview of what redaction would store, and patterns that will not compile or could hang refused with the reason. The Activity page pages back through a project's whole history by sequence number, filtered by type, agent and date; it needs no new index, because paging uses the event log's primary key. `doctor --report --open` and the dashboard open a pre-filled issue. The Windows end-to-end run can test what npm really serves. |
 | **Notes the code moved on from** (0.5.0) | From a reader's comment. A session's note is flagged in the briefing when a file that session changed was changed again since: by hand, by another agent or deleted. Each file and who changed it is named, under the note, on the next step it named and on earlier sessions. It needs no new data: each file's latest recorded change and the working tree already say it. |
+| **Antigravity CLI** (0.6.0) | `setup antigravity` connects Antigravity CLI, which replaced Gemini CLI: hooks in `.agents/hooks.json` brief each conversation and record its edits, and the MCP server is in `.agents/mcp_config.json`. Checked against `agy` 1.5.3; recording a live edit is not yet seen. |
 | **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health); 0.3.0 (the first hour, clearer verification, the first release run entirely by the workflow). The plugin repository accepts private vulnerability reports. |
 
 ## Next
@@ -46,7 +47,7 @@ Order follows what users report.
 | # | Item | Done when | Size |
 |---|---|---|---|
 | 9 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
-| 11 | **More agents.** Windsurf or JetBrains Junie, in the order users ask. Antigravity CLI, which replaced Gemini CLI, is connected; it still needs a run against the real `agy` and a place in `npm run test:cross-agent`. | Each passes `npm run test:cross-agent`. | M each |
+| 11 | **More agents.** Windsurf or JetBrains Junie, in the order users ask. Antigravity CLI, which replaced Gemini CLI, shipped in 0.6.0 and was checked against `agy` 1.5.3 (hooks, briefing, MCP tools); recording a live edit and a place in `npm run test:cross-agent` remain. | Each passes `npm run test:cross-agent`. | M each |
 | 12 | **Session identity for Copilot and Cursor.** Two sessions of either agent in one repository can still cross tasks, because neither tells its MCP server which session is calling. | Fixed when either agent exposes a session id. | S |
 
 ### Only once users ask
