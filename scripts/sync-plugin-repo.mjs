@@ -35,6 +35,8 @@ cpSync(join(ROOT, 'plugin'), join(out, 'plugin'), { recursive: true })
 mkdirSync(join(out, 'plugin/bin'), { recursive: true })
 cpSync(join(RELEASE, 'continuum.js'), join(out, 'plugin/bin/continuum.js'))
 cpSync(join(RELEASE, 'THIRD_PARTY_NOTICES.md'), join(out, 'plugin/THIRD_PARTY_NOTICES.md'))
+// The issue templates are replaced as a whole too, so a template removed here is removed there.
+rmSync(join(out, '.github/ISSUE_TEMPLATE'), { recursive: true, force: true })
 cpSync(join(ROOT, 'plugin-repo'), out, { recursive: true })
 cpSync(join(ROOT, 'LICENSE'), join(out, 'LICENSE'))
 console.log(`Plugin repository assembled in ${out}; review with git status, then commit and push.`)

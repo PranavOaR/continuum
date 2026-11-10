@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The plugin repository had two bug report templates after 0.5.0: the issue form it already had and a plainer one 0.5.0 added. The plainer one is gone, and "Report a problem" (`doctor --report --open` and the dashboard) now opens the issue form with the report in its diagnostic field.
+
 ## [0.5.0] - 2026-11-10
 
 ### Added

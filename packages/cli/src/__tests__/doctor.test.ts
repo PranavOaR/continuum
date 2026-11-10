@@ -218,7 +218,7 @@ describe('reporting a problem from doctor', () => {
 
     expect(code).toBe(EXIT_OK)
     expect(opened).toHaveLength(1)
-    const body = new URL(opened[0]).searchParams.get('body') ?? ''
+    const body = new URL(opened[0]).searchParams.get('doctor') ?? ''
     expect(body).toContain('## Continuum diagnostic report')
     expect(body).not.toContain(repo.root)
     expect(out.join('\n')).toMatch(/Nothing is submitted until you press/)

@@ -21,7 +21,7 @@ body:
     id: doctor
     attributes:
       label: Output of `npx getcontinuum doctor --report`
-      description: Run it in the repository where the problem happens (`| pbcopy` copies it on macOS). It holds versions, settings and counts, with paths shortened and secrets masked, never your code. Read it first and remove anything you would rather not share. If your version does not know `--report`, paste the output of `npx getcontinuum doctor`.
+      description: Run it in the repository where the problem happens (`| pbcopy` copies it on macOS), or run `npx getcontinuum doctor --report --open`, which opens this form with it filled in. It holds versions, settings and counts, with paths shortened and secrets masked, never your code. Read it first and remove anything you would rather not share. If your version does not know `--report`, paste the output of `npx getcontinuum doctor`.
     validations:
       required: true
   - type: input

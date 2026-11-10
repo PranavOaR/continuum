@@ -95,9 +95,8 @@ describe('issueUrl', () => {
     const url = new URL(issueUrl(renderReport(input(), identity)))
 
     expect(`${url.origin}${url.pathname}`).toBe(`${ISSUES_URL}/new`)
-    expect(url.searchParams.get('template')).toBe('bug_report.md')
-    const body = url.searchParams.get('body') ?? ''
-    expect(body).toContain('### What happened')
+    expect(url.searchParams.get('template')).toBe('bug_report.yml')
+    const body = url.searchParams.get('doctor') ?? ''
     expect(body).toContain('## Continuum diagnostic report')
     expect(body).toContain('- Continuum: 0.2.1')
   })
@@ -107,7 +106,7 @@ describe('issueUrl', () => {
     const url = issueUrl(long)
 
     expect(url.length).toBeLessThanOrEqual(MAX_ISSUE_URL_CHARS)
-    const body = new URL(url).searchParams.get('body') ?? ''
+    const body = new URL(url).searchParams.get('doctor') ?? ''
     expect(body).toContain('continuum doctor --report')
     expect(body).not.toContain('Finding number 399')
   })
