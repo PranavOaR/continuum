@@ -152,4 +152,23 @@ export const SCENARIOS: Scenario[] = [
       { id: 'ranked', ask: 'Which recorded decision matters most for handling a webhook that is retried?', expect: [/retries are safe|idempotency/i], section: '', tool: { name: 'get_context', query: 'webhook retries idempotency' }, inBriefing: [/^[^\n]*\n- [^\n]*Task "Add single sign-on"[^\n]*\n- \([^)]*matches "webhook", "retries", "idempotency"[^)]*\) \[agent-reported\] decision: Retries are safe/] },
     ],
   },
+  {
+    name: 'a note the code moved on from: a commit by hand between sessions',
+    files: { 'src/rate.ts': 'h-rate-2', 'src/server.ts': 'h-server-1' },
+    events: [
+      e('file.changed', { path: 'src/rate.ts', contentHash: 'h-rate-0', changeType: 'added' }, 600, 'observed', 'watcher:git'),
+      e('file.changed', { path: 'src/server.ts', contentHash: 'h-server-1', changeType: 'added' }, 600, 'observed', 'watcher:git'),
+      e('session.started', { sessionId: 'claude-r', agent: 'claude-code' }, 300),
+      e('file.changed', { path: 'src/rate.ts', contentHash: 'h-rate-1', changeType: 'modified', sessionId: 'claude-r' }, 290),
+      e('session.ended', { sessionId: 'claude-r', summary: 'The rate limiter allows 100 requests a minute. Next: add a test for the limit.' }, 280, 'agent-reported'),
+      // Then someone changed the limit by hand and committed it.
+      e('file.changed', { path: 'src/rate.ts', contentHash: 'h-rate-2', changeType: 'modified' }, 120, 'observed', 'watcher:git'),
+      e('commit.recorded', { hash: 'b4d2e91aa', message: 'Lower the rate limit to 20', files: ['src/rate.ts'] }, 115, 'observed', 'watcher:git'),
+    ],
+    resumingSession: { sessionId: 'claude-s', agent: 'claude-code' },
+    questions: [
+      { id: 'stale', ask: 'Can you rely on the last note about the rate limiter as it stands? Why?', expect: [/no|not|changed|check/i, /rate\.ts/], forbid: [/^\s*yes\b/i], section: 'Where we left off', inBriefing: [/Last note \[agent-reported\]: "The rate limiter allows 100 requests a minute/, /\[observed\] Since then, files this session changed were changed again: `src\/rate\.ts` \(outside an agent session\)\. Check the note against the code/] },
+      { id: 'next', ask: 'What is the next step, and is anything known to have changed since it was named?', expect: [/test/i, /rate\.ts/], section: 'Next step', inBriefing: [/"add a test for the limit\."/, /\[observed\] `src\/rate\.ts` changed since that note\./] },
+    ],
+  },
 ]
