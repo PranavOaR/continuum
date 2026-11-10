@@ -9,6 +9,13 @@
 // C:\Users\Jane Doe\café.
 //
 //   npm run build && npm run bundle && node scripts/windows-e2e.mjs
+//
+// With --registry npm it plays the same user against what is really published:
+// the package comes from registry.npmjs.org (the latest, or --version <x>) and
+// the plugin from a clone of the public plugin repository, so nothing built
+// in this checkout is used. Run it after a release reaches npm.
+//
+//   node scripts/windows-e2e.mjs --registry npm [--version 0.4.0]
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -17,12 +24,36 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const RELEASE = join(ROOT, 'dist/release')
-const { name: PACKAGE, version: VERSION } = JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8'))
+const IS_WINDOWS = process.platform === 'win32'
+const NPM_REGISTRY = 'https://registry.npmjs.org/'
+const PUBLISHED_PACKAGE = 'getcontinuum'
+const PLUGIN_REPOSITORY = 'https://github.com/PranavOaR/continuum-plugin.git'
 const REGISTRY_PORT = 4873
-const REGISTRY = `http://localhost:${REGISTRY_PORT}/`
+
+const argument = (name) => {
+  const index = process.argv.indexOf(name)
+  return index === -1 ? undefined : process.argv[index + 1]
+}
+const source = argument('--registry') ?? 'private'
+if (source !== 'private' && source !== 'npm') {
+  console.error('Usage: node scripts/windows-e2e.mjs [--registry private|npm] [--version <x>]')
+  process.exit(2)
+}
+/** Against npm, nothing from this checkout is installed: only what a user can download. */
+const IS_PUBLISHED = source === 'npm'
+const REGISTRY = IS_PUBLISHED ? NPM_REGISTRY : `http://localhost:${REGISTRY_PORT}/`
+
+/** The version under test: this checkout's release bundle, or the one npm serves. */
+function packageUnderTest() {
+  if (!IS_PUBLISHED) return JSON.parse(readFileSync(join(RELEASE, 'package.json'), 'utf8'))
+  const asked = argument('--version')
+  if (asked && !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(asked)) throw new Error(`--version must look like 0.4.0, not ${asked}`)
+  const version = asked ?? execFileSync('npm', ['view', PUBLISHED_PACKAGE, 'version', '--registry', NPM_REGISTRY], { encoding: 'utf8', shell: IS_WINDOWS }).trim()
+  return { name: PUBLISHED_PACKAGE, version }
+}
+const { name: PACKAGE, version: VERSION } = packageUnderTest()
 const VERDACCIO = 'verdaccio@6.1.6'
 const STEP_TIMEOUT_MS = 120_000
-const IS_WINDOWS = process.platform === 'win32'
 
 const scratch = realpathSync.native(mkdtempSync(join(tmpdir(), 'continuum-win-e2e-')))
 const failures = []
@@ -101,7 +132,7 @@ async function publishToPrivateRegistry() {
   mkdirSync(storage)
   const config = join(storage, 'config.yaml')
   writeFileSync(config, [`storage: ${JSON.stringify(join(storage, 'storage'))}`, 'auth:', '  htpasswd:', `    file: ${JSON.stringify(join(storage, 'htpasswd'))}`, 'uplinks:', '  npmjs:', '    url: https://registry.npmjs.org/', 'packages:', `  '${PACKAGE}':`, '    access: $all', '    publish: $authenticated', "  '**':", '    access: $all', '    proxy: npmjs', 'log: { type: stdout, format: pretty, level: warn }', ''].join('\n'))
-  const registry = spawn(`npx -y ${VERDACCIO} --config "${config}" --listen ${REGISTRY_PORT}`, { shell: true, stdio: 'ignore', env: { ...process.env, npm_config_registry: 'https://registry.npmjs.org/' }, windowsHide: true })
+  const registry = spawn(`npx -y ${VERDACCIO} --config "${config}" --listen ${REGISTRY_PORT}`, { shell: true, stdio: 'ignore', env: { ...process.env, npm_config_registry: NPM_REGISTRY }, windowsHide: true })
   for (let attempt = 0; attempt < 120; attempt += 1) {
     if (await fetch(`${REGISTRY}-/ping`).then((response) => response.ok, () => false)) break
     await new Promise((resolve) => setTimeout(resolve, 1000))
@@ -158,12 +189,27 @@ async function claudeCode(repo) {
   check('Claude Code: the MCP server starts from .mcp.json and lists its tools', hasTools(tools), JSON.stringify(tools))
 }
 
+/** The plugin as Claude Code installs it: this checkout's, with the release bundle, or the public repository's. */
+function installPlugin(pluginRoot) {
+  if (!IS_PUBLISHED) {
+    cpSync(join(ROOT, 'plugin'), pluginRoot, { recursive: true })
+    mkdirSync(join(pluginRoot, 'bin'), { recursive: true })
+    copyFileSync(join(RELEASE, 'continuum.js'), join(pluginRoot, 'bin', 'continuum.js'))
+    return
+  }
+  const clone = join(scratch, 'marketplace')
+  const cloned = exec('git', ['clone', '--depth', '1', PLUGIN_REPOSITORY, clone])
+  check('Plugin: the public plugin repository can be cloned', cloned.status === 0, cloned.stderr)
+  cpSync(join(clone, 'plugin'), pluginRoot, { recursive: true })
+  const published = readJson(join(pluginRoot, '.claude-plugin', 'plugin.json')).version
+  check(`Plugin: the public plugin repository carries the version on npm (${VERSION})`, published === VERSION, `plugin.json says ${published}`)
+  check('Plugin: the public plugin repository ships its own copy of the CLI', existsSync(join(pluginRoot, 'bin', 'continuum.js')))
+}
+
 /** The Claude Code plugin: node starts the launcher with no shell, after Claude Code substitutes ${CLAUDE_PLUGIN_ROOT}. */
 async function plugin(repo, plain) {
   const pluginRoot = join(scratch, 'plugin cache', 'continuum')
-  cpSync(join(ROOT, 'plugin'), pluginRoot, { recursive: true })
-  mkdirSync(join(pluginRoot, 'bin'), { recursive: true })
-  copyFileSync(join(RELEASE, 'continuum.js'), join(pluginRoot, 'bin', 'continuum.js'))
+  installPlugin(pluginRoot)
   const substitute = (entry) => ({ command: entry.command, args: entry.args.map((arg) => arg.replaceAll('${CLAUDE_PLUGIN_ROOT}', pluginRoot)) })
   const { hooks } = readJson(join(pluginRoot, 'hooks', 'hooks.json'))
   const start = substitute(hooks.SessionStart[0].hooks[0])
@@ -278,7 +324,7 @@ async function uninstall(repo) {
 
 /** Claude Code's own validator, when it can be installed; it needs no account. */
 function validatePlugin(pluginRoot) {
-  const result = exec(`npx -y @anthropic-ai/claude-code plugin validate "${pluginRoot}"`, [], { shell: true, env: { ...ENV, npm_config_registry: 'https://registry.npmjs.org/' } })
+  const result = exec(`npx -y @anthropic-ai/claude-code plugin validate "${pluginRoot}"`, [], { shell: true, env: { ...ENV, npm_config_registry: NPM_REGISTRY } })
   const output = `${result.stdout}${result.stderr}`
   if (/Validation passed/.test(output)) check('Plugin: `claude plugin validate` passes', true)
   else console.log(`note claude plugin validate did not pass or could not run; not counted:\n       ${output.slice(0, 800).replaceAll('\n', '\n       ')}`)
@@ -286,9 +332,10 @@ function validatePlugin(pluginRoot) {
 
 let registry
 try {
-  if (!existsSync(join(RELEASE, 'continuum.js'))) throw new Error('dist/release is missing: run `npm run build && npm run bundle` first.')
-  console.log(`Windows end-to-end for ${PACKAGE}@${VERSION} on ${process.platform} ${process.arch}, Node ${process.versions.node}, in ${scratch}\n`)
-  registry = await publishToPrivateRegistry()
+  if (!IS_PUBLISHED && !existsSync(join(RELEASE, 'continuum.js'))) throw new Error('dist/release is missing: run `npm run build && npm run bundle` first.')
+  console.log(`Windows end-to-end for ${PACKAGE}@${VERSION} from ${IS_PUBLISHED ? 'npm' : 'a private registry'} on ${process.platform} ${process.arch}, Node ${process.versions.node}, in ${scratch}\n`)
+  if (IS_PUBLISHED) writeFileSync(npmrc, `registry=${NPM_REGISTRY}\n`)
+  else registry = await publishToPrivateRegistry()
   const home = join(scratch, 'Jane Doe')
   const repo = makeRepo(home, 'café app')
   const plain = makeRepo(home, 'no continuum')
