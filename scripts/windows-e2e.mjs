@@ -300,7 +300,8 @@ async function terminal(repo) {
   const doctor = typed(`npx -y ${PACKAGE}@${VERSION} doctor`, repo)
   check('Terminal: doctor reports no failures on Windows', doctor.stdout.includes('Platform: win32') && !doctor.stdout.includes('✗'), doctor.stdout)
   const handoff = typed(`npx -y ${PACKAGE}@${VERSION} handoff`, repo)
-  check('Terminal: handoff prints the briefing', handoff.status === 0 && handoff.stdout.includes('Claude Code session') && handoff.stdout.includes('`tests`'), handoff.stderr || handoff.stdout.slice(0, 800))
+  // Antigravity is the last agent this run plays, so the briefing leads with its session.
+  check('Terminal: handoff prints the briefing', handoff.status === 0 && handoff.stdout.includes('Latest: Antigravity CLI session') && handoff.stdout.includes('`tests`'), handoff.stderr || handoff.stdout.slice(0, 800))
 
   const dashboard = await new Promise((resolve) => {
     const child = spawn(`npx -y ${PACKAGE}@${VERSION} serve --port 0 --no-open`, { cwd: repo, env: ENV, shell: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
