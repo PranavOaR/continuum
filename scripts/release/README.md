@@ -47,8 +47,12 @@ Setup writes only to the repository, never to your global agent settings. `setup
 |---|---|
 | `continuum run -- <command>` | Runs a check (tests, lint, build) and records it as **verified**, tied to the exact content of every file it ran against. Edit a covered file and the result is reported out of date. |
 | `continuum handoff` | Prints the briefing, for pasting into any agent or chat. |
+| `continuum search <words>` | Finds recorded decisions, known issues, attempts, tasks and session notes by their words, each with its evidence label. Agents use the `search_memory` tool. |
+| `continuum why <file>[#symbol]` | The decisions, tasks, sessions and checks behind a piece of code. |
+| `continuum check` | For a pre-commit hook: lists decisions whose anchored code the staged changes alter. Exits 0 unless `--strict`. |
+| `continuum profile` | Your preferences for every repository ("Use pnpm, never npm"), carried by every briefing. `profile add "<text>"`, `profile remove <n>`. |
 | `continuum status` | Tracked files, unrecorded changes and check results. |
-| `continuum serve` | The dashboard on 127.0.0.1, behind a private link that changes on every run. |
+| `continuum serve` | The dashboard on 127.0.0.1, behind a private link that changes on every run. Edit tasks, records, repository settings and your profile there. |
 | `continuum config` | Settings: `agent-checks on\|off`, `prompts on\|off` (off by default), `receipts on\|off` (the line Claude Code shows after a reply that recorded something). |
 | `continuum forget --path <p> \| --session <id> \| --before <date>` | Permanently removes recorded data from the database file itself. |
 | `continuum export <file>` / `import <file>` | Moves the history between clones or machines. |
@@ -61,7 +65,7 @@ Everything is stored in `.continuum/` inside your repository, kept out of git. C
 
 ## Help
 
-Report bugs and ask questions at [github.com/PranavOaR/continuum-plugin/issues](https://github.com/PranavOaR/continuum-plugin/issues). Include the output of `npx getcontinuum doctor --report`: versions, settings and counts, with your paths shortened and secrets masked. CHANGELOG.md lists what is in each release.
+Report bugs and ask questions at [github.com/PranavOaR/continuum-plugin/issues](https://github.com/PranavOaR/continuum-plugin/issues). `npx getcontinuum doctor --report --open` starts an issue with a report filled in: versions, settings and counts, with your paths shortened and secrets masked. CHANGELOG.md lists what is in each release.
 
 ## License
 
