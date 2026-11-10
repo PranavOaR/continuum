@@ -2,6 +2,7 @@ import { resolve } from 'node:path'
 import { CommandNotFoundError, InvalidConfigError, NotAGitRepositoryError, UnreadableIgnoreFileError, WatchUnavailableError } from '@continuum/capture'
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
 import { PortInUseError } from '@continuum/daemon'
+import { checkCommand } from './commands/check'
 import { compactCommand } from './commands/compact'
 import { configCommand } from './commands/config'
 import { doctorCommand } from './commands/doctor'
@@ -44,6 +45,8 @@ Commands
   handoff              Print where the project left off, for any agent or chat
   search <words ...>   Search recorded decisions, issues, tasks and session notes
   why <file[#symbol]>  Show the decisions, tasks and checks behind a piece of code
+  check [--strict]     List decisions whose anchored code the staged changes alter,
+                       for a pre-commit hook; exits 0 unless --strict
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   session start|note|end  Record a session for an agent without hooks (Cursor, a chat)
   setup <agent>        Connect claude-code, codex, cursor or vscode to this repository (--remove to undo)
@@ -80,6 +83,7 @@ const COMMANDS: Record<string, Command> = {
   handoff: (io, args) => handoffCommand(io, args),
   search: (io, args) => searchCommand(io, args),
   why: (io, args) => whyCommand(io, args),
+  check: (io, args) => checkCommand(io, args),
   serve: async (io, args) => serveCommand(io, args, VERSION, await serveWorkerOptions()),
   session: (io, args) => sessionCommand(io, args),
   setup: (io, args) => setupCommand(io, args, selfInvocation()),

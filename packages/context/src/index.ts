@@ -8,3 +8,5 @@ export { InvalidMemoryError, isResolved, newMemory, reviewedMemory } from './mem
 export { anotherSessionHoldsTask, currentTaskId, currentTaskNode, isTaskNode, isYourTask, newTaskId, openSessionId, QUIET_SESSION_MS, sameTitle, sessionWorksOn, STALE_TASK_MS, summarizeTask, taskIdOfSession, taskNodeOfSession, taskSnapshot, taskSummaries, type TaskStatus, type TaskSummary, applyTaskChange, createdTask, InvalidTaskChangeError } from './tasks'
 export { renderSearch, searchMemory, shareable, type MemorySearchResult } from './search'
 export { explain, renderWhy, type WhyReport, type WhyTarget } from './why'
+export { closingWarning, unverifiedChecks, type UnverifiedCheck } from './closing'
+export { decisionsTouchedByStaged, renderStagedCheck, type TouchedDecision } from './stagedDecisions'

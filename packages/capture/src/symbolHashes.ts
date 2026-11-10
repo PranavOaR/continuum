@@ -8,11 +8,12 @@ import { extractSymbols, parseSymbolRef } from './symbols'
 const SYMBOL_PREFIX = 'symbol:'
 
 /**
- * Current hashes of the given symbols (`symbol:path#name`), read from disk.
- * A symbol whose file is gone, unreadable, ignored or no longer parses is left
- * out, so anything anchored to it reads as changed rather than as safe.
+ * Hashes of the given symbols (`symbol:path#name`) in whatever version of
+ * their files `read` returns: the working tree, or what is staged. A symbol
+ * whose file `read` has no source for (null), or which no longer parses, is
+ * left out, so anything anchored to it reads as changed rather than as safe.
  */
-export async function readSymbolHashes(root: string, symbolKeys: readonly IdentityKey[]): Promise<Map<IdentityKey, ContentHash>> {
+export async function symbolHashesFrom(symbolKeys: readonly IdentityKey[], read: (path: string) => Promise<string | null>): Promise<Map<IdentityKey, ContentHash>> {
   const byPath = new Map<string, string[]>()
   for (const key of symbolKeys) {
     const ref = parseSymbolRef(key.slice(SYMBOL_PREFIX.length))
@@ -21,12 +22,20 @@ export async function readSymbolHashes(root: string, symbolKeys: readonly Identi
   const found = new Map<IdentityKey, ContentHash>()
   await Promise.all(
     [...byPath].map(async ([path, names]) => {
-      if (!(await isRegularFileInRepo(root, path)) || (await isIgnored(root, path))) return
-      const symbols = extractSymbols(path, await readFile(join(root, path), 'utf8').catch(() => ''))
-      for (const symbol of symbols ?? []) if (names.includes(symbol.name)) found.set(`${SYMBOL_PREFIX}${path}#${symbol.name}`, symbol.hash)
+      const source = await read(path)
+      if (source === null) return
+      for (const symbol of extractSymbols(path, source) ?? []) if (names.includes(symbol.name)) found.set(`${SYMBOL_PREFIX}${path}#${symbol.name}`, symbol.hash)
     }),
   )
   return found
+}
+
+/** Current hashes of the given symbols, read from disk; a file that is gone, unreadable or ignored has none. */
+export function readSymbolHashes(root: string, symbolKeys: readonly IdentityKey[]): Promise<Map<IdentityKey, ContentHash>> {
+  return symbolHashesFrom(symbolKeys, async (path) => {
+    if (!(await isRegularFileInRepo(root, path)) || (await isIgnored(root, path))) return null
+    return readFile(join(root, path), 'utf8').catch(() => '')
+  })
 }
 
 /** The working tree plus the current hash of every symbol something in the store is anchored to. */
