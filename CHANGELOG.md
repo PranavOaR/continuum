@@ -1,9 +1,9 @@
 # Changelog
 
-## [Unreleased]
+## [0.6.0] - 2026-11-10
 
 ### Added
-- **Antigravity CLI.** `setup antigravity` connects Antigravity CLI (`agy`), which replaced Gemini CLI in 2026, through `.agents/hooks.json` and `.agents/mcp_config.json` in the repository. Each conversation starts briefed on where the work left off, its file edits are recorded, and it uses the same MCP tools as the other agents. It reports no exit codes, prompts or session ends to hooks, so its test runs are not recorded as checks (its briefing asks it to use `continuum run`) and its sessions stay open. `doctor`, `status`, `uninstall` and the dashboard know it, and the Windows end-to-end run covers its hooks under PowerShell and cmd.
+- **Antigravity CLI.** `setup antigravity` connects Antigravity CLI (`agy`), which replaced Gemini CLI in 2026, through `.agents/hooks.json` and `.agents/mcp_config.json` in the repository. Each conversation starts briefed on where the work left off, its file edits are recorded, and it uses the same MCP tools as the other agents. It reports no exit codes, prompts or session ends to hooks, so its test runs are not recorded as checks (its briefing asks it to use `continuum run`) and its sessions stay open. `doctor`, `status`, `uninstall` and the dashboard know it, and the Windows end-to-end run covers its hooks under PowerShell and cmd. Checked against Antigravity CLI 1.5.3: its hooks reach Continuum, the briefing reaches the model, and all seven MCP tools are listed. Recording an edit follows Antigravity's documented hook payload (`toolCall.args.TargetFile`) but has not yet been seen with a live edit; if the payload differs, its edits go unrecorded, nothing else is affected, and `continuum scan` still picks the changes up.
 
 ### Fixed
 - The plugin repository had two bug report templates after 0.5.0: the issue form it already had and a plainer one 0.5.0 added. The plainer one is gone, and "Report a problem" (`doctor --report --open` and the dashboard) now opens the issue form with the report in its diagnostic field.
