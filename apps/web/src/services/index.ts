@@ -24,6 +24,8 @@ export const continuumService: ContinuumService = {
   createTask: async (projectId, task) => (await active()).createTask(projectId, task),
   addMemory: async (projectId, record) => (await active()).addMemory(projectId, record),
   reviewMemory: async (projectId, memoryId, review) => (await active()).reviewMemory(projectId, memoryId, review),
+  getProfile: async () => (await active()).getProfile(),
+  updateProfile: async (preferences) => (await active()).updateProfile(preferences),
 }
 
 export { dataMode, type DataMode } from './dataMode'

@@ -204,6 +204,10 @@ export const mockContinuumService: ContinuumService = {
   createTask: readOnly,
   addMemory: readOnly,
   reviewMemory: readOnly,
+  getProfile() {
+    return respond({ preferences: ['Use pnpm, never npm', 'Ask before pushing to a shared branch'] })
+  },
+  updateProfile: readOnly,
   getBriefing(projectId) {
     try {
       const { project, tasks } = buildWorkspace(projectId)

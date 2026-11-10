@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, loadContinuumIgnore, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, UnreadableIgnoreFileError, type Redactor } from '@continuum/capture'
+import { briefingPreferences, extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, loadContinuumIgnore, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, UnreadableIgnoreFileError, type Redactor } from '@continuum/capture'
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, openSessionId, projectState, rankContext, renderContext, renderHandoff, renderSearch, searchMemory, shareable, taskIdOfSession, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
@@ -37,6 +37,8 @@ export interface ServerOptions {
   now?: () => Date
   /** The session this server works for, when its client says; tools then act on that session's task. */
   sessionId?: string
+  /** Continuum's per-user folder, whose profile get_handoff carries; without it there is none. */
+  configDir?: string
 }
 
 /** The agent session this process serves, if its client named one. */
@@ -218,9 +220,10 @@ export function createContinuumServer(options: ServerOptions): McpServer {
     },
     async ({ max_chars }) =>
       guarded(() =>
-        withStore(options.cwd, async (store, root) => {
+        withStore(options.cwd, async (store, root, { redact }) => {
           const at = now()
-          return ok(renderHandoff(await currentState(store, root, at), { now: at, maxChars: max_chars ?? DEFAULT_HANDOFF_CHARS }))
+          const preferences = await briefingPreferences(options.configDir, redact)
+          return ok(renderHandoff(await currentState(store, root, at), { now: at, maxChars: max_chars ?? DEFAULT_HANDOFF_CHARS, preferences }))
         }),
       ),
   )

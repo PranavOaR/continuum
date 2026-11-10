@@ -9,13 +9,14 @@ import {
   type NewMemory,
   type NewTask,
   type OverviewData,
+  type Profile,
   type ProjectSummary,
   type ProjectTask,
   type ProjectWorkspace,
   type SearchResult,
   type TaskChange,
 } from '@continuum/core'
-import { InvalidConfigError, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
+import { briefingPreferences, EMPTY_PROFILE, InvalidConfigError, readProfile, writeProfile, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
 import { applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
 import { keys } from '@continuum/store'
 import { asAgent, ids, storedMemoryId } from './ids'
@@ -42,6 +43,8 @@ export interface LocalServiceOptions {
   ttlMs?: number
   /** Told when a repository cannot be read; the others keep working. */
   onError?: (projectId: string, error: unknown) => void
+  /** Continuum's per-user folder, which holds your profile; without it the profile is empty and cannot be saved. */
+  configDir?: string
 }
 
 /** One served repository could not be read (moved, deleted, or Continuum removed); the others still work. */
@@ -145,6 +148,7 @@ export class LocalContinuumService implements ContinuumService {
   private readonly now: () => Date
   private readonly ttlMs: number
   private readonly onError: (projectId: string, error: unknown) => void
+  private readonly configDir: string | undefined
   /** One load at a time: concurrent requests share it, and freshness counts from when it finished. */
   private cache: { loaded: Promise<Loaded[]>; finishedAt: number | null } | null = null
 
@@ -153,6 +157,7 @@ export class LocalContinuumService implements ContinuumService {
     this.now = options.now ?? (() => new Date())
     this.ttlMs = options.ttlMs ?? SNAPSHOT_TTL_MS
     this.onError = options.onError ?? (() => {})
+    this.configDir = options.configDir
   }
 
   /** Forgets the cached snapshot, e.g. when the change feed reports new records, so the next request reads them. */
@@ -335,7 +340,17 @@ export class LocalContinuumService implements ContinuumService {
 
   async getBriefing(projectId: string): Promise<string> {
     const snapshot = await this.snapshot(projectId)
-    return renderHandoff(snapshot.state, { now: this.now() })
+    const preferences = await briefingPreferences(this.configDir, (await repositoryRedactor(snapshot.root)).redact)
+    return renderHandoff(snapshot.state, { now: this.now(), preferences })
+  }
+
+  async getProfile(): Promise<Profile> {
+    return this.configDir ? readProfile(this.configDir) : EMPTY_PROFILE
+  }
+
+  async updateProfile(preferences: readonly string[]): Promise<Profile> {
+    if (!this.configDir) throw new Error('This server was started without a folder to keep your profile in.')
+    return writeProfile(this.configDir, preferences)
   }
 
   async search(query: string): Promise<SearchResult[]> {

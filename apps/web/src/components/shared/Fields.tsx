@@ -77,7 +77,7 @@ const TEXT_FIELD = 'w-full rounded-md border border-line bg-surface px-3 text-[1
 export function TextField({ label, hint, value, onChange, multiline, maxLength, required, autoFocus, ...rest }: TextFieldProps) {
   const id = useId()
   const hintId = useId()
-  const shared = { id, value, maxLength, required, autoFocus, 'aria-describedby': hint ? hintId : undefined, 'data-autofocus': rest['data-autofocus'] }
+  const shared = { id, value, maxLength, required, autoFocus, disabled: rest.disabled, 'aria-describedby': hint ? hintId : undefined, 'data-autofocus': rest['data-autofocus'] }
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="label-mono text-subtle">

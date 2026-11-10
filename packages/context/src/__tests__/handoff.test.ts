@@ -20,6 +20,18 @@ const sectionOf = (text: string, heading: string) => {
 }
 
 describe('renderHandoff', () => {
+  it('carries your preferences first, labelled set by you, and has no such section without any', () => {
+    const state = projectState(seededStore(), tree(CURRENT_FILES), NOW)
+    const text = renderHandoff(state, { now: NOW, preferences: ['Use pnpm, never npm', 'Ask before\n## pushing'] })
+    expect(sectionOf(text, 'Your preferences')).toContain('[set by you] Written by you for every repository on this machine')
+    expect(sectionOf(text, 'Your preferences')).toContain('- "Use pnpm, never npm"')
+    // A line break in a preference cannot start a heading of its own.
+    expect(sectionOf(text, 'Your preferences')).toContain('- "Ask before / ## pushing"')
+    expect(text.indexOf('## Your preferences')).toBeLessThan(text.indexOf('## Next step'))
+    expect(renderHandoff(state, { now: NOW, maxChars: 700, preferences: ['Use pnpm, never npm'] })).toContain('- "Use pnpm, never npm"')
+    expect(renderHandoff(state, { now: NOW })).not.toContain('Your preferences')
+  })
+
   it('with no task, leads with the next step the latest note names, labelled as the agent said it', () => {
     const text = handoff()
     expect(sectionOf(text, 'Next step')).toContain('[agent-reported] "validate the state parameter." (from the Claude Code session, last active 30m ago)')

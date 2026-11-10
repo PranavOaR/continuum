@@ -61,5 +61,7 @@ export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = '', 
     createTask: (projectId, task) => post(`${project(projectId)}/tasks`, task),
     addMemory: (projectId, record) => post(`${project(projectId)}/memory`, record),
     reviewMemory: (projectId, memoryId, verdict) => post(`${project(projectId)}/memory/${encodeURIComponent(memoryId)}/review`, { verdict }),
+    getProfile: () => get('/api/profile'),
+    updateProfile: (preferences) => post('/api/profile', { preferences }),
   }
 }

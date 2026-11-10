@@ -3,6 +3,7 @@ import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NotFoundError, type ContinuumService, type MemoryRecord, type ProjectTask, type TaskField } from '@continuum/core'
+import { InvalidProfileError } from '@continuum/capture'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PortInUseError, startDaemon, type RunningDaemon } from '../server'
 
@@ -40,6 +41,12 @@ const fakeService: ContinuumService = {
     edits.push({ projectId, input })
     return memory(projectId, 'acme~memory~new')
   },
+  getProfile: async () => ({ preferences: storedPreferences }),
+  updateProfile: async (preferences) => {
+    if (preferences.length > 2) throw new InvalidProfileError('A profile holds at most 2 preferences; remove one first.')
+    storedPreferences = [...preferences]
+    return { preferences: storedPreferences }
+  },
   reviewMemory: async (projectId, memoryId, verdict) => {
     if (memoryId === 'missing') throw new NotFoundError('Memory record', memoryId)
     edits.push({ projectId, memoryId, verdict })
@@ -47,6 +54,7 @@ const fakeService: ContinuumService = {
   },
 }
 const edits: unknown[] = []
+let storedPreferences = ['Use pnpm']
 const task = (projectId: string, id: string, userEdited: TaskField[]): ProjectTask => ({ id, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', userEdited })
 const memory = (projectId: string, id: string): MemoryRecord => ({ id, projectId, kind: 'decision', title: 't', body: '', source: 'user-note', sourceDetail: '', evidenceType: 'user-reported', relatedFileIds: [], createdAt: '' })
 
@@ -298,6 +306,22 @@ describe('task edits', () => {
       expect((await post(daemon, route, JSON.stringify(body), browser(daemon, extra))).status).toBe(status)
       expect(edits).toEqual([])
     })
+  })
+
+  it('saves your profile through the same checks, and reads it back', async () => {
+    const daemon = await startWithCsrf()
+    storedPreferences = ['Use pnpm']
+    expect(JSON.parse((await raw(daemon, '/api/profile')).body).data).toEqual({ preferences: ['Use pnpm'] })
+    const saved = await post(daemon, '/api/profile', JSON.stringify({ preferences: ['Use pnpm', 'Ask before pushing'] }), browser(daemon))
+    expect(saved.status).toBe(200)
+    expect(JSON.parse(saved.body).data).toEqual({ preferences: ['Use pnpm', 'Ask before pushing'] })
+    expect((await post(daemon, '/api/profile', JSON.stringify({ preferences: ['x'] }), browser(daemon, { 'x-continuum-csrf': undefined }))).status).toBe(403)
+    expect((await post(daemon, '/api/profile', JSON.stringify({ preferences: ['x'] }), browser(daemon, { origin: 'http://evil.example' }))).status).toBe(403)
+    expect((await post(daemon, '/api/profile', JSON.stringify({ preferences: 'x' }), browser(daemon))).status).toBe(400)
+    const tooMany = await post(daemon, '/api/profile', JSON.stringify({ preferences: ['a', 'b', 'c'] }), browser(daemon))
+    expect(tooMany.status).toBe(400)
+    expect(JSON.parse(tooMany.body).error.message).toContain('at most 2 preferences')
+    expect(storedPreferences).toEqual(['Use pnpm', 'Ask before pushing'])
   })
 
   it.each([

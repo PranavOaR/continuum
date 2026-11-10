@@ -2,6 +2,8 @@ import { resolve } from 'node:path'
 import { CommandNotFoundError, InvalidConfigError, NotAGitRepositoryError, UnreadableIgnoreFileError, WatchUnavailableError } from '@continuum/capture'
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
 import { PortInUseError } from '@continuum/daemon'
+import { InvalidProfileError } from '@continuum/capture'
+import { profileCommand } from './commands/profile'
 import { checkCommand } from './commands/check'
 import { compactCommand } from './commands/compact'
 import { configCommand } from './commands/config'
@@ -51,6 +53,8 @@ Commands
   session start|note|end  Record a session for an agent without hooks (Cursor, a chat)
   setup <agent>        Connect claude-code, codex, cursor or vscode to this repository (--remove to undo)
   config [name on|off] Show or change settings: agent-checks, prompts
+  profile [add|remove] Your preferences for every repository ("Use pnpm"), kept on
+                       this machine and carried by every briefing
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
   export <file>        Write the recorded history to a JSON file (import <file> restores it)
   forget               Permanently remove recorded data: --path, --session or --before
@@ -91,6 +95,7 @@ const COMMANDS: Record<string, Command> = {
   ingest: (io, args) => ingestCommand(io, args),
   compact: (io, args) => compactCommand(io, args),
   config: (io, args) => configCommand(io, args),
+  profile: (io, args) => profileCommand(io, args),
   forget: (io, args) => forgetCommand(io, args),
   export: (io, args) => exportCommand(io, args),
   import: (io, args) => importCommand(io, args),
@@ -156,6 +161,7 @@ function isExpected(error: unknown): error is Error {
     error instanceof InvalidHookPayloadError ||
     error instanceof StoreVersionError ||
     error instanceof InvalidConfigError ||
+    error instanceof InvalidProfileError ||
     error instanceof UnreadableIgnoreFileError
   )
 }

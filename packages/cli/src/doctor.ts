@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { findRepoRoot, InvalidConfigError, isInitialized, isTracked, loadContinuumIgnore, locateWorkspace, NotAGitRepositoryError, readConfig, readRegistry, UnreadableIgnoreFileError, type ContinuumConfig } from '@continuum/capture'
+import { findRepoRoot, InvalidProfileError, readProfile, InvalidConfigError, isInitialized, isTracked, loadContinuumIgnore, locateWorkspace, NotAGitRepositoryError, readConfig, readRegistry, UnreadableIgnoreFileError, type ContinuumConfig } from '@continuum/capture'
 import {
   CODEX_HOOKS_FILE,
   CURSOR_MCP_FILE,
@@ -256,6 +256,17 @@ function checkDashboard(webDist: string): Finding {
 }
 
 /** Every check, in the order a user would fix them. Stops at the first missing prerequisite. */
+/** Your profile is optional, so only one that exists and cannot be used is worth a line. */
+async function checkProfile(configDir: string): Promise<Finding | null> {
+  try {
+    const { preferences } = await readProfile(configDir)
+    return preferences.length > 0 ? { status: 'ok', label: 'Profile', detail: `${preferences.length} preference${preferences.length === 1 ? '' : 's'} carried by every briefing` } : null
+  } catch (error) {
+    if (!(error instanceof InvalidProfileError)) throw error
+    return { status: 'warn', label: 'Your profile cannot be read, so briefings leave your preferences out', detail: error.message, fix: 'Fix the file, or delete it and add them again with `continuum profile add`.' }
+  }
+}
+
 export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   const findings: Finding[] = [checkPlatform(env.platform), checkNode(env.nodeVersion), await checkGit()]
   if (findings.some((finding) => finding.status === 'fail')) return findings
@@ -286,6 +297,8 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   }
   const now = env.now ?? new Date()
   findings.push(...(await hookStatuses(workspace.root)).map((status) => checkHookHealth(status, now)))
+  const profile = await checkProfile(env.configDir)
+  if (profile) findings.push(profile)
   findings.push(checkDashboard(env.webDist))
   const listed = (await readRegistry(env.configDir)).some((entry) => entry.root === workspace.root)
   findings.push(

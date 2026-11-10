@@ -146,7 +146,7 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   const describeError = (error: unknown) => (error instanceof Error ? (error.stack ?? error.message) : String(error))
   const service = new LocalContinuumService(
     unique.map((workspace, index) => ({ projectId: ids[index], cwd: workspace.root })),
-    { onError: (projectId, error) => io.err(`continuum: could not read ${projectId}: ${describeError(error)}`) },
+    { configDir: io.configDir, onError: (projectId, error) => io.err(`continuum: could not read ${projectId}: ${describeError(error)}`) },
   )
   const hasDashboard = existsSync(webDist)
   // New records must not wait out the service's short snapshot cache.

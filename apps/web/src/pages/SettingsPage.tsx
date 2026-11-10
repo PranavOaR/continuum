@@ -5,6 +5,7 @@ import { buttonClass } from '../components/shared/buttonClass'
 import { ConfirmDialog } from '../components/shared/Dialog'
 import { SelectField, Toggle } from '../components/shared/Fields'
 import { PageHeader } from '../components/shared/PageHeader'
+import { ProfilePanel } from '../components/settings/ProfilePanel'
 import { Panel } from '../components/shared/Panel'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useServiceQuery } from '../hooks/useServiceQuery'
@@ -67,7 +68,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Preferences are stored in this browser only." crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Settings' }]} />
+      <PageHeader title="Settings" description="Display settings are stored in this browser; your profile is kept on this machine for every repository." crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Settings' }]} />
 
       <div className="grid max-w-3xl gap-6">
         <Panel title="General">
@@ -118,6 +119,8 @@ export function SettingsPage() {
           </div>
         </Panel>
 
+        <ProfilePanel />
+
         <Panel title="Privacy and architecture">
           <div className="flex gap-3">
             <HardDrive className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
@@ -130,8 +133,8 @@ export function SettingsPage() {
               {isLive ? (
                 <p>
                   <span className="font-medium text-fg">Connected to your local repositories.</span> This dashboard reads Continuum's records from
-                  disk through <span className="font-mono">continuum serve</span> on 127.0.0.1. The only thing it writes is a task edit you make,
-                  recorded as set by you. Nothing is sent to any server. Preferences are kept in this browser's local storage.
+                  disk through <span className="font-mono">continuum serve</span> on 127.0.0.1. It writes only what you change here: tasks, records and your profile,
+                  each recorded as set by you. Nothing is sent to any server. Preferences are kept in this browser's local storage.
                 </p>
               ) : (
                 <p>

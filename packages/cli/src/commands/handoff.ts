@@ -1,4 +1,4 @@
-import { openWorkspace, readWorkingTreeWithSymbols } from '@continuum/capture'
+import { briefingPreferences, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor } from '@continuum/capture'
 import { DEFAULT_HANDOFF_CHARS, projectState, renderHandoff } from '@continuum/context'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -25,7 +25,8 @@ export async function handoffCommand(io: Io, args: readonly string[]): Promise<n
   const { workspace, store } = await openWorkspace(io.cwd)
   try {
     const now = io.now()
-    io.out(renderHandoff(projectState(store, await readWorkingTreeWithSymbols(store, workspace.root), now), { now, maxChars }))
+    const preferences = await briefingPreferences(io.configDir, (await repositoryRedactor(workspace.root)).redact)
+    io.out(renderHandoff(projectState(store, await readWorkingTreeWithSymbols(store, workspace.root), now), { now, maxChars, preferences }))
     return EXIT_OK
   } finally {
     store.close()

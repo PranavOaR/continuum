@@ -103,7 +103,19 @@ export interface ContinuumService {
   addMemory(projectId: string, record: NewMemory): Promise<MemoryRecord>
   /** Records your verdict on a memory record and returns it as it now stands. */
   reviewMemory(projectId: string, memoryId: string, review: MemoryReview): Promise<MemoryRecord>
+  /** Your preferences, which every repository's briefing carries. */
+  getProfile(): Promise<Profile>
+  /** Replaces your preferences and returns them as stored. */
+  updateProfile(preferences: readonly string[]): Promise<Profile>
 }
+
+/** Your preferences, kept on this machine for every repository: "Use pnpm", "Never push without asking". */
+export interface Profile {
+  preferences: string[]
+}
+
+export const MAX_PREFERENCES = 20
+export const MAX_PREFERENCE_CHARS = 300
 
 /** Limits on what you can type into the dashboard; agents are held to the same ones through MCP. */
 export const MAX_TITLE_CHARS = 200

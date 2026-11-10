@@ -14,3 +14,4 @@ export { extractSymbols, parseSymbolRef, type SourceSymbol, type SymbolKind } fr
 export { readSymbolHashes, readWorkingTreeWithSymbols, symbolHashesFrom } from './symbolHashes'
 export { readStaged, type StagedChanges } from './staged'
 export { readHookHealth, recordHookArrival, recordHookFailure, type HookHealth } from './hookHealth'
+export { briefingPreferences, EMPTY_PROFILE, InvalidProfileError, PROFILE_FILE, readProfile, writeProfile } from './profile'
