@@ -1,6 +1,10 @@
 import {
+  DEFAULT_ACTIVITY_PAGE,
+  MAX_ACTIVITY_PAGE,
   NotFoundError,
   type ActivityEvent,
+  type ActivityPage,
+  type ActivityQuery,
   type AttentionItem,
   type ContinuumService,
   type MemoryGraph,
@@ -20,7 +24,7 @@ import { briefingPreferences, EMPTY_PROFILE, InvalidConfigError, readProfile, wr
 import { applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
 import { keys } from '@continuum/store'
 import { asAgent, ids, storedMemoryId } from './ids'
-import { toActivity } from './mapActivity'
+import { EVENT_TYPES_OF, toActivity, toActivityEvent } from './mapActivity'
 import { toGraph } from './mapGraph'
 import { allChangedFileNodes, toFiles, toProject } from './mapProject'
 import { toMemory, toSessions, toVerification } from './mapRecords'
@@ -31,6 +35,10 @@ import { loadSnapshot, type RepoSnapshot } from './snapshot'
 export const SNAPSHOT_TTL_MS = 1_000
 const RECENT_EVENTS = 8
 const MAX_SEARCH_RESULTS = 20
+/** Events read from the log at a time while filling a page. */
+const ACTIVITY_SCAN_BATCH = 500
+/** Events one request reads at most; a rare filter over a long log is continued by the next request. */
+const MAX_ACTIVITY_SCANNED = 5_000
 
 export interface Repository {
   projectId: string
@@ -235,6 +243,37 @@ export class LocalContinuumService implements ContinuumService {
 
   async listActivity(): Promise<ActivityEvent[]> {
     return (await this.snapshots()).flatMap(toActivity).sort(newestFirst)
+  }
+
+  /**
+   * Pages through the whole log by sequence number. Type and dates are
+   * filtered where the log is read; the agent is known only once an event is
+   * tied to its session, so it is filtered after, reading on until the page is full.
+   */
+  async listActivityPage(projectId: string, query: ActivityQuery): Promise<ActivityPage> {
+    const snapshot = await this.snapshot(projectId)
+    const limit = Math.min(Math.max(1, query.limit ?? DEFAULT_ACTIVITY_PAGE), MAX_ACTIVITY_PAGE)
+    const filter = { ...(query.type ? { types: EVENT_TYPES_OF[query.type] } : {}), ...(query.from ? { from: query.from } : {}), ...(query.to ? { to: query.to } : {}) }
+    const { store } = await openWorkspace(this.repository(projectId).cwd)
+    try {
+      const events: ActivityEvent[] = []
+      let before = query.before
+      let scanned = 0
+      while (scanned < MAX_ACTIVITY_SCANNED) {
+        const rows = store.eventsBefore({ ...filter, limit: ACTIVITY_SCAN_BATCH, ...(before === undefined ? {} : { before }) })
+        for (const { seq, event } of rows) {
+          scanned += 1
+          before = seq
+          const shown = toActivityEvent(snapshot, seq, event)
+          if (shown && (!query.agent || shown.agent === query.agent)) events.push(shown)
+          if (events.length === limit) return { events, nextBefore: seq }
+        }
+        if (rows.length < ACTIVITY_SCAN_BATCH) return { events, nextBefore: null }
+      }
+      return { events, nextBefore: before ?? null }
+    } finally {
+      store.close()
+    }
   }
 
   async getMemoryGraph(projectId: string): Promise<MemoryGraph> {

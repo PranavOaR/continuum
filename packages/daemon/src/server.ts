@@ -5,7 +5,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
 import { pipeline } from 'node:stream'
-import { NotFoundError, type ContinuumService, type MemoryReview, type NewMemory, type NewTask, type TaskChange } from '@continuum/core'
+import { ACTIVITY_TYPES, AGENTS, NotFoundError, type ActivityQuery, type ActivityType, type AgentType, type ContinuumService, type MemoryReview, type NewMemory, type NewTask, type TaskChange } from '@continuum/core'
 import { InvalidProfileError } from '@continuum/capture'
 import { InvalidMemoryError, InvalidTaskChangeError } from '@continuum/context'
 import type { ChangeFeed } from './changeFeed'
@@ -83,12 +83,32 @@ export interface RunningDaemon {
 
 type Handler = (service: ContinuumService, params: Record<string, string>, query: URLSearchParams) => Promise<unknown>
 
+const KNOWN_AGENTS = new Set<string>(AGENTS.map((agent) => agent.id))
+const KNOWN_ACTIVITY_TYPES = new Set<string>(ACTIVITY_TYPES)
+
+/** The query as the address carries it. Anything that is not what it should be is left out, never passed on. */
+function parseActivityQuery(query: URLSearchParams): ActivityQuery {
+  const whole = (name: string) => {
+    const value = Number(query.get(name))
+    return query.has(name) && Number.isSafeInteger(value) && value > 0 ? value : undefined
+  }
+  const time = (name: string) => {
+    const value = Date.parse(query.get(name) ?? '')
+    return Number.isNaN(value) ? undefined : new Date(value).toISOString()
+  }
+  const type = query.get('type') ?? ''
+  const agent = query.get('agent') ?? ''
+  const parsed = { before: whole('before'), limit: whole('limit'), type: KNOWN_ACTIVITY_TYPES.has(type) ? (type as ActivityType) : undefined, agent: KNOWN_AGENTS.has(agent) ? (agent as AgentType) : undefined, from: time('from'), to: time('to') }
+  return Object.fromEntries(Object.entries(parsed).filter(([, value]) => value !== undefined))
+}
+
 const ROUTES: readonly (readonly [RegExp, Handler])[] = [
   [/^\/api\/overview$/, (service) => service.getOverview()],
   [/^\/api\/projects$/, (service) => service.listProjects()],
   [/^\/api\/tasks$/, (service) => service.listTasks()],
   [/^\/api\/activity$/, (service) => service.listActivity()],
   [/^\/api\/projects\/(?<id>[^/]+)\/workspace$/, (service, params) => service.getWorkspace(params.id)],
+  [/^\/api\/projects\/(?<id>[^/]+)\/activity$/, (service, params, query) => service.listActivityPage(params.id, parseActivityQuery(query))],
   [/^\/api\/projects\/(?<id>[^/]+)\/graph$/, (service, params) => service.getMemoryGraph(params.id)],
   [/^\/api\/projects\/(?<id>[^/]+)\/briefing$/, (service, params) => service.getBriefing(params.id)],
   [/^\/api\/profile$/, (service) => service.getProfile()],

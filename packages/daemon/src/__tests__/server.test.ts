@@ -21,6 +21,10 @@ const fakeService: ContinuumService = {
   listProjects: async () => [],
   listTasks: async () => [],
   listActivity: async () => [],
+  listActivityPage: async (projectId, query) => {
+    pageQueries.push({ projectId, query })
+    return { events: [], nextBefore: null }
+  },
   getWorkspace: async (id) => {
     if (id === 'boom') throw new Error('disk on fire at /secret/path')
     throw new NotFoundError('Project', id)
@@ -54,6 +58,7 @@ const fakeService: ContinuumService = {
   },
 }
 const edits: unknown[] = []
+const pageQueries: unknown[] = []
 let storedPreferences = ['Use pnpm']
 const task = (projectId: string, id: string, userEdited: TaskField[]): ProjectTask => ({ id, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', userEdited })
 const memory = (projectId: string, id: string): MemoryRecord => ({ id, projectId, kind: 'decision', title: 't', body: '', source: 'user-note', sourceDetail: '', evidenceType: 'user-reported', relatedFileIds: [], createdAt: '' })
@@ -108,6 +113,20 @@ describe('daemon API', () => {
     expect(reply.status).toBe(200)
     expect(JSON.parse(reply.body).data).toEqual({ markdown: '## Continuum diagnostic report', issueUrl: 'https://github.com/PranavOaR/continuum-plugin/issues/new?body=x' })
     expect((await raw(daemon, '/api/report', { authorization: 'Bearer wrong' })).status).toBe(401)
+  })
+
+  it('passes on only the parts of an activity query that are what they should be', async () => {
+    const daemon = await start()
+    pageQueries.length = 0
+    const page = await raw(daemon, '/api/projects/acme/activity?before=120&limit=25&type=decision&agent=codex&from=2026-10-01&to=2026-11-01T00:00:00Z')
+    expect(JSON.parse(page.body).data).toEqual({ events: [], nextBefore: null })
+    await raw(daemon, '/api/projects/acme/activity?before=-3&limit=abc&type=everything&agent=hal&from=yesterday')
+    await raw(daemon, '/api/projects/acme/activity')
+    expect(pageQueries).toEqual([
+      { projectId: 'acme', query: { before: 120, limit: 25, type: 'decision', agent: 'codex', from: '2026-10-01T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z' } },
+      { projectId: 'acme', query: {} },
+      { projectId: 'acme', query: {} },
+    ])
   })
 
   it('maps errors to statuses without leaking internals', async () => {

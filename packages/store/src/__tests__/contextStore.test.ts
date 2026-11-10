@@ -293,3 +293,46 @@ describe('ContextStore coverage manifests', () => {
     copy.close()
   })
 })
+
+describe('eventsBefore', () => {
+  const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 0, minute)).toISOString()
+  function logged(count: number): ContextStore {
+    const store = ContextStore.open(':memory:')
+    store.recordAll(
+      Array.from({ length: count }, (_, index): ContinuumEvent =>
+        index % 10 === 0
+          ? { type: 'session.progress', payload: { sessionId: 's', note: `note ${index}` }, evidence: 'agent-reported', source: 'test', occurredAt: at(index) }
+          : { type: 'file.changed', payload: { path: `f${index}.ts`, contentHash: `h${index}`, changeType: 'modified' }, evidence: 'observed', source: 'test', occurredAt: at(index) },
+      ),
+    )
+    return store
+  }
+
+  it('pages a store of 10,000 events back to its first event, never skipping or repeating one', () => {
+    const store = logged(10_000)
+    const seen: number[] = []
+    let before: number | undefined
+    for (;;) {
+      const page = store.eventsBefore({ limit: 500, ...(before === undefined ? {} : { before }) })
+      if (page.length === 0) break
+      seen.push(...page.map(({ seq }) => seq))
+      before = page.at(-1)?.seq
+    }
+    expect(seen).toHaveLength(10_000)
+    expect(seen[0]).toBe(10_000)
+    expect(seen.at(-1)).toBe(1)
+    expect(new Set(seen).size).toBe(10_000)
+    store.close()
+  })
+
+  it('filters by type and by time, newest first', () => {
+    const store = logged(100)
+    const notes = store.eventsBefore({ limit: 3, types: ['session.progress'] })
+    expect(notes.map(({ event }) => event.type)).toEqual(['session.progress', 'session.progress', 'session.progress'])
+    expect(notes.map(({ seq }) => seq)).toEqual([91, 81, 71])
+    const window = store.eventsBefore({ limit: 100, from: at(20), to: at(30) })
+    expect(window.map(({ seq }) => seq)).toEqual([30, 29, 28, 27, 26, 25, 24, 23, 22, 21])
+    expect(store.eventsBefore({ limit: 5, before: 3 }).map(({ seq }) => seq)).toEqual([2, 1])
+    store.close()
+  })
+})

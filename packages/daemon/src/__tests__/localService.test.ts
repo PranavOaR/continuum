@@ -130,6 +130,49 @@ describe('LocalContinuumService', () => {
     expect(activity.find((event) => event.type === 'file-change')).toMatchObject({ agent: 'claude-code', fileId: 'acme~file~src/auth.ts' })
   })
 
+  it('pages the whole history back to the first event by sequence number, without the baseline import', async () => {
+    const { service: local } = await service()
+    const first = await local.listActivityPage('acme', { limit: 3 })
+    expect(first.events.map((event) => event.title)).toEqual(['Session ended', 'Passwords use argon2', 'lint failed'])
+    expect(first.nextBefore).not.toBeNull()
+    const second = await local.listActivityPage('acme', { limit: 3, before: first.nextBefore as number })
+    expect(second.events.map((event) => event.title)).toEqual(['unit passed', 'Progress note', 'Modified src/auth.ts'])
+    const last = await local.listActivityPage('acme', { limit: 3, before: second.nextBefore as number })
+    expect(last.events.map((event) => event.title)).toEqual(['Claude Code session started'])
+    expect(last.nextBefore).toBeNull()
+  })
+
+  it('filters the history by type, agent and date', async () => {
+    const { service: local } = await service()
+    expect((await local.listActivityPage('acme', { type: 'test-result' })).events.map((event) => event.title)).toEqual(['lint failed', 'unit passed'])
+    expect((await local.listActivityPage('acme', { agent: 'claude-code' })).events.map((event) => event.title)).toEqual(['Session ended', 'Progress note', 'Modified src/auth.ts', 'Claude Code session started'])
+    expect((await local.listActivityPage('acme', { agent: 'codex' })).events).toEqual([])
+    const window = await local.listActivityPage('acme', { from: '2026-10-16T11:12:00.000Z', to: '2026-10-16T11:21:00.000Z' })
+    expect(window.events.map((event) => event.title)).toEqual(['unit passed', 'Progress note', 'Modified src/auth.ts'])
+    await expect(local.listActivityPage('nope', {})).rejects.toBeInstanceOf(NotFoundError)
+  })
+
+  it('reaches the first event of a store with 10,000 events', async () => {
+    const { repo } = await service()
+    // As served: pages a moment apart share one read of the repository.
+    const local = new LocalContinuumService([{ projectId: 'acme', cwd: repo.root }], { now: () => NOW, ttlMs: 60_000 })
+    const store = openStore(join(repo.root, '.continuum', 'context.db'))
+    store.recordAll(Array.from({ length: 10_000 }, (_, index) => ({ type: 'session.progress' as const, payload: { sessionId: 's1', note: `note ${index}` }, evidence: 'agent-reported' as const, source: 'adapter:claude-code', occurredAt: new Date(NOW.getTime() + index).toISOString() })))
+    store.close()
+    let before: number | undefined
+    let total = 0
+    let oldest = ''
+    for (;;) {
+      const page = await local.listActivityPage('acme', { limit: 200, ...(before === undefined ? {} : { before }) })
+      total += page.events.length
+      oldest = page.events.at(-1)?.title ?? oldest
+      if (page.nextBefore === null) break
+      before = page.nextBefore
+    }
+    expect(total).toBe(10_007)
+    expect(oldest).toBe('Claude Code session started')
+  })
+
   it('says a session resumed, not that a new one started', async () => {
     const { repo, service: local } = await service()
     const store = openStore(join(repo.root, '.continuum/context.db'))

@@ -1,4 +1,4 @@
-import { getAgent, type ActivityEvent, type ContinuumEvent } from '@continuum/core'
+import { getAgent, type ActivityEvent, type ActivityType, type ContinuumEvent } from '@continuum/core'
 import { asAgent, ids } from './ids'
 import type { RepoSnapshot } from './snapshot'
 
@@ -104,21 +104,29 @@ function describe(snapshot: RepoSnapshot, event: ContinuumEvent): Described {
   }
 }
 
+/** The recorded event types behind each kind of activity, for filtering the log itself. */
+export const EVENT_TYPES_OF: Record<ActivityType, ContinuumEvent['type'][]> = {
+  'file-change': ['file.changed'],
+  'task-update': ['task.upserted'],
+  decision: ['memory.recorded'],
+  'test-result': ['check.recorded'],
+  session: ['session.started', 'session.progress', 'session.ended', 'session.task', 'session.prompted', 'data.forgotten'],
+  commit: ['commit.recorded'],
+}
+
+/** One recorded event as the dashboard shows it; null for the first scan's import of existing files, which is not work. */
+export function toActivityEvent(snapshot: RepoSnapshot, seq: number, event: ContinuumEvent): ActivityEvent | null {
+  if (isBaseline(snapshot, event)) return null
+  return { id: ids.event(snapshot.projectId, seq), projectId: snapshot.projectId, evidenceType: event.evidence, timestamp: event.occurredAt, ...describe(snapshot, event) }
+}
+
 const activityCache = new WeakMap<RepoSnapshot, ActivityEvent[]>()
 
 /** Recorded work, newest first. The first scan's import of existing files is left out. */
 export function toActivity(snapshot: RepoSnapshot): ActivityEvent[] {
   const cached = activityCache.get(snapshot)
   if (cached) return cached
-  const activity = snapshot.events
-    .filter(({ event }) => !isBaseline(snapshot, event))
-    .map(({ seq, event }) => ({
-      id: ids.event(snapshot.projectId, seq),
-      projectId: snapshot.projectId,
-      evidenceType: event.evidence,
-      timestamp: event.occurredAt,
-      ...describe(snapshot, event),
-    }))
+  const activity = snapshot.events.flatMap(({ seq, event }) => toActivityEvent(snapshot, seq, event) ?? [])
   activityCache.set(snapshot, activity)
   return activity
 }

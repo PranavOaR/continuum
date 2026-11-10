@@ -1,5 +1,6 @@
 import type {
   ActivityEvent,
+  ActivityType,
   AgentSession,
   AgentType,
   MemoryGraph,
@@ -91,6 +92,8 @@ export interface ContinuumService {
   listTasks(): Promise<ProjectTask[]>
   getWorkspace(projectId: string): Promise<ProjectWorkspace>
   listActivity(): Promise<ActivityEvent[]>
+  /** One page of a project's whole recorded history, back to its first event. */
+  listActivityPage(projectId: string, query: ActivityQuery): Promise<ActivityPage>
   getMemoryGraph(projectId: string): Promise<MemoryGraph>
   search(query: string): Promise<SearchResult[]>
   /** The briefing for this project, as `continuum handoff` prints it. */
@@ -108,6 +111,29 @@ export interface ContinuumService {
   /** Replaces your preferences and returns them as stored. */
   updateProfile(preferences: readonly string[]): Promise<Profile>
 }
+
+/** Which stretch of a project's history to read; everything but `before` narrows it. */
+export interface ActivityQuery {
+  /** Read events older than this cursor: the `nextBefore` of the page before. Omitted for the newest. */
+  before?: number
+  limit?: number
+  type?: ActivityType
+  agent?: AgentType
+  /** ISO time; events at or after it. */
+  from?: string
+  /** ISO time; events before it. */
+  to?: string
+}
+
+export interface ActivityPage {
+  /** Newest first. */
+  events: ActivityEvent[]
+  /** The cursor for the next older page, or null once the first recorded event has been reached. */
+  nextBefore: number | null
+}
+
+export const DEFAULT_ACTIVITY_PAGE = 50
+export const MAX_ACTIVITY_PAGE = 200
 
 /** Your preferences, kept on this machine for every repository: "Use pnpm", "Never push without asking". */
 export interface Profile {

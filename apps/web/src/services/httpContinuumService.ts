@@ -54,6 +54,10 @@ export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = '', 
     listTasks: () => get('/api/tasks'),
     getWorkspace: (projectId) => get(`${project(projectId)}/workspace`),
     listActivity: () => get('/api/activity'),
+    listActivityPage: (projectId, query) => {
+      const params = new URLSearchParams(Object.entries(query).flatMap(([key, value]) => (value === undefined ? [] : [[key, String(value)]])))
+      return get(`${project(projectId)}/activity${params.size > 0 ? `?${params.toString()}` : ''}`)
+    },
     getMemoryGraph: (projectId) => get(`${project(projectId)}/graph`),
     search: (query) => get(`/api/search?q=${encodeURIComponent(query)}`),
     getBriefing: (projectId) => get(`${project(projectId)}/briefing`),

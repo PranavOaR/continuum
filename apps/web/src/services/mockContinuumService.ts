@@ -10,6 +10,7 @@ import type { ActivityEvent, Project, ProjectTask } from '@continuum/core'
 import { matchesQuery } from '../utils/search'
 import { buildMemoryGraph } from './buildMemoryGraph'
 import {
+  DEFAULT_ACTIVITY_PAGE,
   NotFoundError,
   type AttentionItem,
   type ContinuumService,
@@ -199,6 +200,20 @@ export const mockContinuumService: ContinuumService = {
   },
   search(query) {
     return respond(searchAll(query))
+  },
+  listActivityPage(projectId, query) {
+    // The demo's history is short: the cursor is a position in it.
+    const matching = sortedActivity().filter(
+      (event) =>
+        event.projectId === projectId &&
+        (!query.type || event.type === query.type) &&
+        (!query.agent || event.agent === query.agent) &&
+        (!query.from || event.timestamp >= query.from) &&
+        (!query.to || event.timestamp < query.to),
+    )
+    const start = query.before ?? 0
+    const end = start + (query.limit ?? DEFAULT_ACTIVITY_PAGE)
+    return respond({ events: matching.slice(start, end), nextBefore: end < matching.length ? end : null })
   },
   updateTask: readOnly,
   createTask: readOnly,

@@ -17,6 +17,7 @@ export const continuumService: ContinuumService = {
   listTasks: async () => (await active()).listTasks(),
   getWorkspace: async (projectId) => (await active()).getWorkspace(projectId),
   listActivity: async () => (await active()).listActivity(),
+  listActivityPage: async (projectId, query) => (await active()).listActivityPage(projectId, query),
   getMemoryGraph: async (projectId) => (await active()).getMemoryGraph(projectId),
   search: async (query) => (await active()).search(query),
   getBriefing: async (projectId) => (await active()).getBriefing(projectId),
