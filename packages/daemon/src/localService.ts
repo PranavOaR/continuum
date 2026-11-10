@@ -1,6 +1,10 @@
 import {
+  DEFAULT_ACTIVITY_PAGE,
+  MAX_ACTIVITY_PAGE,
   NotFoundError,
   type ActivityEvent,
+  type ActivityPage,
+  type ActivityQuery,
   type AttentionItem,
   type ContinuumService,
   type MemoryGraph,
@@ -9,17 +13,20 @@ import {
   type NewMemory,
   type NewTask,
   type OverviewData,
+  type Profile,
+  type RedactionPreview,
+  type RepositorySettings,
   type ProjectSummary,
   type ProjectTask,
   type ProjectWorkspace,
   type SearchResult,
   type TaskChange,
 } from '@continuum/core'
-import { InvalidConfigError, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
+import { previewRedaction, readConfig, saveSettings, briefingPreferences, EMPTY_PROFILE, InvalidConfigError, readProfile, writeProfile, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
 import { applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
 import { keys } from '@continuum/store'
 import { asAgent, ids, storedMemoryId } from './ids'
-import { toActivity } from './mapActivity'
+import { EVENT_TYPES_OF, toActivity, toActivityEvent } from './mapActivity'
 import { toGraph } from './mapGraph'
 import { allChangedFileNodes, toFiles, toProject } from './mapProject'
 import { toMemory, toSessions, toVerification } from './mapRecords'
@@ -30,6 +37,10 @@ import { loadSnapshot, type RepoSnapshot } from './snapshot'
 export const SNAPSHOT_TTL_MS = 1_000
 const RECENT_EVENTS = 8
 const MAX_SEARCH_RESULTS = 20
+/** Events read from the log at a time while filling a page. */
+const ACTIVITY_SCAN_BATCH = 500
+/** Events one request reads at most; a rare filter over a long log is continued by the next request. */
+const MAX_ACTIVITY_SCANNED = 5_000
 
 export interface Repository {
   projectId: string
@@ -42,6 +53,8 @@ export interface LocalServiceOptions {
   ttlMs?: number
   /** Told when a repository cannot be read; the others keep working. */
   onError?: (projectId: string, error: unknown) => void
+  /** Continuum's per-user folder, which holds your profile; without it the profile is empty and cannot be saved. */
+  configDir?: string
 }
 
 /** One served repository could not be read (moved, deleted, or Continuum removed); the others still work. */
@@ -145,6 +158,7 @@ export class LocalContinuumService implements ContinuumService {
   private readonly now: () => Date
   private readonly ttlMs: number
   private readonly onError: (projectId: string, error: unknown) => void
+  private readonly configDir: string | undefined
   /** One load at a time: concurrent requests share it, and freshness counts from when it finished. */
   private cache: { loaded: Promise<Loaded[]>; finishedAt: number | null } | null = null
 
@@ -153,6 +167,7 @@ export class LocalContinuumService implements ContinuumService {
     this.now = options.now ?? (() => new Date())
     this.ttlMs = options.ttlMs ?? SNAPSHOT_TTL_MS
     this.onError = options.onError ?? (() => {})
+    this.configDir = options.configDir
   }
 
   /** Forgets the cached snapshot, e.g. when the change feed reports new records, so the next request reads them. */
@@ -230,6 +245,37 @@ export class LocalContinuumService implements ContinuumService {
 
   async listActivity(): Promise<ActivityEvent[]> {
     return (await this.snapshots()).flatMap(toActivity).sort(newestFirst)
+  }
+
+  /**
+   * Pages through the whole log by sequence number. Type and dates are
+   * filtered where the log is read; the agent is known only once an event is
+   * tied to its session, so it is filtered after, reading on until the page is full.
+   */
+  async listActivityPage(projectId: string, query: ActivityQuery): Promise<ActivityPage> {
+    const snapshot = await this.snapshot(projectId)
+    const limit = Math.min(Math.max(1, query.limit ?? DEFAULT_ACTIVITY_PAGE), MAX_ACTIVITY_PAGE)
+    const filter = { ...(query.type ? { types: EVENT_TYPES_OF[query.type] } : {}), ...(query.from ? { from: query.from } : {}), ...(query.to ? { to: query.to } : {}) }
+    const { store } = await openWorkspace(this.repository(projectId).cwd)
+    try {
+      const events: ActivityEvent[] = []
+      let before = query.before
+      let scanned = 0
+      while (scanned < MAX_ACTIVITY_SCANNED) {
+        const rows = store.eventsBefore({ ...filter, limit: ACTIVITY_SCAN_BATCH, ...(before === undefined ? {} : { before }) })
+        for (const { seq, event } of rows) {
+          scanned += 1
+          before = seq
+          const shown = toActivityEvent(snapshot, seq, event)
+          if (shown && (!query.agent || shown.agent === query.agent)) events.push(shown)
+          if (events.length === limit) return { events, nextBefore: seq }
+        }
+        if (rows.length < ACTIVITY_SCAN_BATCH) return { events, nextBefore: null }
+      }
+      return { events, nextBefore: before ?? null }
+    } finally {
+      store.close()
+    }
   }
 
   async getMemoryGraph(projectId: string): Promise<MemoryGraph> {
@@ -335,7 +381,33 @@ export class LocalContinuumService implements ContinuumService {
 
   async getBriefing(projectId: string): Promise<string> {
     const snapshot = await this.snapshot(projectId)
-    return renderHandoff(snapshot.state, { now: this.now() })
+    const preferences = await briefingPreferences(this.configDir, (await repositoryRedactor(snapshot.root)).redact)
+    return renderHandoff(snapshot.state, { now: this.now(), preferences })
+  }
+
+  async getSettings(projectId: string): Promise<RepositorySettings> {
+    return readConfig((await this.snapshot(projectId)).root)
+  }
+
+  async updateSettings(projectId: string, change: Partial<RepositorySettings>): Promise<RepositorySettings> {
+    const saved = await saveSettings((await this.snapshot(projectId)).root, change)
+    this.invalidate()
+    return saved
+  }
+
+  async previewRedaction(projectId: string, patterns: readonly string[], sample: string): Promise<RedactionPreview> {
+    // The project only says whose settings these are; a preview reads and records nothing.
+    await this.snapshot(projectId)
+    return previewRedaction(patterns, sample)
+  }
+
+  async getProfile(): Promise<Profile> {
+    return this.configDir ? readProfile(this.configDir) : EMPTY_PROFILE
+  }
+
+  async updateProfile(preferences: readonly string[]): Promise<Profile> {
+    if (!this.configDir) throw new Error('This server was started without a folder to keep your profile in.')
+    return writeProfile(this.configDir, preferences)
   }
 
   async search(query: string): Promise<SearchResult[]> {

@@ -1,5 +1,5 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -23,9 +23,12 @@ let noteRepo = ''
 let server: ChildProcess | undefined
 let url = ''
 let launchUrl = ''
+/** Continuum's per-user folder for this run, so the profile written here is never the developer's own. */
+let configDir = ''
+const env = () => ({ ...process.env, CONTINUUM_CONFIG_DIR: configDir })
 
 function continuum(args: string[], input?: string): string {
-  return execFileSync(process.execPath, [...CLI, '-C', repo, ...args], { cwd: ROOT, input, encoding: 'utf8' })
+  return execFileSync(process.execPath, [...CLI, '-C', repo, ...args], { cwd: ROOT, input, encoding: 'utf8', env: env() })
 }
 
 function write(path: string, content: string) {
@@ -41,6 +44,7 @@ test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(async () => {
   test.skip(!existsSync(join(ROOT, 'apps/web/dist/index.html')), 'needs `npm run build` first')
+  configDir = realpathSync(mkdtempSync(join(tmpdir(), 'continuum-e2e-config-')))
   repo = realpathSync(mkdtempSync(join(tmpdir(), 'continuum-e2e-')))
   execFileSync('git', [...GIT_IDENTITY, 'init', '--quiet', '--initial-branch=main'], { cwd: repo })
   write('package.json', '{"name":"e2e-app"}\n')
@@ -83,7 +87,7 @@ test.beforeAll(async () => {
   server = spawn(process.execPath, [...CLI, '-C', repo, 'serve', '--port', '0', '.', emptyRepo, noteRepo], {
     cwd: ROOT,
     // No Claude Code settings, so a Continuum plugin enabled on this machine does not count as connected here.
-    env: { ...process.env, CLAUDE_CONFIG_DIR: join(repo, '.no-claude-settings') },
+    env: { ...env(), CLAUDE_CONFIG_DIR: join(repo, '.no-claude-settings') },
     stdio: ['ignore', 'pipe', 'inherit'],
   })
   launchUrl = await new Promise<string>((resolve, reject) => {
@@ -365,6 +369,67 @@ test('a new project shows a getting-started checklist that ticks itself off live
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Where we left off' })).toBeVisible()
   await expect(page.locator('#getting-started')).toHaveCount(0)
+})
+
+test('a preference added in Settings reaches the next briefing, labelled set by you', async ({ page }) => {
+  await page.goto(`${url}/app/settings`)
+  const profile = page.getByRole('region', { name: 'Your profile' })
+  await expect(profile.getByText('No preferences yet.')).toBeVisible()
+  await profile.getByLabel('Add a preference').fill('Use pnpm, never npm')
+  await profile.getByRole('button', { name: 'Add' }).click()
+  await expect(profile.getByRole('list', { name: 'Your preferences' })).toContainText('Use pnpm, never npm')
+  await expect(profile.getByLabel('Add a preference')).toHaveValue('')
+
+  const handoff = continuum(['handoff'])
+  expect(handoff).toContain('## Your preferences')
+  expect(handoff).toContain('- "Use pnpm, never npm"')
+  expect(continuum(['profile'])).toContain('1. Use pnpm, never npm')
+
+  await profile.getByRole('button', { name: 'Remove “Use pnpm, never npm”' }).click()
+  await expect(profile.getByText('No preferences yet.')).toBeVisible()
+  expect(continuum(['handoff'])).not.toContain('Your preferences')
+})
+
+test('a redaction pattern is previewed on a sample, a bad one is refused with its reason, and a good one is saved', async ({ page }) => {
+  await page.goto(`${url}/app/settings`)
+  const settings = page.getByRole('region', { name: 'Repository settings' })
+  await settings.getByLabel('Repository').selectOption({ label: repo.split('/').at(-1) as string })
+  await settings.getByLabel('Try it on a sample').fill('Ticket ACME-123456 is open')
+
+  await settings.getByLabel('New pattern').fill('(a+)+$')
+  await expect(settings.getByRole('alert')).toContainText('This pattern cannot be used. It repeats a group that itself repeats')
+  await expect(settings.getByRole('button', { name: 'Add pattern' })).toBeDisabled()
+
+  await settings.getByLabel('New pattern').fill('ACME-[0-9]{6}')
+  await expect(settings.getByLabel('Sample as it would be stored')).toHaveText('Ticket [redacted] is open')
+  await expect(settings.getByRole('alert')).toHaveCount(0)
+  await settings.getByRole('button', { name: 'Add pattern' }).click()
+  await expect(settings.getByRole('list', { name: 'Redaction patterns' })).toContainText('ACME-[0-9]{6}')
+  expect(JSON.parse(readFileSync(join(repo, '.continuum', 'config.json'), 'utf8')).redactPatterns).toEqual(['ACME-[0-9]{6}'])
+
+  await settings.getByRole('switch', { name: 'Record your prompts' }).click()
+  await expect(settings.getByRole('switch', { name: 'Record your prompts' })).toHaveAttribute('aria-checked', 'true')
+  await page.reload()
+  await expect(page.getByRole('region', { name: 'Repository settings' }).getByRole('switch', { name: 'Record your prompts' })).toHaveAttribute('aria-checked', 'true')
+})
+
+test('Settings links to a new issue with the diagnostic report filled in', async ({ page }) => {
+  await page.goto(`${url}/app/settings`)
+  const link = page.getByRole('link', { name: 'Report a problem' })
+  await expect(link).toHaveAttribute('href', /^https:\/\/github\.com\/PranavOaR\/continuum-plugin\/issues\/new\?template=bug_report\.md&body=/)
+  const body = new URL((await link.getAttribute('href')) as string).searchParams.get('body') ?? ''
+  expect(body).toContain('## Continuum diagnostic report')
+  expect(body).not.toContain(repo)
+})
+
+test("the activity page reads one project's history back to its first event", async ({ page }) => {
+  const slug = (repo.split('/').at(-1) as string).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+  await page.goto(`${url}/app/activity?project=${slug}`)
+  await expect(page.getByText(/\d+ events, back to the first recorded/)).toBeVisible()
+  await expect(page.getByText('Claude Code session started').first()).toBeVisible()
+  await page.getByLabel('Event type').selectOption('test-result')
+  await expect(page.getByText('unit passed').first()).toBeVisible()
+  await expect(page.getByText('Claude Code session started')).toHaveCount(0)
 })
 
 test('the forms for adding to a project have no serious or critical axe violations', async ({ page }) => {

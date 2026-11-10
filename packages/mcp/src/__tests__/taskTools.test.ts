@@ -1,6 +1,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { initWorkspace, scanRepository, openWorkspace } from '@continuum/capture'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { Writable } from 'node:stream'
+import { initWorkspace, runCheck, scanRepository, openWorkspace } from '@continuum/capture'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createContinuumServer } from '../server'
@@ -150,5 +153,72 @@ describe('task tools', () => {
     const value = ['not', 'real', 'value'].join('-')
     await call('start_task', { title: 'Deploy', objective: `Use API_KEY=${value}` })
     expect((await call('get_handoff', {})).text).not.toContain(value)
+  })
+})
+
+describe('closing a task with unverified work', () => {
+  const silent = () => new Writable({ write: (_chunk, _encoding, done) => done() })
+
+  /** Runs a check through Continuum, as `continuum run --name <name> -- node -e <script>` would. */
+  async function check(root: string, name: string, script: string) {
+    const { store } = await openWorkspace(root)
+    try {
+      await runCheck(store, { root, command: process.execPath, args: ['-e', script], name, stdout: silent(), stderr: silent() })
+    } finally {
+      store.close()
+    }
+  }
+
+  /** Records an edit to src/auth.ts as part of the current task, as a hook would. */
+  async function editForTask(root: string, taskId: string, content: string) {
+    writeFileSync(join(root, 'src/auth.ts'), content)
+    const { store } = await openWorkspace(root)
+    try {
+      store.record({ type: 'file.changed', payload: { path: 'src/auth.ts', contentHash: `h-${content}`, changeType: 'modified', taskId }, evidence: 'observed', source: 'test', occurredAt: now().toISOString() })
+    } finally {
+      store.close()
+    }
+  }
+
+  const taskIdOf = (reply: string) => /Task (\S+):/.exec(reply)?.[1] ?? ''
+
+  it('says nothing when the checks on its files passed against the code as it is', async () => {
+    const { repo, call } = await connect()
+    const started = await call('start_task', { title: 'Tidy auth' })
+    await editForTask(repo.root, taskIdOf(started.text), 'auth v2')
+    await check(repo.root, 'unit', '0')
+    const closed = await call('update_task', { status: 'completed' })
+    expect(closed.text).toMatch(/is completed\./)
+    expect(closed.text).not.toContain('Warning')
+  })
+
+  it('names a failed check in the reply, and the task still closes', async () => {
+    const { repo, call } = await connect()
+    const started = await call('start_task', { title: 'Tidy auth' })
+    await editForTask(repo.root, taskIdOf(started.text), 'auth v2')
+    await check(repo.root, 'unit', 'process.exit(3)')
+    const closed = await call('update_task', { status: 'completed' })
+    expect(closed.isError).toBe(false)
+    expect(closed.text).toMatch(/is completed\./)
+    expect(closed.text).toContain('Warning: closed with unverified work. [verified] `unit` FAILED (exit 3)')
+    expect((await call('get_handoff', {})).text).not.toContain('## Current task')
+  })
+
+  it('names a check that passed before the task changed the code it covered', async () => {
+    const { repo, call } = await connect()
+    await check(repo.root, 'unit', '0')
+    const started = await call('start_task', { title: 'Tidy auth' })
+    await editForTask(repo.root, taskIdOf(started.text), 'auth v2')
+    const closed = await call('update_task', { status: 'completed' })
+    expect(closed.text).toContain('`unit` is OUT OF DATE: src/auth.ts changed since it ran')
+    expect(closed.text).toContain('The task is still completed.')
+  })
+
+  it('does not warn on updates that leave the task open', async () => {
+    const { repo, call } = await connect()
+    const started = await call('start_task', { title: 'Tidy auth' })
+    await editForTask(repo.root, taskIdOf(started.text), 'auth v2')
+    await check(repo.root, 'unit', 'process.exit(3)')
+    expect((await call('update_task', { status: 'blocked' })).text).not.toContain('Warning')
   })
 })

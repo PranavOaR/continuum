@@ -7,3 +7,4 @@ export { LATEST_SCHEMA_VERSION, migrate, MIGRATIONS, readSchemaVersion, StoreVer
 export { inspectStore, isCorruptStoreError, isStoreBusy, openChangeProbe, type ChangeProbe, type StoreInfo } from './inspect'
 export { EXPORT_FORMAT, EXPORT_VERSION, type Checkpoint, type CompactionResult, type GraphState, type HistoryExport, type HistoryRewrite, type RewriteResult } from './checkpoint'
 export { composeRewrites, FORGOTTEN, forgetPath, rewriteText, forgetSession, forgetTextBefore, InvalidForgetPathError, MIN_FORGET_PATH_CHARS } from './forget'
+export { DEFAULT_SEARCH_LIMIT, MAX_QUERY_TERMS, SEARCHABLE_KINDS, searchGraph, tokenize, type SearchHit, type SearchOptions, type SearchableKind } from './search'

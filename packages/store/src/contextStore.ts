@@ -167,6 +167,29 @@ export class ContextStore implements Mutations {
     return rows.map((row) => ({ seq: row.seq as number, event: toEvent(row) }))
   }
 
+  /**
+   * One page of the log, newest first: events with a sequence number below
+   * `before`, optionally of some types and within a time range (ISO strings,
+   * `from` included, `to` excluded). Paging by sequence number never skips or
+   * repeats an event, however many are recorded meanwhile.
+   */
+  eventsBefore(page: { before?: number; limit: number; types?: readonly ContinuumEvent['type'][]; from?: string; to?: string }): { seq: number; event: ContinuumEvent }[] {
+    const conditions: string[] = []
+    const values: (string | number)[] = []
+    const where = (condition: string, ...bound: (string | number)[]) => {
+      conditions.push(condition)
+      values.push(...bound)
+    }
+    if (page.before !== undefined) where('seq < ?', page.before)
+    if (page.types && page.types.length > 0) where(`type IN (${page.types.map(() => '?').join(', ')})`, ...page.types)
+    if (page.from !== undefined) where('occurred_at >= ?', page.from)
+    if (page.to !== undefined) where('occurred_at < ?', page.to)
+    const rows = this.db
+      .prepare(`SELECT seq, type, payload, evidence, source, occurred_at, revision FROM events ${conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''} ORDER BY seq DESC LIMIT ?`)
+      .all(...values, page.limit) as unknown as EventRow[]
+    return rows.map((row) => ({ seq: row.seq as number, event: toEvent(row) }))
+  }
+
   *events(): Generator<ContinuumEvent> {
     const rows = this.db.prepare('SELECT type, payload, evidence, source, occurred_at, revision FROM events ORDER BY seq').all() as unknown as EventRow[]
     for (const row of rows) yield toEvent(row)

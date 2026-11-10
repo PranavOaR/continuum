@@ -54,6 +54,10 @@ export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = '', 
     listTasks: () => get('/api/tasks'),
     getWorkspace: (projectId) => get(`${project(projectId)}/workspace`),
     listActivity: () => get('/api/activity'),
+    listActivityPage: (projectId, query) => {
+      const params = new URLSearchParams(Object.entries(query).flatMap(([key, value]) => (value === undefined ? [] : [[key, String(value)]])))
+      return get(`${project(projectId)}/activity${params.size > 0 ? `?${params.toString()}` : ''}`)
+    },
     getMemoryGraph: (projectId) => get(`${project(projectId)}/graph`),
     search: (query) => get(`/api/search?q=${encodeURIComponent(query)}`),
     getBriefing: (projectId) => get(`${project(projectId)}/briefing`),
@@ -61,5 +65,10 @@ export function createHttpContinuumService(fetchImpl: Fetch = fetch, base = '', 
     createTask: (projectId, task) => post(`${project(projectId)}/tasks`, task),
     addMemory: (projectId, record) => post(`${project(projectId)}/memory`, record),
     reviewMemory: (projectId, memoryId, verdict) => post(`${project(projectId)}/memory/${encodeURIComponent(memoryId)}/review`, { verdict }),
+    getSettings: (projectId) => get(`${project(projectId)}/settings`),
+    updateSettings: (projectId, change) => post(`${project(projectId)}/settings`, change),
+    previewRedaction: (projectId, patterns, sample) => post(`${project(projectId)}/settings/preview`, { patterns, sample }),
+    getProfile: () => get('/api/profile'),
+    updateProfile: (preferences) => post('/api/profile', { preferences }),
   }
 }

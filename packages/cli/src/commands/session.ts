@@ -1,14 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import {
-  clearActiveSession,
+import { briefingPreferences, clearActiveSession,
   openWorkspace,
   readActiveSession,
   readWorkingTreeWithSymbols,
   repositoryRedactor,
   scanRepository,
   claimActiveSession,
-  type ActiveSession,
-} from '@continuum/capture'
+  type ActiveSession, } from '@continuum/capture'
 import { projectState, renderHandoff, sinceYouLeft } from '@continuum/context'
 import { AGENTS, type AgentType } from '@continuum/core'
 import { keys } from '@continuum/store'
@@ -71,7 +69,8 @@ async function start(io: Io, args: readonly string[]): Promise<number> {
     io.out(`Started a ${agent} session (${session.sessionId}). Changes captured by \`continuum start\` or \`scan\` are now attributed to it.`)
     io.out('Paste this briefing into the agent, and end with `continuum session end --summary "..."`:')
     io.out('')
-    io.out(renderHandoff(state, { now: io.now(), since: sinceYouLeft(store, agent, session.sessionId) }))
+    const preferences = await briefingPreferences(io.configDir, (await repositoryRedactor(workspace.root)).redact)
+    io.out(renderHandoff(state, { now: io.now(), since: sinceYouLeft(store, agent, session.sessionId), preferences }))
     return EXIT_OK
   } finally {
     store.close()

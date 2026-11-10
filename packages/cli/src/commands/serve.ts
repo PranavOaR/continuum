@@ -4,6 +4,8 @@ import { forgetMissingRepositories, isInitialized, locateWorkspace, NotAGitRepos
 import { createAccessToken, createChangeFeed, DEFAULT_PORT, LocalContinuumService, projectIds, startDaemon } from '@continuum/daemon'
 import { basename, resolve } from 'node:path'
 import { BUILD_INFO } from '../build'
+import { selfInvocation } from '../invocation'
+import { buildReport, issueUrl } from '../report'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
 export const SERVE_USAGE = 'Usage: continuum serve [--port <n>] [--no-open] [repository ...]'
@@ -144,7 +146,7 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
   const describeError = (error: unknown) => (error instanceof Error ? (error.stack ?? error.message) : String(error))
   const service = new LocalContinuumService(
     unique.map((workspace, index) => ({ projectId: ids[index], cwd: workspace.root })),
-    { onError: (projectId, error) => io.err(`continuum: could not read ${projectId}: ${describeError(error)}`) },
+    { configDir: io.configDir, onError: (projectId, error) => io.err(`continuum: could not read ${projectId}: ${describeError(error)}`) },
   )
   const hasDashboard = existsSync(webDist)
   // New records must not wait out the service's short snapshot cache.
@@ -153,9 +155,15 @@ export async function serveCommand(io: Io, args: readonly string[], version: str
     { onChange: () => service.invalidate() },
   )
 
+  // "Report a problem" in the dashboard: doctor's report for the first repository served, built when asked for.
+  const report = async () => {
+    const markdown = await buildReport({ cwd: unique[0].root, nodeVersion: process.versions.node, platform: process.platform, arch: process.arch, invocation: selfInvocation(), webDist, configDir: io.configDir, claudeConfigDir: io.claudeConfigDir, now: io.now(), version })
+    return { markdown, issueUrl: issueUrl(markdown) }
+  }
   const daemon = await startDaemon({
     service,
     version,
+    report,
     token: options.token ?? createAccessToken(),
     ...(options.csrfToken ? { csrfToken: options.csrfToken } : {}),
     port: parsed.port,

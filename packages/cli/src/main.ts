@@ -2,6 +2,9 @@ import { resolve } from 'node:path'
 import { CommandNotFoundError, InvalidConfigError, NotAGitRepositoryError, UnreadableIgnoreFileError, WatchUnavailableError } from '@continuum/capture'
 import { InvalidHookPayloadError, SetupError } from '@continuum/claude-code'
 import { PortInUseError } from '@continuum/daemon'
+import { InvalidProfileError } from '@continuum/capture'
+import { profileCommand } from './commands/profile'
+import { checkCommand } from './commands/check'
 import { compactCommand } from './commands/compact'
 import { configCommand } from './commands/config'
 import { doctorCommand } from './commands/doctor'
@@ -13,12 +16,14 @@ import { initCommand } from './commands/init'
 import { mcpCommand } from './commands/mcp'
 import { RUN_USAGE, runCommand } from './commands/run'
 import { scanCommand } from './commands/scan'
+import { searchCommand } from './commands/search'
 import { sessionCommand } from './commands/session'
 import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
 import { uninstallCommand } from './commands/uninstall'
+import { whyCommand } from './commands/why'
 import { printBanner } from './banner'
 import { VERSION } from './build'
 import { selfInvocation } from './invocation'
@@ -40,15 +45,22 @@ Commands
   run -- <command>     Run a check (tests, lint, build) and record it as verified
                        ${RUN_USAGE.replace('Usage: ', '')}
   handoff              Print where the project left off, for any agent or chat
+  search <words ...>   Search recorded decisions, issues, tasks and session notes
+  why <file[#symbol]>  Show the decisions, tasks and checks behind a piece of code
+  check [--strict]     List decisions whose anchored code the staged changes alter,
+                       for a pre-commit hook; exits 0 unless --strict
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   session start|note|end  Record a session for an agent without hooks (Cursor, a chat)
   setup <agent>        Connect claude-code, codex, cursor or vscode to this repository (--remove to undo)
   config [name on|off] Show or change settings: agent-checks, prompts
+  profile [add|remove] Your preferences for every repository ("Use pnpm"), kept on
+                       this machine and carried by every briefing
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
   export <file>        Write the recorded history to a JSON file (import <file> restores it)
   forget               Permanently remove recorded data: --path, --session or --before
   doctor [--report]    Check the install and this repository's setup, with fixes;
-                       --report prints a scrubbed report to attach to an issue
+                       --report prints a scrubbed report to attach to an issue,
+                       and --report --open starts that issue in your browser
   uninstall [--purge]  Disconnect every agent; --purge also deletes .continuum/
 
 Used by agents
@@ -73,6 +85,9 @@ const COMMANDS: Record<string, Command> = {
   status: (io) => statusCommand(io),
   run: (io, args) => runCommand(io, args),
   handoff: (io, args) => handoffCommand(io, args),
+  search: (io, args) => searchCommand(io, args),
+  why: (io, args) => whyCommand(io, args),
+  check: (io, args) => checkCommand(io, args),
   serve: async (io, args) => serveCommand(io, args, VERSION, await serveWorkerOptions()),
   session: (io, args) => sessionCommand(io, args),
   setup: (io, args) => setupCommand(io, args, selfInvocation()),
@@ -80,6 +95,7 @@ const COMMANDS: Record<string, Command> = {
   ingest: (io, args) => ingestCommand(io, args),
   compact: (io, args) => compactCommand(io, args),
   config: (io, args) => configCommand(io, args),
+  profile: (io, args) => profileCommand(io, args),
   forget: (io, args) => forgetCommand(io, args),
   export: (io, args) => exportCommand(io, args),
   import: (io, args) => importCommand(io, args),
@@ -145,6 +161,7 @@ function isExpected(error: unknown): error is Error {
     error instanceof InvalidHookPayloadError ||
     error instanceof StoreVersionError ||
     error instanceof InvalidConfigError ||
+    error instanceof InvalidProfileError ||
     error instanceof UnreadableIgnoreFileError
   )
 }

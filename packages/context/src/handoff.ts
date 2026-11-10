@@ -16,6 +16,14 @@ export interface HandoffOptions {
   now?: Date
   /** For an agent resuming here: what changed since its previous session. Shown first. */
   since?: SinceYouLeft | null
+  /** Your profile: preferences you wrote for every repository on this machine. */
+  preferences?: readonly string[]
+}
+
+/** Yours, not recorded from the repository, and short: they come before everything else so a tight budget never drops them. */
+function preferencesSection(preferences: readonly string[] | undefined): string[] {
+  if (!preferences || preferences.length === 0) return []
+  return ['## Your preferences', '[set by you] Written by you for every repository on this machine, not recorded from this one.', ...preferences.map((preference) => `- ${quote(preference, 300)}`)]
 }
 
 const KIND_LABELS: Record<DecisionSummary['kind'], string> = {
@@ -48,7 +56,7 @@ function listPaths(paths: readonly string[]): string {
 }
 
 /** A known agent by its name (Claude Code, Codex); any other id as code, exactly as it was recorded. */
-function agentName(id: string): string {
+export function agentName(id: string): string {
   return AGENTS.find((agent) => agent.id === id)?.name ?? code(id)
 }
 
@@ -281,7 +289,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
     'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.',
   ]
   return fit(
-    [header, sinceSection(options.since, now), taskSection(state), plannedSection(state), nextStepSection(state, now), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
+    [header, preferencesSection(options.preferences), sinceSection(options.since, now), taskSection(state), plannedSection(state), nextStepSection(state, now), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }

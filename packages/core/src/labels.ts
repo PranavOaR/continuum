@@ -78,6 +78,9 @@ export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   commit: 'Commit',
 }
 
+/** Every kind of activity, for checking a filter someone sent. */
+export const ACTIVITY_TYPES = Object.keys(ACTIVITY_TYPE_LABEL) as ActivityType[]
+
 export const MEMORY_KIND_LABEL: Record<MemoryKind, string> = {
   decision: 'Architecture decision',
   'known-issue': 'Known issue',

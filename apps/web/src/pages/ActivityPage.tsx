@@ -8,16 +8,26 @@ import { PageHeader } from '../components/shared/PageHeader'
 import { EmptyState, ErrorState, LoadingBlock } from '../components/shared/States'
 import { AGENTS } from '@continuum/core'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useActivityHistory } from '../hooks/useActivityHistory'
 import { useServiceQuery } from '../hooks/useServiceQuery'
 import { useProjects } from '../hooks/useWorkspace'
 import { continuumService } from '../services'
-import type { ActivityEvent, ActivityType } from '@continuum/core'
+import type { ActivityEvent, ActivityType, AgentType } from '@continuum/core'
 import { formatDay } from '../utils/formatDate'
 import { ACTIVITY_TYPE_LABEL } from '@continuum/core'
 import { matchesQuery } from '../utils/search'
 import { useIsLive } from '../state/dataMode'
 
-const FILTER_KEYS = ['project', 'type', 'agent', 'q'] as const
+const FILTER_KEYS = ['project', 'type', 'agent', 'q', 'from', 'to'] as const
+const DATE_FIELD = 'h-9 w-full rounded-md border border-line bg-surface px-3 text-[13px] text-fg focus:border-accent focus:outline-none'
+
+/** A day picked in the browser as the instant it starts (or, for an end date, the instant the next day starts) in local time. */
+function dayBoundary(day: string, isEnd: boolean): string | undefined {
+  const start = new Date(`${day}T00:00:00`)
+  if (day === '' || Number.isNaN(start.getTime())) return undefined
+  if (isEnd) start.setDate(start.getDate() + 1)
+  return start.toISOString()
+}
 
 function groupByDay(events: ActivityEvent[]): Array<{ day: string; events: ActivityEvent[] }> {
   return events.reduce<Array<{ day: string; events: ActivityEvent[] }>>((groups, event) => {
@@ -40,7 +50,19 @@ export function ActivityPage() {
     type: params.get('type') ?? '',
     agent: params.get('agent') ?? '',
     q: params.get('q') ?? '',
+    from: params.get('from') ?? '',
+    to: params.get('to') ?? '',
   }
+  // With one project chosen, its whole history is read a page at a time, filtered where it is read.
+  const isPaged = filters.project !== ''
+  const from = dayBoundary(filters.from, false)
+  const to = dayBoundary(filters.to, true)
+  const history = useActivityHistory(isPaged ? filters.project : null, {
+    ...(filters.type ? { type: filters.type as ActivityType } : {}),
+    ...(filters.agent ? { agent: filters.agent as AgentType } : {}),
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+  })
   const hasFilters = FILTER_KEYS.some((key) => filters[key] !== '')
 
   const update = (changes: Record<string, string>) =>
@@ -57,14 +79,16 @@ export function ActivityPage() {
     )
 
   const projectNames = Object.fromEntries((projects.data ?? []).map(({ project }) => [project.id, project.name]))
-  const events = (activity.data ?? []).filter(
+  const loaded = isPaged ? history.events : (activity.data ?? [])
+  const events = loaded.filter(
     (event) =>
-      (filters.project === '' || event.projectId === filters.project) &&
-      (filters.type === '' || event.type === filters.type) &&
-      (filters.agent === '' || event.agent === filters.agent) &&
+      (isPaged || ((filters.type === '' || event.type === filters.type) && (filters.agent === '' || event.agent === filters.agent))) &&
       matchesQuery(filters.q, event.title, event.description),
   )
-  const selectedEvent = activity.data?.find((event) => event.id === params.get('event'))
+  const isLoading = isPaged ? history.isLoading && history.events.length === 0 : activity.isLoading
+  const error = isPaged ? history.error : activity.error
+  const isReady = isPaged ? !history.isLoading || history.events.length > 0 : activity.data !== undefined
+  const selectedEvent = [...loaded, ...(activity.data ?? [])].find((event) => event.id === params.get('event'))
 
   return (
     <>
@@ -107,20 +131,38 @@ export function ActivityPage() {
         </SelectField>
       </div>
 
+      {isPaged && (
+        <div className="mb-5 grid gap-3 rounded-lg border border-line bg-surface p-3 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="activity-from" className="label-mono text-subtle">
+              From
+            </label>
+            <input id="activity-from" type="date" value={filters.from} max={filters.to || undefined} onChange={(event) => update({ from: event.target.value })} className={DATE_FIELD} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="activity-to" className="label-mono text-subtle">
+              To
+            </label>
+            <input id="activity-to" type="date" value={filters.to} min={filters.from || undefined} onChange={(event) => update({ to: event.target.value })} className={DATE_FIELD} />
+          </div>
+        </div>
+      )}
+
       <div className="mb-3 flex items-center justify-between text-[12px] text-muted">
         <span aria-live="polite">
-          {activity.data ? `${events.length} of ${activity.data.length} events` : 'Loading events'}
+          {!isReady ? 'Loading events' : isPaged ? `${events.length} event${events.length === 1 ? '' : 's'}${history.hasOlder ? ', with older ones to load' : ', back to the first recorded'}` : `${events.length} of ${loaded.length} events`}
         </span>
+        {!isPaged && isReady && <span className="hidden sm:inline">The most recent events. Choose a project to read its whole history.</span>}
         {hasFilters && (
-          <Button size="sm" variant="ghost" onClick={() => update({ project: '', type: '', agent: '', q: '' })}>
+          <Button size="sm" variant="ghost" onClick={() => update({ project: '', type: '', agent: '', q: '', from: '', to: '' })}>
             Clear filters
           </Button>
         )}
       </div>
 
-      {activity.isLoading && <LoadingBlock rows={5} label="Loading activity" />}
-      {activity.error && <ErrorState title="Could not load activity" description={activity.error.message} />}
-      {activity.data && events.length === 0 && (
+      {isLoading && <LoadingBlock rows={5} label="Loading activity" />}
+      {error && <ErrorState title="Could not load activity" description={error.message} />}
+      {isReady && !error && events.length === 0 && !(isPaged && history.hasOlder) && (
         <EmptyState icon={<Activity />} title="No activity matches these filters" description="Try another project, event type, or agent." />
       )}
       {events.length > 0 && (
@@ -133,6 +175,14 @@ export function ActivityPage() {
               </div>
             </section>
           ))}
+        </div>
+      )}
+
+      {isPaged && history.hasOlder && (
+        <div className="mt-6 flex justify-center">
+          <Button size="sm" onClick={history.loadOlder} disabled={history.isLoading}>
+            {history.isLoading ? 'Loading older events' : 'Load older events'}
+          </Button>
         </div>
       )}
 

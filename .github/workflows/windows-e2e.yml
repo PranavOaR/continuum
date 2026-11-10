@@ -2,8 +2,19 @@ name: Windows end-to-end
 
 # Plays a Windows user against the release package: scripts/windows-e2e.mjs.
 # Run it from the Actions tab before tagging a release, and on pull requests that change how agents start Continuum.
+# After a release, run it again with "npm" to play the same user against what npm and the plugin repository really serve.
 on:
   workflow_dispatch:
+    inputs:
+      registry:
+        description: "private: this checkout's build, from a private registry. npm: the published package and plugin."
+        type: choice
+        options: [private, npm]
+        default: private
+      version:
+        description: 'With npm: the version to test (default: the latest on npm)'
+        type: string
+        default: ''
   pull_request:
     paths:
       - 'packages/claude-code/src/**'
@@ -29,7 +40,22 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run bundle
-      - run: node scripts/windows-e2e.mjs
+      - if: inputs.registry != 'npm'
+        run: npm ci
+      - if: inputs.registry != 'npm'
+        run: npm run build
+      - if: inputs.registry != 'npm'
+        run: npm run bundle
+      - if: inputs.registry != 'npm'
+        run: node scripts/windows-e2e.mjs
+      # The inputs reach the script through the environment, never spliced into the command line.
+      - if: inputs.registry == 'npm'
+        env:
+          E2E_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          if [ -n "$E2E_VERSION" ]; then
+            node scripts/windows-e2e.mjs --registry npm --version "$E2E_VERSION"
+          else
+            node scripts/windows-e2e.mjs --registry npm
+          fi

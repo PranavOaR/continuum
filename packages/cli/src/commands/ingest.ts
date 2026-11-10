@@ -14,7 +14,7 @@ export async function ingestCommand(io: Io, args: readonly string[] = []): Promi
     io.err(`continuum: ingest --agent must be one of ${AGENTS.join(', ')}`)
     return EXIT_USAGE
   }
-  const outcome = await ingestHook(await io.readStdin(), { now: io.now, agent: agent as HookAgent, cwd: io.cwd })
+  const outcome = await ingestHook(await io.readStdin(), { now: io.now, agent: agent as HookAgent, cwd: io.cwd, configDir: io.configDir })
   if (outcome.status === 'recorded' && outcome.additionalContext) {
     io.out(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: outcome.additionalContext } }))
   }

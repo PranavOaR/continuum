@@ -1,12 +1,17 @@
-import { HardDrive, Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
+import { ExternalLink, HardDrive, Monitor, Moon, RotateCcw, Sun } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Button } from '../components/shared/Button'
+import { buttonClass } from '../components/shared/buttonClass'
 import { ConfirmDialog } from '../components/shared/Dialog'
 import { SelectField, Toggle } from '../components/shared/Fields'
 import { PageHeader } from '../components/shared/PageHeader'
+import { ProfilePanel } from '../components/settings/ProfilePanel'
+import { RepositorySettingsPanel } from '../components/settings/RepositorySettingsPanel'
 import { Panel } from '../components/shared/Panel'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useServiceQuery } from '../hooks/useServiceQuery'
 import { useProjects, usePreferredProjectId } from '../hooks/useWorkspace'
+import { fetchProblemReport, reportLink } from '../services/problemReport'
 import { usePreferences, type ThemePreference } from '../state/preferences'
 import { useToast } from '../state/toasts'
 import { cn } from '../utils/cn'
@@ -30,6 +35,24 @@ function SettingRow({ label, description, children }: { label: string; descripti
   )
 }
 
+/** A plain link, so the browser opens it as a click and no pop-up blocker steps in. */
+function ReportProblem() {
+  const isLive = useIsLive()
+  const report = useServiceQuery(isLive ? 'problem-report' : null, () => fetchProblemReport())
+  const isFilled = report.data !== undefined && reportLink(report.data) === report.data.issueUrl
+  const description = isFilled
+    ? 'Opens a new issue on GitHub with a diagnostic report filled in: versions, settings and counts, with your paths shortened and secrets masked. None of your code, prompts, tasks or decisions. Nothing is submitted until you press the button there.'
+    : 'Opens a new issue on GitHub. Include the output of `continuum doctor --report`, which shortens your paths and masks secrets.'
+  return (
+    <SettingRow label="Report a problem" description={description}>
+      <a href={reportLink(report.data)} target="_blank" rel="noreferrer" className={buttonClass('secondary', 'sm', 'w-full')}>
+        <ExternalLink aria-hidden />
+        Report a problem
+      </a>
+    </SettingRow>
+  )
+}
+
 export function SettingsPage() {
   const isLive = useIsLive()
   useDocumentTitle('Settings')
@@ -46,7 +69,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="Preferences are stored in this browser only." crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Settings' }]} />
+      <PageHeader title="Settings" description="Display settings are stored in this browser; your profile is kept on this machine for every repository." crumbs={[{ label: 'Overview', to: '/app' }, { label: 'Settings' }]} />
 
       <div className="grid max-w-3xl gap-6">
         <Panel title="General">
@@ -97,6 +120,10 @@ export function SettingsPage() {
           </div>
         </Panel>
 
+        <ProfilePanel />
+
+        {isLive && <RepositorySettingsPanel />}
+
         <Panel title="Privacy and architecture">
           <div className="flex gap-3">
             <HardDrive className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
@@ -109,8 +136,8 @@ export function SettingsPage() {
               {isLive ? (
                 <p>
                   <span className="font-medium text-fg">Connected to your local repositories.</span> This dashboard reads Continuum's records from
-                  disk through <span className="font-mono">continuum serve</span> on 127.0.0.1. The only thing it writes is a task edit you make,
-                  recorded as set by you. Nothing is sent to any server. Preferences are kept in this browser's local storage.
+                  disk through <span className="font-mono">continuum serve</span> on 127.0.0.1. It writes only what you change here: tasks, records and your profile,
+                  each recorded as set by you. Nothing is sent to any server. Preferences are kept in this browser's local storage.
                 </p>
               ) : (
                 <p>
@@ -120,6 +147,10 @@ export function SettingsPage() {
               )}
             </div>
           </div>
+        </Panel>
+
+        <Panel title="Help">
+          <ReportProblem />
         </Panel>
 
         <Panel title="Browser data" description="What this browser keeps for the dashboard.">

@@ -17,6 +17,7 @@ export const continuumService: ContinuumService = {
   listTasks: async () => (await active()).listTasks(),
   getWorkspace: async (projectId) => (await active()).getWorkspace(projectId),
   listActivity: async () => (await active()).listActivity(),
+  listActivityPage: async (projectId, query) => (await active()).listActivityPage(projectId, query),
   getMemoryGraph: async (projectId) => (await active()).getMemoryGraph(projectId),
   search: async (query) => (await active()).search(query),
   getBriefing: async (projectId) => (await active()).getBriefing(projectId),
@@ -24,6 +25,11 @@ export const continuumService: ContinuumService = {
   createTask: async (projectId, task) => (await active()).createTask(projectId, task),
   addMemory: async (projectId, record) => (await active()).addMemory(projectId, record),
   reviewMemory: async (projectId, memoryId, review) => (await active()).reviewMemory(projectId, memoryId, review),
+  getSettings: async (projectId) => (await active()).getSettings(projectId),
+  updateSettings: async (projectId, change) => (await active()).updateSettings(projectId, change),
+  previewRedaction: async (projectId, patterns, sample) => (await active()).previewRedaction(projectId, patterns, sample),
+  getProfile: async () => (await active()).getProfile(),
+  updateProfile: async (preferences) => (await active()).updateProfile(preferences),
 }
 
 export { dataMode, type DataMode } from './dataMode'

@@ -3,6 +3,7 @@ import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NotFoundError, type ContinuumService, type MemoryRecord, type ProjectTask, type TaskField } from '@continuum/core'
+import { InvalidConfigError, InvalidProfileError, InvalidSettingsError } from '@continuum/capture'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PortInUseError, startDaemon, type RunningDaemon } from '../server'
 
@@ -20,6 +21,10 @@ const fakeService: ContinuumService = {
   listProjects: async () => [],
   listTasks: async () => [],
   listActivity: async () => [],
+  listActivityPage: async (projectId, query) => {
+    pageQueries.push({ projectId, query })
+    return { events: [], nextBefore: null }
+  },
   getWorkspace: async (id) => {
     if (id === 'boom') throw new Error('disk on fire at /secret/path')
     throw new NotFoundError('Project', id)
@@ -40,6 +45,22 @@ const fakeService: ContinuumService = {
     edits.push({ projectId, input })
     return memory(projectId, 'acme~memory~new')
   },
+  getSettings: async (projectId) => {
+    if (projectId === 'broken') throw new InvalidConfigError('/repo/.continuum/config.json', 'a redactPatterns entry cannot be used (\\w+\\w+@: It has two repeats in a row)')
+    return { agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: [] }
+  },
+  updateSettings: async (projectId, change) => {
+    if ((change.redactPatterns ?? []).includes('(a+)+$')) throw new InvalidSettingsError('The pattern (a+)+$ was not saved. It repeats a group that itself repeats.')
+    edits.push({ projectId, change })
+    return { agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: [], ...change }
+  },
+  previewRedaction: async (_projectId, patterns, sample) => ({ masked: sample.replace('ACME', '[redacted]'), count: 1, refused: patterns.filter((pattern) => pattern === '(').map((pattern) => ({ pattern, reason: 'It is not a valid regular expression.' })) }),
+  getProfile: async () => ({ preferences: storedPreferences }),
+  updateProfile: async (preferences) => {
+    if (preferences.length > 2) throw new InvalidProfileError('A profile holds at most 2 preferences; remove one first.')
+    storedPreferences = [...preferences]
+    return { preferences: storedPreferences }
+  },
   reviewMemory: async (projectId, memoryId, verdict) => {
     if (memoryId === 'missing') throw new NotFoundError('Memory record', memoryId)
     edits.push({ projectId, memoryId, verdict })
@@ -47,6 +68,8 @@ const fakeService: ContinuumService = {
   },
 }
 const edits: unknown[] = []
+const pageQueries: unknown[] = []
+let storedPreferences = ['Use pnpm']
 const task = (projectId: string, id: string, userEdited: TaskField[]): ProjectTask => ({ id, projectId, title: 't', description: '', objective: '', status: 'blocked', acceptanceCriteria: [], completedSteps: [], remainingSteps: [], relatedFileIds: [], verificationIds: [], updatedAt: '', userEdited })
 const memory = (projectId: string, id: string): MemoryRecord => ({ id, projectId, kind: 'decision', title: 't', body: '', source: 'user-note', sourceDetail: '', evidenceType: 'user-reported', relatedFileIds: [], createdAt: '' })
 
@@ -90,6 +113,30 @@ describe('daemon API', () => {
     expect(JSON.parse((await raw(daemon, '/api/search?q=auth')).body).data[0].title).toBe('auth')
     expect(JSON.parse((await raw(daemon, '/api/projects/acme/briefing')).body).data).toBe('# Continuum handoff: acme')
     expect(JSON.parse((await raw(daemon, '/api/projects/my%20app/graph')).body).data.projectId).toBe('my app')
+  })
+
+  it('serves the problem report only when serve provides one', async () => {
+    expect((await raw(await start(), '/api/report')).status).toBe(404)
+    const daemon = await startDaemon({ service: fakeService, version: 'test', token: TOKEN, port: 0, report: async () => ({ markdown: '## Continuum diagnostic report', issueUrl: 'https://github.com/PranavOaR/continuum-plugin/issues/new?body=x' }) })
+    running.push(daemon)
+    const reply = await raw(daemon, '/api/report')
+    expect(reply.status).toBe(200)
+    expect(JSON.parse(reply.body).data).toEqual({ markdown: '## Continuum diagnostic report', issueUrl: 'https://github.com/PranavOaR/continuum-plugin/issues/new?body=x' })
+    expect((await raw(daemon, '/api/report', { authorization: 'Bearer wrong' })).status).toBe(401)
+  })
+
+  it('passes on only the parts of an activity query that are what they should be', async () => {
+    const daemon = await start()
+    pageQueries.length = 0
+    const page = await raw(daemon, '/api/projects/acme/activity?before=120&limit=25&type=decision&agent=codex&from=2026-10-01&to=2026-11-01T00:00:00Z')
+    expect(JSON.parse(page.body).data).toEqual({ events: [], nextBefore: null })
+    await raw(daemon, '/api/projects/acme/activity?before=-3&limit=abc&type=everything&agent=hal&from=yesterday')
+    await raw(daemon, '/api/projects/acme/activity')
+    expect(pageQueries).toEqual([
+      { projectId: 'acme', query: { before: 120, limit: 25, type: 'decision', agent: 'codex', from: '2026-10-01T00:00:00.000Z', to: '2026-11-01T00:00:00.000Z' } },
+      { projectId: 'acme', query: {} },
+      { projectId: 'acme', query: {} },
+    ])
   })
 
   it('maps errors to statuses without leaking internals', async () => {
@@ -288,6 +335,50 @@ describe('task edits', () => {
       expect((await post(daemon, route, JSON.stringify(body), browser(daemon, extra))).status).toBe(status)
       expect(edits).toEqual([])
     })
+  })
+
+  it('saves repository settings through the same checks, refusing a bad pattern with its reason', async () => {
+    const daemon = await startWithCsrf()
+    edits.length = 0
+    expect(JSON.parse((await raw(daemon, '/api/projects/acme/settings')).body).data.agentChecks).toBe(true)
+    const broken = await raw(daemon, '/api/projects/broken/settings')
+    expect(broken.status).toBe(422)
+    expect(JSON.parse(broken.body).error.message).toContain('two repeats in a row')
+    const saved = await post(daemon, '/api/projects/acme/settings', JSON.stringify({ capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] }), browser(daemon))
+    expect(saved.status).toBe(200)
+    expect(JSON.parse(saved.body).data).toMatchObject({ capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] })
+    const refused = await post(daemon, '/api/projects/acme/settings', JSON.stringify({ redactPatterns: ['(a+)+$'] }), browser(daemon))
+    expect(refused.status).toBe(400)
+    expect(JSON.parse(refused.body).error.message).toContain('repeats a group that itself repeats')
+    expect((await post(daemon, '/api/projects/acme/settings', JSON.stringify({ capturePrompts: true }), browser(daemon, { 'x-continuum-csrf': 'guess' }))).status).toBe(403)
+    expect((await post(daemon, '/api/projects/acme/settings', '[]', browser(daemon))).status).toBe(400)
+    expect(edits).toEqual([{ projectId: 'acme', change: { capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] } }])
+  })
+
+  it('previews what patterns would mask in a sample, within limits', async () => {
+    const daemon = await startWithCsrf()
+    const preview = await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: ['ACME', '('], sample: 'call ACME' }), browser(daemon))
+    expect(preview.status).toBe(200)
+    expect(JSON.parse(preview.body).data).toEqual({ masked: 'call [redacted]', count: 1, refused: [{ pattern: '(', reason: 'It is not a valid regular expression.' }] })
+    expect((await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: [], sample: 'x'.repeat(2_001) }), browser(daemon))).status).toBe(400)
+    expect((await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: Array.from({ length: 22 }, () => 'a'), sample: '' }), browser(daemon))).status).toBe(400)
+    expect((await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: ['a'], sample: 'a' }), browser(daemon, { origin: undefined }))).status).toBe(403)
+  })
+
+  it('saves your profile through the same checks, and reads it back', async () => {
+    const daemon = await startWithCsrf()
+    storedPreferences = ['Use pnpm']
+    expect(JSON.parse((await raw(daemon, '/api/profile')).body).data).toEqual({ preferences: ['Use pnpm'] })
+    const saved = await post(daemon, '/api/profile', JSON.stringify({ preferences: ['Use pnpm', 'Ask before pushing'] }), browser(daemon))
+    expect(saved.status).toBe(200)
+    expect(JSON.parse(saved.body).data).toEqual({ preferences: ['Use pnpm', 'Ask before pushing'] })
+    expect((await post(daemon, '/api/profile', JSON.stringify({ preferences: ['x'] }), browser(daemon, { 'x-continuum-csrf': undefined }))).status).toBe(403)
+    expect((await post(daemon, '/api/profile', JSON.stringify({ preferences: ['x'] }), browser(daemon, { origin: 'http://evil.example' }))).status).toBe(403)
+    expect((await post(daemon, '/api/profile', JSON.stringify({ preferences: 'x' }), browser(daemon))).status).toBe(400)
+    const tooMany = await post(daemon, '/api/profile', JSON.stringify({ preferences: ['a', 'b', 'c'] }), browser(daemon))
+    expect(tooMany.status).toBe(400)
+    expect(JSON.parse(tooMany.body).error.message).toContain('at most 2 preferences')
+    expect(storedPreferences).toEqual(['Use pnpm', 'Ask before pushing'])
   })
 
   it.each([

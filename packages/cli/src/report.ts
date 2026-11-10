@@ -9,6 +9,30 @@ import { hookStatuses, type HookStatus } from './hookStatus'
 /** Where people report problems: the public plugin repository hosts the issues. */
 export const ISSUES_URL = 'https://github.com/PranavOaR/continuum-plugin/issues'
 
+/**
+ * GitHub refuses a link much longer than this, and a report with many
+ * findings, once percent-encoded, can pass it.
+ */
+export const MAX_ISSUE_URL_CHARS = 7_000
+/** The template in the plugin repository (plugin-repo/.github/ISSUE_TEMPLATE) with the same headings. */
+const ISSUE_TEMPLATE = 'bug_report.md'
+const PASTE_REPORT = 'Run `npx getcontinuum doctor --report` in the project and paste what it prints here.'
+
+const issueBody = (report: string) =>
+  ['### What happened', '', '<!-- What you did, what you expected, and what happened instead. -->', '', '### Diagnostic report', '', report, ''].join('\n')
+
+const newIssueUrl = (body: string) => `${ISSUES_URL}/new?${new URLSearchParams({ template: ISSUE_TEMPLATE, body: issueBody(body) }).toString()}`
+
+/**
+ * A link that opens a new issue with `report` already in it. Following it
+ * shows the report to GitHub and nobody else; nothing is posted until the
+ * person submits the form. A report too long for a link is asked for instead.
+ */
+export function issueUrl(report: string): string {
+  const filled = newIssueUrl(report)
+  return filled.length <= MAX_ISSUE_URL_CHARS ? filled : newIssueUrl(PASTE_REPORT)
+}
+
 const MARKS: Record<FindingStatus, string> = { ok: '✓', warn: '!', fail: '✗' }
 const KIB = 1024
 const MIB = KIB * KIB

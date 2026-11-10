@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, UnreadableIgnoreFileError, type Redactor } from '@continuum/capture'
-import { DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, openSessionId, projectState, rankContext, renderContext, renderHandoff, taskIdOfSession, type ProjectState } from '@continuum/context'
+import { briefingPreferences, extractSymbols, hashFiles, InvalidConfigError, isIgnored, isRegularFileInRepo, loadContinuumIgnore, NotAGitRepositoryError, NotInitializedError, openWorkspace, parseSymbolRef, readWorkingTreeWithSymbols, repositoryRedactor, UnreadableIgnoreFileError, type Redactor } from '@continuum/capture'
+import { DEFAULT_CONTEXT_TOKENS, DEFAULT_HANDOFF_CHARS, openSessionId, projectState, rankContext, renderContext, renderHandoff, renderSearch, searchMemory, shareable, taskIdOfSession, type ProjectState } from '@continuum/context'
 import type { ContentHash, IdentityKey, MemoryRecordedEvent } from '@continuum/core'
 import { keys, normalizePath, type ContextStore } from '@continuum/store'
 import { registerTaskTools, TaskToolError } from './taskTools'
@@ -17,6 +17,9 @@ const MIN_CONTEXT_TOKENS = 200
 const MAX_CONTEXT_TOKENS = 8_000
 const MAX_LISTED_UNRECORDED = 50
 const MAX_ANCHORED_FILES = 50
+const MAX_QUERY_CHARS = 200
+const DEFAULT_SEARCH_RESULTS = 8
+const MAX_SEARCH_RESULTS = 25
 /**
  * Claude Code starts one MCP server per session with this set, to the id its
  * hooks report, also after --resume. It is fixed at the start, and child
@@ -34,6 +37,8 @@ export interface ServerOptions {
   now?: () => Date
   /** The session this server works for, when its client says; tools then act on that session's task. */
   sessionId?: string
+  /** Continuum's per-user folder, whose profile get_handoff carries; without it there is none. */
+  configDir?: string
 }
 
 /** The agent session this process serves, if its client named one. */
@@ -146,8 +151,8 @@ const recordDecisionInput = {
 }
 
 /**
- * The Continuum MCP server. Read tools never write; record_decision is the only
- * write, and it is labelled agent-reported so it is never mistaken for verified fact.
+ * The Continuum MCP server. Read tools never write; record_decision and the task
+ * tools are the only writes, labelled agent-reported so they are never mistaken for verified fact.
  */
 export function createContinuumServer(options: ServerOptions): McpServer {
   const now = options.now ?? (() => new Date())
@@ -159,21 +164,47 @@ export function createContinuumServer(options: ServerOptions): McpServer {
     {
       title: 'Get ranked context',
       description:
-        'The recorded context most useful for a task, ranked and cut to a token budget: the task, failing or out-of-date checks, decisions anchored to the files it touches, recent session notes, hand edits and commits. Each line shows its score and why. Use it to focus before working on a task; get_handoff gives the full overview.',
+        'The recorded context most useful for a task, ranked and cut to a token budget: the task, failing or out-of-date checks, decisions anchored to the files it touches, recent session notes, hand edits and commits. Each line shows its score and why. Pass `query` with what you are about to work on, and decisions and notes holding those words rank higher, whichever task they were recorded on. Use it to focus before working on a task; get_handoff gives the full overview.',
       inputSchema: {
         task_id: z.string().trim().min(1).max(100).optional().describe('Defaults to the current task'),
+        query: z.string().trim().min(1).max(MAX_QUERY_CHARS).optional().describe('A few words on what you are about to do, e.g. "webhook retries"'),
         budget_tokens: z.number().int().min(MIN_CONTEXT_TOKENS).max(MAX_CONTEXT_TOKENS).optional().describe(`Defaults to ${DEFAULT_CONTEXT_TOKENS}`),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async ({ task_id, budget_tokens }, extra) =>
+    async ({ task_id, budget_tokens, query }, extra) =>
       guarded(() =>
-        withStore(options.cwd, async (store, root) => {
+        withStore(options.cwd, async (store, root, { redact }) => {
           const at = now()
           const state = await currentState(store, root, at)
           if (task_id && !state.tasks.some((task) => task.id === task_id)) throw new ToolInputError(`No task "${task_id}".`)
           const taskId = task_id ?? taskIdOfSession(store, openSessionId(store, sessionOf(extra)), at)
-          return ok(renderContext(rankContext(store, state, { now: at, ...(taskId ? { taskId } : {}) }), budget_tokens ?? DEFAULT_CONTEXT_TOKENS))
+          const ranked = rankContext(store, state, { now: at, ...(taskId ? { taskId } : {}), ...(query ? { query } : {}) })
+          // The query's words are echoed in each line's reason, so the reply is masked like anything recorded.
+          return ok(query ? redact(renderContext(ranked, budget_tokens ?? DEFAULT_CONTEXT_TOKENS)) : renderContext(ranked, budget_tokens ?? DEFAULT_CONTEXT_TOKENS))
+        }),
+      ),
+  )
+
+  server.registerTool(
+    'search_memory',
+    {
+      title: 'Search memory',
+      description:
+        'Search everything recorded in this repository for some words: decisions, known issues, failed attempts, tasks and session notes, including old ones on other tasks that a briefing no longer shows. Each result carries its evidence label, when it was recorded, the task and code it belongs to, and whether that code changed since. Use it before deciding something that may already have been decided, or when the user asks what was done about something.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(MAX_QUERY_CHARS).describe('Words to look for, e.g. "webhook idempotency"'),
+        limit: z.number().int().min(1).max(MAX_SEARCH_RESULTS).optional().describe(`Defaults to ${DEFAULT_SEARCH_RESULTS}`),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ query, limit }) =>
+      guarded(() =>
+        withStore(options.cwd, async (store, root, { redact }) => {
+          const at = now()
+          const results = searchMemory(store, await currentState(store, root, at), query, { limit: limit ?? DEFAULT_SEARCH_RESULTS })
+          // Shown the way capture stores: masked by today's redaction rules, with nothing .continuumignore lists.
+          return ok(redact(renderSearch(shareable(results, { redact, isIgnored: await loadContinuumIgnore(root) }), query, at)))
         }),
       ),
   )
@@ -189,9 +220,10 @@ export function createContinuumServer(options: ServerOptions): McpServer {
     },
     async ({ max_chars }) =>
       guarded(() =>
-        withStore(options.cwd, async (store, root) => {
+        withStore(options.cwd, async (store, root, { redact }) => {
           const at = now()
-          return ok(renderHandoff(await currentState(store, root, at), { now: at, maxChars: max_chars ?? DEFAULT_HANDOFF_CHARS }))
+          const preferences = await briefingPreferences(options.configDir, redact)
+          return ok(renderHandoff(await currentState(store, root, at), { now: at, maxChars: max_chars ?? DEFAULT_HANDOFF_CHARS, preferences }))
         }),
       ),
   )
@@ -251,7 +283,7 @@ export function createContinuumServer(options: ServerOptions): McpServer {
       ),
   )
 
-  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, _root, { redact }) => ok(await work(store, redact)))), now, sessionOf)
+  registerTaskTools(server, (work) => guarded(() => withStore(options.cwd, async (store, root, { redact }) => ok(await work(store, redact, () => currentState(store, root, now()))))), now, sessionOf)
 
   return server
 }

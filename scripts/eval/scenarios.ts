@@ -16,6 +16,8 @@ export interface Question {
   inBriefing: RegExp[]
   /** Briefing mode: wording the section must never contain, e.g. calling an out-of-date check "passed". */
   notInBriefing?: RegExp[]
+  /** The answer is not in the briefing: the agent has to ask for it. `inBriefing` is then matched against this tool's reply. */
+  tool?: { name: 'search_memory' | 'get_context'; query: string }
 }
 
 export interface Scenario {
@@ -124,6 +126,30 @@ export const SCENARIOS: Scenario[] = [
       { id: 'when', ask: 'Roughly how long ago did you change the refunds task in the dashboard?', expect: [/\b1\s*h|an hour|one hour|60 min/i], inBriefing: [/in the dashboard \(1h ago\)/], section: 'Since your last session' },
       { id: 'next', ask: 'What should happen next?', expect: [/finance/i], section: 'Current task', inBriefing: [/Next action: "Wait for finance to approve the refund rules"/] },
       { id: 'title-source', ask: 'Was the task title written by you (the person) or by an agent?', expect: [/agent/i], section: 'Current task', inBriefing: [/^\[agent-reported\] "Support partial refunds"/m], notInBriefing: [/\[set by you\] "Support partial refunds"/] },
+    ],
+  },
+  {
+    name: 'an old decision on another task, found by a word in its body',
+    files: { 'src/webhooks.ts': 'h-hook-1', 'src/auth.ts': 'h-auth-1' },
+    events: [
+      e('file.changed', { path: 'src/webhooks.ts', contentHash: 'h-hook-1', changeType: 'added' }, 90_000, 'observed', 'watcher:git'),
+      e('file.changed', { path: 'src/auth.ts', contentHash: 'h-auth-1', changeType: 'added' }, 90_000, 'observed', 'watcher:git'),
+      // Two months ago, on a task long finished.
+      e('task.upserted', { id: 'invoices', title: 'Invoice export', status: 'completed', objective: 'Export invoices as CSV' }, 86_400, 'agent-reported', 'mcp'),
+      e('memory.recorded', { id: 'retries', kind: 'decision', title: 'Retries are safe', body: 'Every webhook handler checks the idempotency key before it writes, so the provider may deliver twice.', taskId: 'invoices', anchors: { 'file:src/webhooks.ts': 'h-hook-1' } }, 86_400, 'agent-reported', 'mcp'),
+      // Since then: another task, with newer decisions of its own.
+      e('task.upserted', { id: 'sso', title: 'Add single sign-on', status: 'in-progress', nextAction: 'Handle the provider webhook for deprovisioned users' }, 200, 'agent-reported', 'mcp'),
+      e('session.started', { sessionId: 'claude-s', agent: 'claude-code', taskId: 'sso' }, 200),
+      e('file.changed', { path: 'src/auth.ts', contentHash: 'h-auth-1', changeType: 'modified', sessionId: 'claude-s', taskId: 'sso' }, 190),
+      ...Array.from({ length: 6 }, (_, index) =>
+        e('memory.recorded', { id: `sso-${index}`, kind: 'decision', title: `SSO choice ${index + 1}`, body: 'Follow the identity provider defaults.', taskId: 'sso', anchors: { 'file:src/auth.ts': 'h-auth-1' } }, 180 - index, 'agent-reported', 'mcp'),
+      ),
+      e('session.ended', { sessionId: 'claude-s', summary: 'Login redirects work.' }, 150, 'agent-reported'),
+    ],
+    resumingSession: { sessionId: 'claude-t', agent: 'claude-code' },
+    questions: [
+      { id: 'search', ask: 'Can a webhook be delivered twice safely? Who says so, and for which task was it decided?', expect: [/idempotency/i, /invoice/i], section: '', tool: { name: 'search_memory', query: 'idempotency' }, inBriefing: [/1 record matches "idempotency"/, /\[agent-reported\] decision: Retries are safe/, /checks the idempotency key before it writes/, /task "Invoice export"/, /anchored to src\/webhooks\.ts/] },
+      { id: 'ranked', ask: 'Which recorded decision matters most for handling a webhook that is retried?', expect: [/retries are safe|idempotency/i], section: '', tool: { name: 'get_context', query: 'webhook retries idempotency' }, inBriefing: [/^[^\n]*\n- [^\n]*Task "Add single sign-on"[^\n]*\n- \([^)]*matches "webhook", "retries", "idempotency"[^)]*\) \[agent-reported\] decision: Retries are safe/] },
     ],
   },
 ]

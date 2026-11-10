@@ -5,7 +5,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
 import { pipeline } from 'node:stream'
-import { NotFoundError, type ContinuumService, type MemoryReview, type NewMemory, type NewTask, type TaskChange } from '@continuum/core'
+import { ACTIVITY_TYPES, AGENTS, MAX_REDACT_PATTERNS, MAX_REDACTION_SAMPLE_CHARS, NotFoundError, type RepositorySettings, type ActivityQuery, type ActivityType, type AgentType, type ContinuumService, type MemoryReview, type NewMemory, type NewTask, type TaskChange } from '@continuum/core'
+import { InvalidConfigError, InvalidProfileError, InvalidSettingsError } from '@continuum/capture'
 import { InvalidMemoryError, InvalidTaskChangeError } from '@continuum/context'
 import type { ChangeFeed } from './changeFeed'
 import { ProjectUnavailableError } from './localService'
@@ -16,6 +17,7 @@ const MAX_QUERY_CHARS = 200
 const TOKEN_BYTES = 24
 const TOKEN_PARAM = 'token'
 const EVENTS_PATH = '/api/events'
+const REPORT_PATH = '/api/report'
 /** Header carrying the per-run CSRF token on writes from the dashboard. */
 export const CSRF_HEADER = 'x-continuum-csrf'
 /** The longest write is a record's text; anything bigger than it can be is refused unread. */
@@ -61,6 +63,14 @@ export interface DaemonOptions {
   onError?: (error: unknown) => void
   /** Pushes "something was recorded" to open dashboards; without it they refresh on a timer. */
   changes?: ChangeFeed
+  /** Builds what "Report a problem" hands to GitHub; without it the dashboard links to the issue list. */
+  report?: () => Promise<ProblemReport>
+}
+
+/** `continuum doctor --report`, and a link that opens a new issue with it filled in. */
+export interface ProblemReport {
+  markdown: string
+  issueUrl: string
 }
 
 export interface RunningDaemon {
@@ -73,14 +83,36 @@ export interface RunningDaemon {
 
 type Handler = (service: ContinuumService, params: Record<string, string>, query: URLSearchParams) => Promise<unknown>
 
+const KNOWN_AGENTS = new Set<string>(AGENTS.map((agent) => agent.id))
+const KNOWN_ACTIVITY_TYPES = new Set<string>(ACTIVITY_TYPES)
+
+/** The query as the address carries it. Anything that is not what it should be is left out, never passed on. */
+function parseActivityQuery(query: URLSearchParams): ActivityQuery {
+  const whole = (name: string) => {
+    const value = Number(query.get(name))
+    return query.has(name) && Number.isSafeInteger(value) && value > 0 ? value : undefined
+  }
+  const time = (name: string) => {
+    const value = Date.parse(query.get(name) ?? '')
+    return Number.isNaN(value) ? undefined : new Date(value).toISOString()
+  }
+  const type = query.get('type') ?? ''
+  const agent = query.get('agent') ?? ''
+  const parsed = { before: whole('before'), limit: whole('limit'), type: KNOWN_ACTIVITY_TYPES.has(type) ? (type as ActivityType) : undefined, agent: KNOWN_AGENTS.has(agent) ? (agent as AgentType) : undefined, from: time('from'), to: time('to') }
+  return Object.fromEntries(Object.entries(parsed).filter(([, value]) => value !== undefined))
+}
+
 const ROUTES: readonly (readonly [RegExp, Handler])[] = [
   [/^\/api\/overview$/, (service) => service.getOverview()],
   [/^\/api\/projects$/, (service) => service.listProjects()],
   [/^\/api\/tasks$/, (service) => service.listTasks()],
   [/^\/api\/activity$/, (service) => service.listActivity()],
   [/^\/api\/projects\/(?<id>[^/]+)\/workspace$/, (service, params) => service.getWorkspace(params.id)],
+  [/^\/api\/projects\/(?<id>[^/]+)\/activity$/, (service, params, query) => service.listActivityPage(params.id, parseActivityQuery(query))],
+  [/^\/api\/projects\/(?<id>[^/]+)\/settings$/, (service, params) => service.getSettings(params.id)],
   [/^\/api\/projects\/(?<id>[^/]+)\/graph$/, (service, params) => service.getMemoryGraph(params.id)],
   [/^\/api\/projects\/(?<id>[^/]+)\/briefing$/, (service, params) => service.getBriefing(params.id)],
+  [/^\/api\/profile$/, (service) => service.getProfile()],
   [/^\/api\/search$/, (service, _params, query) => service.search((query.get('q') ?? '').slice(0, MAX_QUERY_CHARS))],
 ]
 
@@ -170,6 +202,16 @@ function handleEvents(request: IncomingMessage, response: ServerResponse, change
   })
 }
 
+async function handleReport(report: DaemonOptions['report'], response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
+  if (!report) return fail(response, 404, 'not-found', 'No problem report is available.')
+  try {
+    return send(response, 200, { data: await report() })
+  } catch (error) {
+    onError?.(error)
+    return fail(response, 500, 'internal', 'Continuum could not build the report. Run `continuum doctor --report` in a terminal instead.')
+  }
+}
+
 async function handleApi(service: ContinuumService, url: URL, response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
   if (url.pathname === '/api/health') return send(response, 200, { data: { ok: true, mode: 'local' } })
   for (const [pattern, handler] of ROUTES) {
@@ -186,6 +228,9 @@ async function handleApi(service: ContinuumService, url: URL, response: ServerRe
     } catch (error) {
       if (error instanceof NotFoundError) return fail(response, 404, 'not-found', error.message)
       if (error instanceof ProjectUnavailableError) return fail(response, 503, 'unavailable', error.message)
+      // The message names the file to fix and nothing else.
+      if (error instanceof InvalidProfileError) return fail(response, 422, 'invalid-profile', error.message)
+      if (error instanceof InvalidConfigError) return fail(response, 422, 'invalid-config', error.message)
       onError?.(error)
       return fail(response, 500, 'internal', 'Continuum could not read this repository. See the terminal running `continuum serve` for details.')
     }
@@ -283,6 +328,23 @@ function parseReview(body: unknown): MemoryReview | null {
   return isObject(body) && (body.verdict === 'resolved' || body.verdict === 'still-valid') ? body.verdict : null
 }
 
+function parseProfile(body: unknown): string[] | null {
+  return isObject(body) && Array.isArray(body.preferences) && body.preferences.every((preference) => typeof preference === 'string') ? (body.preferences as string[]) : null
+}
+
+/** Any object: which settings it may name, and of what kind, is checked where they are saved, with a reason for the person. */
+function parseSettings(body: unknown): Partial<RepositorySettings> | null {
+  return isObject(body) ? (body as Partial<RepositorySettings>) : null
+}
+
+/** One more pattern than can be saved: the one being typed. */
+function parsePreview(body: unknown): { patterns: string[]; sample: string } | null {
+  if (!isObject(body) || typeof body.sample !== 'string' || body.sample.length > MAX_REDACTION_SAMPLE_CHARS) return null
+  const { patterns, sample } = body
+  if (!Array.isArray(patterns) || patterns.length > MAX_REDACT_PATTERNS + 1 || !patterns.every((pattern) => typeof pattern === 'string')) return null
+  return { patterns: patterns as string[], sample }
+}
+
 interface Write {
   route: RegExp
   /** Null when the body is not what this write accepts. */
@@ -301,6 +363,9 @@ function write<T>(route: RegExp, parse: (body: unknown) => T | null, run: (servi
 
 /** Everything the dashboard can write. All of it goes through the same access, origin and CSRF checks. */
 const WRITES: readonly Write[] = [
+  write(/^\/api\/projects\/(?<project>[^/]+)\/settings$/, parseSettings, (service, { project }, input) => service.updateSettings(project, input)),
+  write(/^\/api\/projects\/(?<project>[^/]+)\/settings\/preview$/, parsePreview, (service, { project }, input) => service.previewRedaction(project, input.patterns, input.sample)),
+  write(/^\/api\/profile$/, parseProfile, (service, _params, input) => service.updateProfile(input)),
   write(/^\/api\/projects\/(?<project>[^/]+)\/tasks$/, parseNewTask, (service, { project }, input) => service.createTask(project, input)),
   write(/^\/api\/projects\/(?<project>[^/]+)\/tasks\/(?<task>[^/]+)$/, parseTaskChange, (service, { project, task }, input) => service.updateTask(project, task, input)),
   write(/^\/api\/projects\/(?<project>[^/]+)\/memory$/, parseNewMemory, (service, { project }, input) => service.addMemory(project, input)),
@@ -310,9 +375,9 @@ const WRITES: readonly Write[] = [
 async function handleWrite(service: ContinuumService, url: URL, request: IncomingMessage, response: ServerResponse, onError?: (error: unknown) => void): Promise<void> {
   const target = WRITES.find(({ route }) => route.test(url.pathname))
   const match = target?.route.exec(url.pathname)
-  if (!target || !match?.groups) return fail(response, 404, 'not-found', `No API route ${url.pathname}`)
+  if (!target || !match) return fail(response, 404, 'not-found', `No API route ${url.pathname}`)
   const params: Record<string, string> = {}
-  for (const [key, raw] of Object.entries(match.groups)) {
+  for (const [key, raw] of Object.entries(match.groups ?? {})) {
     const decoded = safeDecode(raw)
     if (decoded === null) return fail(response, 400, 'bad-request', 'Malformed path.')
     params[key] = decoded
@@ -330,7 +395,7 @@ async function handleWrite(service: ContinuumService, url: URL, request: Incomin
     return send(response, 200, { data: await result })
   } catch (error) {
     if (error instanceof NotFoundError) return fail(response, 404, 'not-found', error.message)
-    if (error instanceof InvalidTaskChangeError || error instanceof InvalidMemoryError) return fail(response, 400, 'bad-request', error.message)
+    if (error instanceof InvalidTaskChangeError || error instanceof InvalidMemoryError || error instanceof InvalidProfileError || error instanceof InvalidSettingsError || error instanceof InvalidConfigError) return fail(response, 400, 'bad-request', error.message)
     if (error instanceof ProjectUnavailableError) return fail(response, 503, 'unavailable', error.message)
     onError?.(error)
     return fail(response, 500, 'internal', 'Continuum could not record the change. See the terminal running `continuum serve` for details.')
@@ -370,7 +435,7 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
       if (!isTrustedRequest(request, port())) return fail(response, 403, 'forbidden', 'Requests must come from the Continuum dashboard on this machine.')
       const url = new URL(request.url ?? '/', `http://${LOOPBACK}`)
       const isWrite = request.method === 'POST' && WRITES.some(({ route }) => route.test(url.pathname))
-      if (request.method !== 'GET' && request.method !== 'HEAD' && !isWrite) return fail(response, 405, 'method-not-allowed', 'Only tasks and memory records can be written; everything else is read-only.')
+      if (request.method !== 'GET' && request.method !== 'HEAD' && !isWrite) return fail(response, 405, 'method-not-allowed', 'Only tasks, memory records, settings and your profile can be written; everything else is read-only.')
       const isApi = url.pathname === '/api' || url.pathname.startsWith('/api/')
       const access = authorize(request, response, url, options.token, port())
       if (access === 'redirected') return
@@ -382,6 +447,7 @@ export function createDaemonServer(options: DaemonOptions, port: () => number): 
         return handleWrite(options.service, url, request, response, options.onError)
       }
       if (url.pathname === EVENTS_PATH) return handleEvents(request, response, options.changes)
+      if (url.pathname === REPORT_PATH) return handleReport(options.report, response, options.onError)
       if (isApi) return handleApi(options.service, url, response, options.onError)
       if (!staticRoot) return fail(response, 404, 'not-found', 'The dashboard is not built. Run `npm run build` in the Continuum checkout.')
       return handleStatic(staticRoot, url, response, csrfToken)

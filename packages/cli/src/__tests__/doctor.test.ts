@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
+import { doctorCommand } from '../commands/doctor'
 import { setupCommand } from '../commands/setup'
 import { checkNode, runDoctor, type Finding } from '../doctor'
 import { selfInvocation } from '../invocation'
@@ -183,6 +184,57 @@ describe('continuum doctor --report', () => {
 
   it('refuses other arguments', async () => {
     expect((await cli(sandbox().root, ['doctor', '--bogus'])).code).toBe(EXIT_USAGE)
+    expect((await cli(sandbox().root, ['doctor', '--open'])).code).toBe(EXIT_USAGE)
+  })
+})
+
+describe('reporting a problem from doctor', () => {
+  const recordingIo = (cwd: string) => {
+    const out: string[] = []
+    return { out, io: { ...io(cwd), out: (line: string) => out.push(line) } as Parameters<typeof doctorCommand>[0] }
+  }
+
+  it('ends a failing run with the one command that opens a pre-filled issue', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const result = await cli(repo.root, ['doctor'])
+    expect(result.code).toBe(EXIT_FAILURE)
+    expect(result.out).toContain('continuum doctor --report --open')
+    expect(result.out).toContain('https://github.com/PranavOaR/continuum-plugin/issues')
+  })
+
+  it('says nothing about reporting when everything works', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['setup', 'claude-code'])
+    expect((await cli(repo.root, ['doctor'])).out).not.toContain('--report --open')
+  })
+
+  it('--report --open hands the browser a new issue with the scrubbed report in it', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const opened: string[] = []
+    const { io: recording, out } = recordingIo(repo.root)
+    const code = await doctorCommand(recording, ['--report', '--open'], selfInvocation(), '/nowhere', async (url) => void opened.push(url))
+
+    expect(code).toBe(EXIT_OK)
+    expect(opened).toHaveLength(1)
+    const body = new URL(opened[0]).searchParams.get('body') ?? ''
+    expect(body).toContain('## Continuum diagnostic report')
+    expect(body).not.toContain(repo.root)
+    expect(out.join('\n')).toMatch(/Nothing is submitted until you press/)
+  })
+
+  it('prints the link when no browser can be opened', async () => {
+    const repo = sandbox()
+    await cli(repo.root, ['init'])
+    const { io: recording, out } = recordingIo(repo.root)
+    const code = await doctorCommand(recording, ['--report', '--open'], selfInvocation(), '/nowhere', async () => {
+      throw new Error('xdg-open was not found')
+    })
+
+    expect(code).toBe(EXIT_OK)
+    expect(out.join('\n')).toContain('xdg-open was not found')
+    expect(out.join('\n')).toContain('https://github.com/PranavOaR/continuum-plugin/issues/new?')
   })
 })
 
