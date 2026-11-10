@@ -6,7 +6,7 @@ import type { AddressInfo } from 'node:net'
 import { extname, join, resolve, sep } from 'node:path'
 import { pipeline } from 'node:stream'
 import { ACTIVITY_TYPES, AGENTS, MAX_REDACT_PATTERNS, MAX_REDACTION_SAMPLE_CHARS, NotFoundError, type RepositorySettings, type ActivityQuery, type ActivityType, type AgentType, type ContinuumService, type MemoryReview, type NewMemory, type NewTask, type TaskChange } from '@continuum/core'
-import { InvalidProfileError, InvalidSettingsError } from '@continuum/capture'
+import { InvalidConfigError, InvalidProfileError, InvalidSettingsError } from '@continuum/capture'
 import { InvalidMemoryError, InvalidTaskChangeError } from '@continuum/context'
 import type { ChangeFeed } from './changeFeed'
 import { ProjectUnavailableError } from './localService'
@@ -230,6 +230,7 @@ async function handleApi(service: ContinuumService, url: URL, response: ServerRe
       if (error instanceof ProjectUnavailableError) return fail(response, 503, 'unavailable', error.message)
       // The message names the file to fix and nothing else.
       if (error instanceof InvalidProfileError) return fail(response, 422, 'invalid-profile', error.message)
+      if (error instanceof InvalidConfigError) return fail(response, 422, 'invalid-config', error.message)
       onError?.(error)
       return fail(response, 500, 'internal', 'Continuum could not read this repository. See the terminal running `continuum serve` for details.')
     }
@@ -394,7 +395,7 @@ async function handleWrite(service: ContinuumService, url: URL, request: Incomin
     return send(response, 200, { data: await result })
   } catch (error) {
     if (error instanceof NotFoundError) return fail(response, 404, 'not-found', error.message)
-    if (error instanceof InvalidTaskChangeError || error instanceof InvalidMemoryError || error instanceof InvalidProfileError || error instanceof InvalidSettingsError) return fail(response, 400, 'bad-request', error.message)
+    if (error instanceof InvalidTaskChangeError || error instanceof InvalidMemoryError || error instanceof InvalidProfileError || error instanceof InvalidSettingsError || error instanceof InvalidConfigError) return fail(response, 400, 'bad-request', error.message)
     if (error instanceof ProjectUnavailableError) return fail(response, 503, 'unavailable', error.message)
     onError?.(error)
     return fail(response, 500, 'internal', 'Continuum could not record the change. See the terminal running `continuum serve` for details.')

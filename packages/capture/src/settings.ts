@@ -26,7 +26,8 @@ function parseChange(change: Readonly<Record<string, unknown>>): Partial<Continu
 /**
  * Saves a change to a repository's settings from the dashboard. A redaction
  * pattern being added is refused, with its reason, when it will not compile,
- * matches empty text or could hang; patterns already saved are left as they are.
+ * matches empty text or could hang. A config that already holds such a
+ * pattern is refused too, as capture refuses it, until it is fixed by hand.
  */
 export async function saveSettings(root: string, change: Readonly<Record<string, unknown>>): Promise<ContinuumConfig> {
   const parsed = parseChange(change)

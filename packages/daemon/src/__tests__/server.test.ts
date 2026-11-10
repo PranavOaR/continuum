@@ -3,7 +3,7 @@ import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NotFoundError, type ContinuumService, type MemoryRecord, type ProjectTask, type TaskField } from '@continuum/core'
-import { InvalidProfileError, InvalidSettingsError } from '@continuum/capture'
+import { InvalidConfigError, InvalidProfileError, InvalidSettingsError } from '@continuum/capture'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PortInUseError, startDaemon, type RunningDaemon } from '../server'
 
@@ -45,7 +45,10 @@ const fakeService: ContinuumService = {
     edits.push({ projectId, input })
     return memory(projectId, 'acme~memory~new')
   },
-  getSettings: async () => ({ agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: [] }),
+  getSettings: async (projectId) => {
+    if (projectId === 'broken') throw new InvalidConfigError('/repo/.continuum/config.json', 'a redactPatterns entry cannot be used (\\w+\\w+@: It has two repeats in a row)')
+    return { agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: [] }
+  },
   updateSettings: async (projectId, change) => {
     if ((change.redactPatterns ?? []).includes('(a+)+$')) throw new InvalidSettingsError('The pattern (a+)+$ was not saved. It repeats a group that itself repeats.')
     edits.push({ projectId, change })
@@ -338,6 +341,9 @@ describe('task edits', () => {
     const daemon = await startWithCsrf()
     edits.length = 0
     expect(JSON.parse((await raw(daemon, '/api/projects/acme/settings')).body).data.agentChecks).toBe(true)
+    const broken = await raw(daemon, '/api/projects/broken/settings')
+    expect(broken.status).toBe(422)
+    expect(JSON.parse(broken.body).error.message).toContain('two repeats in a row')
     const saved = await post(daemon, '/api/projects/acme/settings', JSON.stringify({ capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] }), browser(daemon))
     expect(saved.status).toBe(200)
     expect(JSON.parse(saved.body).data).toMatchObject({ capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] })

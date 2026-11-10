@@ -40,10 +40,11 @@ describe('saveSettings', () => {
     expect(await readConfig(root)).toMatchObject({ agentChecks: true, redactPatterns: ['ACME-[0-9]{6}'] })
   })
 
-  it('leaves a pattern that was already saved alone, so other settings can still change', async () => {
+  it('refuses to write over a config whose saved pattern could hang, naming it, as capture does', async () => {
     const root = await repo()
-    writeFileSync(join(root, '.continuum', 'config.json'), JSON.stringify({ redactPatterns: ['(a+)+b'] }))
-    expect((await saveSettings(root, { receipts: false, redactPatterns: ['(a+)+b'] })).receipts).toBe(false)
+    writeFileSync(join(root, '.continuum', 'config.json'), JSON.stringify({ redactPatterns: ['\\w+\\w+\\w+\\w+@'] }))
+    await expect(saveSettings(root, { receipts: false })).rejects.toThrow(/cannot be used .*two repeats in a row/i)
+    await expect(readConfig(root)).rejects.toThrow(/two repeats in a row/i)
   })
 
   it('refuses unknown settings, wrong kinds and too many patterns', async () => {

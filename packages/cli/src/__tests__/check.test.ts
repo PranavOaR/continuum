@@ -91,6 +91,15 @@ describe('continuum check', () => {
     expect((await cli(repo.root, ['check'])).out).not.toContain('README stays one page')
   })
 
+  it('never stops a commit when it cannot look, unless --strict', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    const result = await cli(repo.root, ['check'])
+    expect(result.code).toBe(EXIT_OK)
+    expect(result.err).toContain('continuum: check skipped:')
+    expect((await cli(repo.root, ['check', '--strict'])).code).not.toBe(EXIT_OK)
+  })
+
   it('refuses unknown arguments', async () => {
     expect((await cli((await repoWithDecisions()).root, ['check', '--bogus'])).code).toBe(EXIT_USAGE)
   })

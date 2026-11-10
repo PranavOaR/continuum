@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -58,7 +59,8 @@ export async function writeProfile(configDir: string, preferences: readonly stri
   const profile: Profile = { preferences: normalize(normalize(preferences).map((preference) => BUILT_IN_REDACTOR.redact(preference))) }
   await mkdir(configDir, { recursive: true, mode: PRIVATE_DIR_MODE })
   const path = profilePath(configDir)
-  const temporary = `${path}.${process.pid}.tmp`
+  // Unique per write: the dashboard's server can save twice at once.
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
   await writeFile(temporary, `${JSON.stringify({ version: PROFILE_VERSION, ...profile }, null, 2)}\n`, { mode: PRIVATE_FILE_MODE })
   await rename(temporary, path)
   return profile

@@ -1,3 +1,4 @@
+import { unusablePattern } from './patternShape'
 /**
  * Best-effort masking of credentials before anything is stored. It errs toward
  * redacting; it cannot catch every secret, so the store is also owner-only.
@@ -9,7 +10,7 @@ const SECRET_NAME = String.raw`[A-Za-z0-9_.-]{0,40}(?:token|secret|passw(?:or)?d
 /** Text is redacted in pieces of at most this many characters (split at line ends), so cost stays linear in its length. */
 const MAX_CHUNK_CHARS = 16_384
 /** Custom patterns come from a repository's config; longer ones are refused rather than risk a pathological pattern. */
-export const MAX_CUSTOM_PATTERN_CHARS = 200
+export { MAX_CUSTOM_PATTERN_CHARS } from './limits'
 
 /** Shorter values after a secret-looking name are code (TOKEN_BYTES = 24), not credentials. */
 const MIN_VALUE_LENGTH = 6
@@ -107,13 +108,9 @@ export interface Redactor {
   readonly rejectedPatterns: readonly string[]
 }
 
+/** A usable pattern compiled; null for one that is too long, invalid, matches empty text or could backtrack for minutes. */
 function compile(pattern: string): RegExp | null {
-  if (pattern.length > MAX_CUSTOM_PATTERN_CHARS) return null
-  try {
-    return new RegExp(pattern, 'g')
-  } catch {
-    return null
-  }
+  return unusablePattern(pattern) === null ? new RegExp(pattern, 'g') : null
 }
 
 /**

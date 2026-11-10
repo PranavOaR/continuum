@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ActivityEvent, ActivityQuery } from '@continuum/core'
 import { continuumService } from '../services'
 
@@ -32,26 +32,32 @@ export function useActivityHistory(projectId: string | null, filters: HistoryFil
   const [history, setHistory] = useState<History>({ key: '', events: [], nextBefore: null, isLoading: false })
   const current: History = history.key === key ? history : { key, events: [], nextBefore: null, isLoading: projectId !== null }
 
+  // Only the latest request may answer: a page asked for before the filters changed is dropped.
+  const latest = useRef(0)
+
   const load = (before: number | undefined, earlier: ActivityEvent[]) => {
-    if (projectId === null) return () => {}
-    let isCancelled = false
+    const request = ++latest.current
+    if (projectId === null) return
     setHistory({ key, events: earlier, nextBefore: null, isLoading: true })
     continuumService.listActivityPage(projectId, { ...filters, ...(before === undefined ? {} : { before }) }).then(
       (page) => {
-        if (!isCancelled) setHistory({ key, events: [...earlier, ...page.events], nextBefore: page.nextBefore, isLoading: false })
+        if (request === latest.current) setHistory({ key, events: [...earlier, ...page.events], nextBefore: page.nextBefore, isLoading: false })
       },
       (error: unknown) => {
-        if (!isCancelled) setHistory({ key, events: earlier, nextBefore: null, isLoading: false, error: error instanceof Error ? error : new Error(String(error)) })
+        if (request === latest.current) setHistory({ key, events: earlier, nextBefore: null, isLoading: false, error: error instanceof Error ? error : new Error(String(error)) })
       },
     )
-    return () => {
-      isCancelled = true
-    }
   }
 
-  // The key names everything the first page depends on.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => load(undefined, []), [key])
+  useEffect(() => {
+    load(undefined, [])
+    // Leaving the page, or changing project, drops whatever is still on its way.
+    return () => {
+      latest.current += 1
+    }
+    // The key names everything the first page depends on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
 
   return {
     events: current.events,

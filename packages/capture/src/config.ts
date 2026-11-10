@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { CONTINUUM_DIR } from './git'
-import { createRedactor, MAX_CUSTOM_PATTERN_CHARS, type Redactor } from './redact'
+import { unusablePattern } from './patternShape'
+import { createRedactor, type Redactor } from './redact'
 
 export const CONFIG_FILE = 'config.json'
 
@@ -54,11 +56,13 @@ async function readRawConfig(root: string): Promise<RawConfig> {
   if (patterns !== undefined && !(Array.isArray(patterns) && patterns.every((pattern) => typeof pattern === 'string'))) {
     throw new InvalidConfigError(path, 'redactPatterns must be a list of strings')
   }
-  // A pattern that cannot be used would mask nothing, so what it was meant to hide would be stored.
-  const { rejectedPatterns } = createRedactor((patterns as string[] | undefined) ?? [])
-  if (rejectedPatterns.length > 0) {
-    throw new InvalidConfigError(path, `redactPatterns must be valid regular expressions of at most ${MAX_CUSTOM_PATTERN_CHARS} characters (not: ${rejectedPatterns.join(', ')})`)
-  }
+  // A pattern that cannot be used would mask nothing, so what it was meant to hide would be stored;
+  // one that could backtrack for minutes would freeze every hook that applies it.
+  const unusable = ((patterns as string[] | undefined) ?? []).flatMap((pattern) => {
+    const reason = unusablePattern(pattern)
+    return reason ? [`${pattern}: ${reason}`] : []
+  })
+  if (unusable.length > 0) throw new InvalidConfigError(path, `a redactPatterns entry cannot be used (${unusable.join(' ')})`)
   return values
 }
 
@@ -86,7 +90,8 @@ export async function updateConfig(root: string, change: Partial<ContinuumConfig
   const raw = await readRawConfig(root)
   const next = { ...raw, ...withDefaults(raw), ...change }
   const path = configPath(root)
-  const temporary = `${path}.${process.pid}.tmp`
+  // Unique per write: the dashboard's server can save twice at once.
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
   await writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 })
   await rename(temporary, path)
   return withDefaults(next)
