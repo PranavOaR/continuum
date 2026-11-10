@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fetchProblemReport, NEW_ISSUE_URL, reportLink } from '../services/problemReport'
 
-const FILLED = 'https://github.com/PranavOaR/continuum-plugin/issues/new?template=bug_report.md&body=report'
+const FILLED = 'https://github.com/PranavOaR/continuum-plugin/issues/new?template=bug_report.yml&doctor=report'
 const reply = (status: number, body: unknown) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
 
 describe('reportLink', () => {

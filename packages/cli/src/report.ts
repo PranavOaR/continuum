@@ -14,14 +14,13 @@ export const ISSUES_URL = 'https://github.com/PranavOaR/continuum-plugin/issues'
  * findings, once percent-encoded, can pass it.
  */
 export const MAX_ISSUE_URL_CHARS = 7_000
-/** The template in the plugin repository (plugin-repo/.github/ISSUE_TEMPLATE) with the same headings. */
-const ISSUE_TEMPLATE = 'bug_report.md'
+/** The bug report form in the plugin repository (plugin-repo/.github/ISSUE_TEMPLATE/bug_report.yml). */
+const ISSUE_TEMPLATE = 'bug_report.yml'
+/** The form's field for the report: GitHub fills a form's fields from query parameters named by their ids. */
+const REPORT_FIELD = 'doctor'
 const PASTE_REPORT = 'Run `npx getcontinuum doctor --report` in the project and paste what it prints here.'
 
-const issueBody = (report: string) =>
-  ['### What happened', '', '<!-- What you did, what you expected, and what happened instead. -->', '', '### Diagnostic report', '', report, ''].join('\n')
-
-const newIssueUrl = (body: string) => `${ISSUES_URL}/new?${new URLSearchParams({ template: ISSUE_TEMPLATE, body: issueBody(body) }).toString()}`
+const newIssueUrl = (report: string) => `${ISSUES_URL}/new?${new URLSearchParams({ template: ISSUE_TEMPLATE, [REPORT_FIELD]: report }).toString()}`
 
 /**
  * A link that opens a new issue with `report` already in it. Following it

@@ -416,8 +416,8 @@ test('a redaction pattern is previewed on a sample, a bad one is refused with it
 test('Settings links to a new issue with the diagnostic report filled in', async ({ page }) => {
   await page.goto(`${url}/app/settings`)
   const link = page.getByRole('link', { name: 'Report a problem' })
-  await expect(link).toHaveAttribute('href', /^https:\/\/github\.com\/PranavOaR\/continuum-plugin\/issues\/new\?template=bug_report\.md&body=/)
-  const body = new URL((await link.getAttribute('href')) as string).searchParams.get('body') ?? ''
+  await expect(link).toHaveAttribute('href', /^https:\/\/github\.com\/PranavOaR\/continuum-plugin\/issues\/new\?template=bug_report\.yml&doctor=/)
+  const body = new URL((await link.getAttribute('href')) as string).searchParams.get('doctor') ?? ''
   expect(body).toContain('## Continuum diagnostic report')
   expect(body).not.toContain(repo)
 })
