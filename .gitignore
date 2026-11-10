@@ -40,3 +40,7 @@ scripts/demo-video/film/.hyperframes
 scripts/demo-video/film/.media
 scripts/demo-video/film/.thumbnails
 scripts/demo-video/film/.waveform-cache
+
+# Written by `continuum setup`: each pins the version that machine installed
+.cursor/
+.mcp.json
