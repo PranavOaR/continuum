@@ -4,8 +4,8 @@
 // private registry (Verdaccio) on this machine, so the `cmd /c npx -y
 // getcontinuum@<version>` lines setup writes download it the way they will
 // from npm. Then every hook and MCP server each agent was given runs the way
-// that agent starts it: Claude Code (settings and plugin), Codex, Cursor and
-// VS Code. The repository lives in a folder with a space and an accent, like
+// that agent starts it: Claude Code (settings and plugin), Codex, Cursor,
+// VS Code and Antigravity CLI. The repository lives in a folder with a space and an accent, like
 // C:\Users\Jane Doe\café.
 //
 //   npm run build && npm run bundle && node scripts/windows-e2e.mjs
@@ -273,6 +273,24 @@ async function vscode(repo) {
   check('VS Code: the MCP server starts from .vscode/mcp.json', hasTools(tools), JSON.stringify(tools))
 }
 
+/** Antigravity CLI: hook commands are shell strings that name their event; the server is in .agents/mcp_config.json. */
+async function antigravity(repo) {
+  const setup = typed(`npx -y ${PACKAGE}@${VERSION} setup antigravity`, repo)
+  check('Antigravity: `npx getcontinuum setup antigravity` succeeds', setup.status === 0, setup.stderr || setup.stdout)
+  const { continuum } = readJson(join(repo, '.agents', 'hooks.json'))
+  const line = continuum.SessionStart[0].command
+  const input = JSON.stringify({ conversationId: 'agy-1', workspacePaths: [repo], transcriptPath: join(repo, 'agy.json') })
+  const viaPowerShell = exec('powershell', ['-NoProfile', '-NonInteractive', '-Command', line], { cwd: repo, input })
+  check(`Antigravity: the SessionStart hook replies under PowerShell (${viaPowerShell.ms} ms)`, viaPowerShell.status === 0 && viaPowerShell.stdout.includes('injectSteps'), viaPowerShell.stderr || viaPowerShell.stdout)
+  const viaCmd = exec('cmd', ['/d', '/s', '/c', line], { cwd: repo, input })
+  check('Antigravity: the SessionStart hook replies under cmd', viaCmd.status === 0 && viaCmd.stdout.includes('injectSteps'), viaCmd.stderr || viaCmd.stdout)
+  const stop = exec('cmd', ['/d', '/s', '/c', continuum.Stop[0].command], { cwd: repo, input })
+  check('Antigravity: the Stop hook lets the turn end', stop.status === 0 && stop.stdout.includes('"decision":"stop"'), stop.stderr || stop.stdout)
+  const server = readJson(join(repo, '.agents', 'mcp_config.json')).mcpServers.continuum
+  const tools = await mcpTools({ command: server.command, args: server.args, cwd: server.cwd })
+  check('Antigravity: the MCP server starts from .agents/mcp_config.json', hasTools(tools), JSON.stringify(tools))
+}
+
 /** The commands a user runs in a terminal. */
 async function terminal(repo) {
   const run = typed(`npx -y ${PACKAGE}@${VERSION} run --name tests -- npm test`, repo)
@@ -282,7 +300,8 @@ async function terminal(repo) {
   const doctor = typed(`npx -y ${PACKAGE}@${VERSION} doctor`, repo)
   check('Terminal: doctor reports no failures on Windows', doctor.stdout.includes('Platform: win32') && !doctor.stdout.includes('✗'), doctor.stdout)
   const handoff = typed(`npx -y ${PACKAGE}@${VERSION} handoff`, repo)
-  check('Terminal: handoff prints the briefing', handoff.status === 0 && handoff.stdout.includes('Claude Code session') && handoff.stdout.includes('`tests`'), handoff.stderr || handoff.stdout.slice(0, 800))
+  // Antigravity is the last agent this run plays, so the briefing leads with its session.
+  check('Terminal: handoff prints the briefing', handoff.status === 0 && handoff.stdout.includes('Latest: Antigravity CLI session') && handoff.stdout.includes('`tests`'), handoff.stderr || handoff.stdout.slice(0, 800))
 
   const dashboard = await new Promise((resolve) => {
     const child = spawn(`npx -y ${PACKAGE}@${VERSION} serve --port 0 --no-open`, { cwd: repo, env: ENV, shell: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
@@ -318,7 +337,7 @@ async function uninstall(repo) {
   check('Terminal: uninstall --purge succeeds', removed.status === 0, removed.stderr || removed.stdout)
   const left = execFileSync('git', ['status', '--porcelain', '--ignored'], { cwd: repo, encoding: 'utf8' }).trim().split('\n').filter(Boolean)
   // What the session itself changed stays; everything Continuum wrote is gone.
-  const continuumFiles = left.filter((line) => /\.continuum|\.claude|\.mcp\.json|\.codex|\.cursor|\.vscode|\.github/.test(line))
+  const continuumFiles = left.filter((line) => /\.continuum|\.claude|\.mcp\.json|\.codex|\.cursor|\.vscode|\.github|\.agents/.test(line))
   check('Terminal: uninstall leaves nothing of Continuum behind', continuumFiles.length === 0, left.join('\n'))
 }
 
@@ -344,6 +363,7 @@ try {
   await codex(repo)
   await cursor(repo)
   await vscode(repo)
+  await antigravity(repo)
   await terminal(repo)
   validatePlugin(pluginRoot)
   await uninstall(repo)

@@ -46,7 +46,7 @@ Order follows what users report.
 | # | Item | Done when | Size |
 |---|---|---|---|
 | 9 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
-| 11 | **More agents.** Gemini CLI, Windsurf or JetBrains Junie, in the order users ask. | Each passes `npm run test:cross-agent`. | M each |
+| 11 | **More agents.** Windsurf or JetBrains Junie, in the order users ask. Antigravity CLI, which replaced Gemini CLI, is connected; it still needs a run against the real `agy` and a place in `npm run test:cross-agent`. | Each passes `npm run test:cross-agent`. | M each |
 | 12 | **Session identity for Copilot and Cursor.** Two sessions of either agent in one repository can still cross tasks, because neither tells its MCP server which session is calling. | Fixed when either agent exposes a session id. | S |
 
 ### Only once users ask

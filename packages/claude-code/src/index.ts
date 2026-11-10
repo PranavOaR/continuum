@@ -16,6 +16,8 @@ export {
   type Invocation,
   type SetupResult,
 } from './setup'
+export { ANTIGRAVITY_EDIT_TOOLS, ANTIGRAVITY_EVENTS, antigravityOutput, fromAntigravity } from './antigravity'
+export { ANTIGRAVITY_HOOKS_FILE, ANTIGRAVITY_MCP_FILE, removeAntigravitySetup, setupAntigravity } from './antigravitySetup'
 export { CODEX_CONFIG_FILE, CODEX_HOOKS_FILE, removeCodexSetup, setupCodex } from './codexSetup'
 export { connectedAgents, connectedHookAgents } from './connectedAgents'
 export { CURSOR_MCP_FILE, CURSOR_RULE_FILE, removeCursorSetup, setupCursor } from './cursorSetup'

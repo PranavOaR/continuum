@@ -6,7 +6,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { createSandbox, type Sandbox } from '@continuum/capture/testing'
 import { afterEach, describe, expect, it } from 'vitest'
 import { setupCommand } from '../commands/setup'
-import { EXIT_USAGE } from '../io'
+import { EXIT_OK, EXIT_USAGE } from '../io'
 import { cli, NOW, TEST_CLAUDE_DIR, TEST_CONFIG_DIR } from './harness'
 
 const sandboxes: Sandbox[] = []
@@ -235,4 +235,41 @@ describe('VS Code (Copilot) session, end to end through the configured commands'
       await client.close()
     }
   }, 60_000)
+})
+
+describe('continuum setup antigravity', () => {
+  const payload = (root: string, extra: Record<string, unknown> = {}) => JSON.stringify({ conversationId: 'agy-1', workspacePaths: [root], transcriptPath: '/t.json', ...extra })
+
+  it('connects Antigravity CLI, whose hooks reply with the JSON it reads, and uninstall removes it all', async () => {
+    const repo = createSandbox({ 'src/app.ts': 'export const app = 1\n' })
+    sandboxes.push(repo)
+    const setup = await cli(repo.root, ['setup', 'antigravity'])
+    expect(setup.code).toBe(EXIT_OK)
+    expect(setup.out).toContain('Connected Antigravity CLI to Continuum')
+    expect(setup.out).toContain('.agents/hooks.json')
+    expect((await cli(repo.root, ['doctor'])).out).toContain('✓ Antigravity CLI hooks registered')
+
+    const ingest = (event: string, extra: Record<string, unknown> = {}) => cli(repo.root, ['ingest', '--agent', 'antigravity', '--event', event], { readStdin: async () => payload(repo.root, extra) })
+    expect(JSON.parse((await ingest('SessionStart')).out)).toEqual({})
+    repo.write('src/app.ts', 'export const app = 2\n')
+    expect(JSON.parse((await ingest('PostToolUse', { toolCall: { name: 'write_to_file', args: { TargetFile: join(repo.root, 'src/app.ts') } } })).out)).toEqual({})
+    expect(JSON.parse((await ingest('Stop', { fullyIdle: true })).out)).toEqual({ decision: 'stop' })
+    const next = JSON.parse((await cli(repo.root, ['ingest', '--agent', 'antigravity', '--event', 'SessionStart'], { readStdin: async () => payload(repo.root, { conversationId: 'agy-2' }) })).out)
+    expect(next.injectSteps[0].systemMessage.systemMessage).toContain('Antigravity CLI session')
+    expect(next.injectSteps[0].systemMessage.systemMessage).toContain('`src/app.ts`')
+
+    const removed = await cli(repo.root, ['uninstall'])
+    expect(removed.out).toContain('.agents/hooks.json')
+    expect(existsSync(join(repo.root, '.agents'))).toBe(false)
+  })
+
+  it('still replies, and exits 0, when the payload cannot be read', async () => {
+    const repo = createSandbox({ 'a.ts': 'a' })
+    sandboxes.push(repo)
+    await cli(repo.root, ['setup', 'antigravity'])
+    const broken = await cli(repo.root, ['ingest', '--agent', 'antigravity', '--event', 'Stop'], { readStdin: async () => 'not json' })
+    expect(broken.code).toBe(EXIT_OK)
+    expect(JSON.parse(broken.out)).toEqual({ decision: 'stop' })
+    expect(broken.err).toContain('continuum:')
+  })
 })

@@ -2,7 +2,7 @@
 
 **Your work continues. Your agents change.**
 
-Continuum is local project memory for AI coding agents. Every Claude Code, Codex, Cursor or GitHub Copilot (VS Code) session starts briefed on where the work left off:
+Continuum is local project memory for AI coding agents. Every Claude Code, Codex, Cursor, GitHub Copilot (VS Code) or Antigravity CLI session starts briefed on where the work left off:
 - the current task and its next step;
 - which test results still hold for the code as it is now;
 - what another agent or a hand edit changed;
@@ -13,7 +13,7 @@ Every claim is labelled **verified**, **observed**, **agent-reported** or **set 
 This README is for working on Continuum. **Using it?** Start at [continuumgroup.dev/docs](https://continuumgroup.dev/docs) (sources in `apps/web/src/site/docs/`), or the package's own README (`scripts/release/README.md`):
 
 ```bash
-npx getcontinuum setup claude-code   # or: setup codex, setup cursor, setup vscode
+npx getcontinuum setup claude-code   # or: setup codex, setup cursor, setup vscode, setup antigravity
 npx getcontinuum serve               # the dashboard for every connected repository
 ```
 

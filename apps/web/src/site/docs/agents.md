@@ -44,6 +44,23 @@ Open the repository in VS Code, **trust the workspace**, and start the `continuu
 
 Agent hooks are a preview in VS Code (1.109 or newer, `chat.useHooks` on), and an organization can turn them off. Without them, the instructions ask Copilot to call `get_handoff` itself. VS Code does not tell hooks a command's exit code, and it has no end-of-session event, so Copilot's own test runs are not recorded as checks and its sessions stay open. Its briefing and instructions ask it to run them as `continuum run -- <command>` instead, which records a verified result.
 
+## Antigravity CLI
+
+```bash
+npx getcontinuum setup antigravity
+```
+
+Connects Antigravity CLI (`agy`), which replaced Gemini CLI in 2026. It writes two files in the repository, never `~/.gemini`:
+- `.agents/hooks.json`: hooks, under the name `continuum`, that brief each conversation, record file edits and close each turn.
+- `.agents/mcp_config.json`: the `continuum` MCP server. It names this repository as its working directory, so it is always kept out of git.
+
+Start `agy` in the repository.
+- Each conversation starts briefed on where the work left off, including what Claude Code, Codex or a hand edit did since.
+- Its file edits (`write_to_file`, `replace_file_content`, `multi_replace_file_content`) are recorded as changes. Other tools don't start Continuum at all.
+- It can use the same MCP tools: `start_task`, `update_task`, `get_context`, `search_memory`, `record_decision`.
+
+Antigravity does not tell hooks a command's exit code, so its own test runs are not recorded as checks; its briefing asks it to run them as `continuum run -- <command>`, which records a verified result. Your prompts are not recorded from Antigravity yet, and a session's end is not either, so its sessions stay open. Antigravity does not tell Continuum's MCP server which conversation is calling, so two Antigravity conversations in one repository can cross tasks, as with Cursor and Copilot.
+
 ## Cursor
 
 ```bash

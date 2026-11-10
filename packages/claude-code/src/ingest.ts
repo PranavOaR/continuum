@@ -27,6 +27,7 @@ import { editedFiles, parseHookPayload, reportedTaskId, SHELL_TOOL, withVsCodeDe
 import { adapterSource, cleanPrompt, translateHook, type FileEdit } from './translate'
 import { replyReceipt } from './receipt'
 import { VERIFIED_RUN_HINT } from './guidance'
+import { fromAntigravity } from './antigravity'
 
 /** How this adapter's sessions are recorded; "since you left" compares with this agent's previous session. */
 const DEFAULT_AGENT: HookAgent = 'claude-code'
@@ -40,6 +41,8 @@ export interface IngestOptions {
   agent?: HookAgent
   /** Where the hook runs, for payloads that may omit `cwd` (VS Code). Defaults to the process's directory. */
   cwd?: string
+  /** The event, for agents whose payloads do not name it (Antigravity CLI passes it as `--event`). */
+  event?: string
   /** Continuum's per-user folder, whose profile a session-start briefing carries; without it there is none. */
   configDir?: string
 }
@@ -164,8 +167,9 @@ async function sessionStartContext(store: ContextStore, root: string, sessionId:
 export async function ingestHook(raw: string, options: IngestOptions = {}): Promise<IngestOutcome> {
   const now = (options.now ?? (() => new Date()))()
   const agent = options.agent ?? DEFAULT_AGENT
-  const prepare = agent === 'vscode' ? withVsCodeDefaults(options.cwd ?? process.cwd(), vsCodeSessionId) : undefined
-  if (prepare && !hasSessionId(raw, prepare)) return { status: 'ignored', reason: 'VS Code sent no session id or transcript path' }
+  const cwd = options.cwd ?? process.cwd()
+  const prepare = agent === 'vscode' ? withVsCodeDefaults(cwd, vsCodeSessionId) : agent === 'antigravity' ? fromAntigravity(options.event ?? '', cwd) : undefined
+  if (agent === 'vscode' && prepare && !hasSessionId(raw, prepare)) return { status: 'ignored', reason: 'VS Code sent no session id or transcript path' }
   const payload = parseHookPayload(raw, prepare)
   if (!payload) return { status: 'ignored', reason: 'hook event not used by Continuum' }
   const workspace = await findWorkspace(payload.cwd, agent, now)

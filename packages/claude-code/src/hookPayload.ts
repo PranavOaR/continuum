@@ -90,9 +90,10 @@ export function reportedTaskId(payload: HookPayload): string | null {
 
 /**
  * Agents whose hooks Continuum understands. Codex's hooks use the same events
- * and fields as Claude Code's; VS Code's (Copilot agent mode) nearly do, see `withVsCodeDefaults`.
+ * and fields as Claude Code's; VS Code's (Copilot agent mode) nearly do, see `withVsCodeDefaults`;
+ * Antigravity CLI's are translated, see `fromAntigravity`.
  */
-export type HookAgent = 'claude-code' | 'codex' | 'vscode'
+export type HookAgent = 'claude-code' | 'codex' | 'vscode' | 'antigravity'
 
 /** Codex edits files through one tool whose input is a patch naming every file it touches; Copilot in VS Code has one too. */
 export const PATCH_TOOL = 'apply_patch'

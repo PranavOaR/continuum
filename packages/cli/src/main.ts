@@ -51,7 +51,8 @@ Commands
                        for a pre-commit hook; exits 0 unless --strict
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   session start|note|end  Record a session for an agent without hooks (Cursor, a chat)
-  setup <agent>        Connect claude-code, codex, cursor or vscode to this repository (--remove to undo)
+  setup <agent>        Connect claude-code, codex, cursor, vscode or antigravity to this repository
+                       (--remove to undo)
   config [name on|off] Show or change settings: agent-checks, prompts
   profile [add|remove] Your preferences for every repository ("Use pnpm"), kept on
                        this machine and carried by every briefing
