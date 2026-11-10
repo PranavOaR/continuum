@@ -1,4 +1,4 @@
-export { liveHashes, projectState, type CheckSummary, type DecisionSummary, type ProjectState, type SessionSummary } from './projectState'
+export { liveHashes, projectState, type ChangedBy, type ChangedSince, type CheckSummary, type DecisionSummary, type ProjectState, type SessionSummary } from './projectState'
 export { DEFAULT_HANDOFF_CHARS, renderHandoff, type HandoffOptions } from './handoff'
 export { agoFromIso, formatAgo } from './time'
 export { isQuiet, sinceYouLeft, type SinceYouLeft } from './sinceYouLeft'

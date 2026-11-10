@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { AGENTS, evidenceTag } from '@continuum/core'
-import type { CheckSummary, DecisionSummary, ProjectState, SessionSummary } from './projectState'
+import type { ChangedSince, CheckSummary, DecisionSummary, ProjectState, SessionSummary } from './projectState'
 import { isQuiet, type SinceYouLeft } from './sinceYouLeft'
 import { isYourTask, type TaskSummary } from './tasks'
 import { agoFromIso } from './time'
@@ -132,11 +132,31 @@ const NEXT_STEP = /\bnext(?:\s+steps?)?(?:\s*:|\s+[\u2013\u2014-]\s)\s*(\S.*)$/i
  * With no task (a task carries its own next action), the next step the most
  * recent note names, newest session first. Agent-reported, and it says whose.
  */
+/** How a briefing names who changed a file since: "(outside an agent session)", "(by a Codex session)", "(deleted)". */
+function changedByLabel(change: ChangedSince): string {
+  if (change.by.kind === 'deleted') return 'deleted'
+  return change.by.kind === 'outside' ? 'outside an agent session' : `by a ${agentName(change.by.agent)} session`
+}
+
+const changedAgain = (changes: readonly ChangedSince[]) => {
+  const shown = changes.slice(0, MAX_LISTED).map((change) => `${code(change.path)} (${changedByLabel(change)})`).join(', ')
+  return changes.length > MAX_LISTED ? `${shown} and ${changes.length - MAX_LISTED} more` : shown
+}
+
+/** One short clause for a list of earlier sessions: "`a.ts` changed outside an agent session, `b.ts` was deleted". */
+const changedAgainBriefly = (changes: readonly ChangedSince[]) =>
+  changes
+    .slice(0, MAX_LISTED)
+    .map((change) => `${code(change.path)} ${change.by.kind === 'deleted' ? 'was deleted' : `changed ${changedByLabel(change)}`}`)
+    .join(', ') + (changes.length > MAX_LISTED ? ` and ${changes.length - MAX_LISTED} more` : '')
+
 function nextStepSection(state: ProjectState, now: Date): string[] {
   if (state.tasks.some((task) => task.id === state.currentTaskId)) return []
   for (const session of state.sessions) {
     const named = session.note ? NEXT_STEP.exec(session.note)?.[1] : undefined
-    if (named) return ['## Next step', `[agent-reported] ${quote(named, 300)} (from the ${agentName(session.agent)} session, last active ${agoFromIso(session.lastActivityAt, now)})`]
+    if (!named) continue
+    const stale = session.changedSince.length > 0 ? [`[observed] ${listPaths(session.changedSince.map((change) => change.path))} changed since that note.`] : []
+    return ['## Next step', `[agent-reported] ${quote(named, 300)} (from the ${agentName(session.agent)} session, last active ${agoFromIso(session.lastActivityAt, now)})`, ...stale]
   }
   return []
 }
@@ -151,6 +171,11 @@ function leftOffSection(state: ProjectState, now: Date): string[] {
     const files = latest.filesChanged.map((file) => (file.exists ? code(file.path) : `${code(file.path)} (since deleted)`))
     const shown = files.slice(0, MAX_LISTED).join(', ')
     lines.push(`Files it changed: ${files.length > MAX_LISTED ? `${shown} and ${files.length - MAX_LISTED} more` : shown}`)
+  }
+  if (latest.changedSince.length > 0) {
+    // What an agent said about code that has moved on is the claim most likely to mislead the next one.
+    const check = latest.note ? ' Check the note against the code before relying on it.' : ''
+    lines.push(`[observed] Since then, files this session changed were changed again: ${changedAgain(latest.changedSince)}.${check}`)
   }
   return [...lines, ...commitLines(state, now, latest.startedAt)]
 }
@@ -257,7 +282,8 @@ function earlierSection(state: ProjectState, now: Date): string[] {
     '## Earlier sessions',
     ...earlier.map((session) => {
       const note = session.note ? `: ${quote(session.note, 200)}` : ''
-      return `- ${describeSession(session, now)}${note}`
+      const stale = session.changedSince.length > 0 ? ` (since then ${changedAgainBriefly(session.changedSince)})` : ''
+      return `- ${describeSession(session, now)}${note}${stale}`
     }),
   ]
 }

@@ -28,6 +28,20 @@ export interface SessionSummary {
   /** The person's last prompt in this session, when prompt capture is on. */
   prompt: string | null
   filesChanged: { path: string; exists: boolean }[]
+  /**
+   * Files this session changed that are no longer as it left them: changed by
+   * hand or by another session, or deleted. Its note may describe code that
+   * has moved on, so a briefing says so beside it.
+   */
+  changedSince: ChangedSince[]
+}
+
+/** Who changed a file after the session that changed it before. */
+export type ChangedBy = { kind: 'outside' } | { kind: 'deleted' } | { kind: 'session'; agent: string }
+
+export interface ChangedSince {
+  path: string
+  by: ChangedBy
 }
 
 export interface CheckSummary {
@@ -147,6 +161,21 @@ function outsideSessions(store: ContextStore, sessions: readonly GraphNode[]): P
     .map((node) => ({ path: pathOf(node.key), changeType: text(node.props.changeType) ?? 'modified', at: node.updatedAt }))
 }
 
+/**
+ * Whether a file this session changed is still as it left it. The file's node
+ * holds its latest recorded hash and the session that recorded it, and the
+ * working tree holds what is on disk now, recorded or not; nothing else is read.
+ */
+function changedAfter(store: ContextStore, sessionId: string, path: string, tree: WorkingTree): ChangedBy | null {
+  const file = store.graph.get(keys.file(path))
+  const onDisk = tree.files.get(path) ?? null
+  const changedBy = text(file?.props.changedBy)
+  if (changedBy === sessionId && (file?.hash ?? null) === onDisk) return null
+  if (onDisk === null) return { kind: 'deleted' }
+  if (changedBy !== null && changedBy !== sessionId) return { kind: 'session', agent: text(store.graph.get(keys.session(changedBy))?.props.agent) ?? 'unknown' }
+  return { kind: 'outside' }
+}
+
 function summarizeSession(store: ContextStore, node: GraphNode, tree: WorkingTree): SessionSummary {
   const filesChanged = store.graph
     .neighbors(node.key, { direction: 'out', types: ['modified'] })
@@ -164,6 +193,10 @@ function summarizeSession(store: ContextStore, node: GraphNode, tree: WorkingTre
     note: text(node.props.summary) ?? text(node.props.lastNote),
     prompt: text(node.props.lastPrompt),
     filesChanged,
+    changedSince: filesChanged.flatMap(({ path }) => {
+      const by = changedAfter(store, node.key.slice('session:'.length), path, tree)
+      return by ? [{ path, by }] : []
+    }),
   }
 }
 
