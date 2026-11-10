@@ -13,12 +13,14 @@ import { initCommand } from './commands/init'
 import { mcpCommand } from './commands/mcp'
 import { RUN_USAGE, runCommand } from './commands/run'
 import { scanCommand } from './commands/scan'
+import { searchCommand } from './commands/search'
 import { sessionCommand } from './commands/session'
 import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
 import { uninstallCommand } from './commands/uninstall'
+import { whyCommand } from './commands/why'
 import { printBanner } from './banner'
 import { VERSION } from './build'
 import { selfInvocation } from './invocation'
@@ -40,6 +42,8 @@ Commands
   run -- <command>     Run a check (tests, lint, build) and record it as verified
                        ${RUN_USAGE.replace('Usage: ', '')}
   handoff              Print where the project left off, for any agent or chat
+  search <words ...>   Search recorded decisions, issues, tasks and session notes
+  why <file[#symbol]>  Show the decisions, tasks and checks behind a piece of code
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
   session start|note|end  Record a session for an agent without hooks (Cursor, a chat)
   setup <agent>        Connect claude-code, codex, cursor or vscode to this repository (--remove to undo)
@@ -74,6 +78,8 @@ const COMMANDS: Record<string, Command> = {
   status: (io) => statusCommand(io),
   run: (io, args) => runCommand(io, args),
   handoff: (io, args) => handoffCommand(io, args),
+  search: (io, args) => searchCommand(io, args),
+  why: (io, args) => whyCommand(io, args),
   serve: async (io, args) => serveCommand(io, args, VERSION, await serveWorkerOptions()),
   session: (io, args) => sessionCommand(io, args),
   setup: (io, args) => setupCommand(io, args, selfInvocation()),

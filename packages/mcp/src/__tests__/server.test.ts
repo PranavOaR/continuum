@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -50,9 +50,50 @@ describe('Continuum MCP server', () => {
   it('lists its tools with read-only hints on the read tools', async () => {
     const client = await connect((await initializedRepo()).root)
     const { tools } = await client.listTools()
-    expect(tools.map((tool) => tool.name).sort()).toEqual(['get_context', 'get_handoff', 'get_project_state', 'record_decision', 'start_task', 'update_task'])
+    expect(tools.map((tool) => tool.name).sort()).toEqual(['get_context', 'get_handoff', 'get_project_state', 'record_decision', 'search_memory', 'start_task', 'update_task'])
+    expect(tools.find((tool) => tool.name === 'search_memory')?.annotations?.readOnlyHint).toBe(true)
     expect(tools.find((tool) => tool.name === 'get_handoff')?.annotations?.readOnlyHint).toBe(true)
     expect(tools.find((tool) => tool.name === 'record_decision')?.annotations?.readOnlyHint).toBe(false)
+  })
+
+  it('search_memory finds a decision recorded on an earlier task by a word in its body', async () => {
+    const repo = await initializedRepo()
+    const client = await connect(repo.root)
+    await client.callTool({ name: 'start_task', arguments: { title: 'Billing webhooks' } })
+    await client.callTool({ name: 'record_decision', arguments: { title: 'Retries are safe', body: 'Handlers check the idempotency key before writing.', files: ['src/db.ts'] } })
+    await client.callTool({ name: 'update_task', arguments: { status: 'completed' } })
+    await client.callTool({ name: 'start_task', arguments: { title: 'Google sign-in' } })
+
+    const found = text(await client.callTool({ name: 'search_memory', arguments: { query: 'idempotency' } }))
+    expect(found).toContain('1 record matches "idempotency"')
+    expect(found).toContain('[agent-reported] decision: Retries are safe')
+    expect(found).toContain('task "Billing webhooks"')
+    expect(found).toContain('anchored to src/db.ts')
+    expect(text(await client.callTool({ name: 'search_memory', arguments: { query: 'kubernetes' } }))).toContain('Nothing recorded matches "kubernetes"')
+    expect((await client.callTool({ name: 'search_memory', arguments: { query: '  ' } })).isError).toBe(true)
+  })
+
+  it("search_memory masks results with today's redaction patterns and hides anchors .continuumignore lists", async () => {
+    const repo = await initializedRepo()
+    const client = await connect(repo.root)
+    await client.callTool({ name: 'record_decision', arguments: { title: 'Customer ACME-123456 needs webhooks', body: 'Agreed on the call.', files: ['src/db.ts'] } })
+    writeFileSync(join(repo.root, '.continuum', 'config.json'), JSON.stringify({ redactPatterns: ['ACME-[0-9]{6}'] }))
+    writeFileSync(join(repo.root, '.continuumignore'), 'src/db.ts\n')
+
+    const found = text(await client.callTool({ name: 'search_memory', arguments: { query: 'webhooks ACME-123456' } }))
+    expect(found).toContain('Customer [redacted] needs webhooks')
+    expect(found).not.toContain('ACME-123456')
+    expect(found).not.toContain('src/db.ts')
+  })
+
+  it('get_context lifts a decision that holds the words of the query', async () => {
+    const repo = await initializedRepo()
+    const client = await connect(repo.root)
+    await client.callTool({ name: 'record_decision', arguments: { title: 'Retries are safe', body: 'Handlers check the idempotency key.' } })
+    await client.callTool({ name: 'record_decision', arguments: { title: 'Use pnpm', body: 'Workspaces.' } })
+    const ranked = text(await client.callTool({ name: 'get_context', arguments: { query: 'idempotency' } }))
+    expect(ranked).toMatch(/matches "idempotency"; project-wide\) \[agent-reported\] decision: Retries are safe/)
+    expect(ranked.indexOf('Retries are safe')).toBeLessThan(ranked.indexOf('Use pnpm'))
   })
 
   it('returns ranked context within a token budget', async () => {

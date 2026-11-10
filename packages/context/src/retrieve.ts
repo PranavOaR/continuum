@@ -1,5 +1,5 @@
 import { CHARS_PER_TOKEN, evidenceTag, type EvidenceType } from '@continuum/core'
-import { anchoredPath, type ContextStore } from '@continuum/store'
+import { anchoredPath, keys, searchGraph, type ContextStore } from '@continuum/store'
 import type { ProjectState } from './projectState'
 import { isYourTask, type TaskSummary } from './tasks'
 import { agoFromIso } from './time'
@@ -23,6 +23,10 @@ const EVIDENCE_WEIGHT: Record<EvidenceType, number> = {
 const RELEVANCE = { task: 1, linked: 0.8, project: 0.35 } as const
 /** Items that need doing something about outrank merely informative ones. */
 const ACTIONABLE_BOOST = 0.5
+/** Added to a record holding every word of the query; one holding half of them gets half. */
+const QUERY_BOOST = 1
+/** Records considered for a query; the ranking only lifts ones that are already candidates. */
+const MAX_QUERY_MATCHES = 200
 
 export interface ContextItem {
   kind: 'task' | 'check' | 'decision' | 'session' | 'change' | 'commit'
@@ -66,14 +70,35 @@ function decisionAnchors(store: ContextStore): Map<string, string[]> {
  * Every piece of recorded context, scored for one task: how closely it is tied
  * to the task in the graph, how much its evidence can be trusted, how recent it
  * is, and whether it needs action (a failing or out-of-date check, a decision
- * whose code changed). Highest first.
+ * whose code changed). With a `query`, a decision or session note holding its
+ * words is lifted, so an on-topic record from another task is not buried.
+ * Highest first.
  */
-export function rankContext(store: ContextStore, state: ProjectState, options: { taskId?: string; now: Date }): ContextItem[] {
+interface QueryMatch {
+  boost: number
+  why: string
+}
+
+/** What a query adds to each record that holds its words, by graph key. */
+function queryMatches(store: ContextStore, query: string | undefined): Map<string, QueryMatch> {
+  if (!query) return new Map()
+  return new Map(
+    searchGraph(store.graph, query, { limit: MAX_QUERY_MATCHES, kinds: ['memory', 'session'] }).map((hit) => [
+      hit.key,
+      { boost: QUERY_BOOST * hit.coverage, why: `matches ${hit.matched.map((word) => `"${word}"`).join(', ')}; ` },
+    ]),
+  )
+}
+
+const NO_MATCH: QueryMatch = { boost: 0, why: '' }
+
+export function rankContext(store: ContextStore, state: ProjectState, options: { taskId?: string; now: Date; query?: string }): ContextItem[] {
   const task = state.tasks.find((candidate) => candidate.id === (options.taskId ?? state.currentTaskId))
   const taskFiles = new Set(task?.files ?? [])
   const touchesTask = (paths: readonly string[]) => paths.some((path) => taskFiles.has(path))
   const anchors = decisionAnchors(store)
   const { now } = options
+  const matched = queryMatches(store, options.query)
   const items: ContextItem[] = task ? [taskItem(task)] : []
 
   for (const check of state.checks) {
@@ -93,22 +118,24 @@ export function rankContext(store: ContextStore, state: ProjectState, options: {
     const anchored = anchors.get(decision.id) ?? []
     const relevance = touchesTask(anchored) ? RELEVANCE.linked : RELEVANCE.project
     const stale = decision.status === 'anchor-changed'
+    const match = matched.get(keys.memory(decision.id)) ?? NO_MATCH
     items.push({
       kind: 'decision',
       text: line(`${evidenceTag(decision.evidence)} ${decision.kind}: ${decision.title}${decision.body ? ` (${decision.body})` : ''}${stale ? ` [anchored code changed: ${decision.changed.join(', ')}]` : ''}`),
-      score: score(relevance, decision.evidence, recency(decision.recordedAt, now), stale),
-      why: `${stale ? 'its code changed; ' : ''}${relevance === RELEVANCE.linked ? 'anchored to task files' : 'project-wide'}`,
+      score: round(score(relevance, decision.evidence, recency(decision.recordedAt, now), stale) + match.boost),
+      why: `${match.why}${stale ? 'its code changed; ' : ''}${relevance === RELEVANCE.linked ? 'anchored to task files' : 'project-wide'}`,
     })
   }
 
   for (const session of state.sessions.slice(0, 5)) {
     if (!session.note) continue
     const relevance = touchesTask(session.filesChanged.map((file) => file.path)) ? RELEVANCE.linked : RELEVANCE.project
+    const match = matched.get(keys.session(session.id)) ?? NO_MATCH
     items.push({
       kind: 'session',
       text: line(`[agent-reported] ${session.agent} session, ${agoFromIso(session.lastActivityAt, now)}: ${session.note}`),
-      score: score(relevance, 'agent-reported', recency(session.lastActivityAt, now), false),
-      why: relevance === RELEVANCE.linked ? 'worked on task files' : 'recent session',
+      score: round(score(relevance, 'agent-reported', recency(session.lastActivityAt, now), false) + match.boost),
+      why: `${match.why}${relevance === RELEVANCE.linked ? 'worked on task files' : 'recent session'}`,
     })
   }
 

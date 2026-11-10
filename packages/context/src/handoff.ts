@@ -48,7 +48,7 @@ function listPaths(paths: readonly string[]): string {
 }
 
 /** A known agent by its name (Claude Code, Codex); any other id as code, exactly as it was recorded. */
-function agentName(id: string): string {
+export function agentName(id: string): string {
   return AGENTS.find((agent) => agent.id === id)?.name ?? code(id)
 }
 
