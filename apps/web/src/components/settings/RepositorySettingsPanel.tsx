@@ -131,7 +131,7 @@ export function RepositorySettingsPanel() {
   const change = (next: Partial<RepositorySettings>) => save(() => continuumService.updateSettings(projectId, next))
 
   return (
-    <Panel title="Repository settings" description="What Continuum records in one repository, and what it masks first. Kept in that repository's .continuum folder, never committed.">
+    <Panel id="repository-settings" title="Repository settings" description="What Continuum records in one repository, and what it masks first. Kept in that repository's .continuum folder, never committed.">
       <SelectField label="Repository" value={projectId} onChange={(event) => setChosen(event.target.value)}>
         {(projects.data ?? []).map(({ project }) => (
           <option key={project.id} value={project.id}>

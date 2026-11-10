@@ -30,7 +30,7 @@ export function ProfilePanel() {
   const remove = (preference: string) => void save(() => continuumService.updateProfile(preferences.filter((candidate) => candidate !== preference)))
 
   return (
-    <Panel title="Your profile" description="Preferences for every repository on this machine, such as “Use pnpm, never npm”. Every agent's briefing carries them, labelled set by you.">
+    <Panel id="profile" title="Your profile" description="Preferences for every repository on this machine, such as “Use pnpm, never npm”. Every agent's briefing carries them, labelled set by you.">
       {profile.error && <p className="text-[13px] text-danger">{profile.error.message}</p>}
       {!profile.error && preferences.length === 0 && !profile.isLoading && <p className="text-[13px] text-muted">No preferences yet.</p>}
       {preferences.length > 0 && (

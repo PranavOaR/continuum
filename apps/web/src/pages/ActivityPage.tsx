@@ -150,8 +150,9 @@ export function ActivityPage() {
 
       <div className="mb-3 flex items-center justify-between text-[12px] text-muted">
         <span aria-live="polite">
-          {!isReady ? 'Loading events' : isPaged ? `${events.length} event${events.length === 1 ? '' : 's'}${history.hasOlder ? ', with older ones to load' : ', back to the first recorded'}` : `${events.length} of ${loaded.length} recent events. Choose a project to page back through its whole history.`}
+          {!isReady ? 'Loading events' : isPaged ? `${events.length} event${events.length === 1 ? '' : 's'}${history.hasOlder ? ', with older ones to load' : ', back to the first recorded'}` : `${events.length} of ${loaded.length} events`}
         </span>
+        {!isPaged && isReady && <span className="hidden sm:inline">The most recent events. Choose a project to read its whole history.</span>}
         {hasFilters && (
           <Button size="sm" variant="ghost" onClick={() => update({ project: '', type: '', agent: '', q: '', from: '', to: '' })}>
             Clear filters
