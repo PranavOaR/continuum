@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.0] - 2026-11-10
 
 ### Added
 - **A warning beside a note the code has moved on from.** When a file a session changed has since been changed by hand (committed or not), by another agent's session, or deleted, the briefing says so under that session's note, names each file and who changed it, and asks the next agent to check the note against the code. The next step a stale note named carries the same warning, and so does each earlier session listed. It is judged per file the session changed, against the code as it is now, so unrelated commits raise nothing and uncommitted edits are caught. Thanks to a reader on LinkedIn for the case.
