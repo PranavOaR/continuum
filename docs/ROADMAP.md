@@ -1,6 +1,6 @@
 # Continuum roadmap
 
-Status, 5 November 2026, after the 0.4.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has the first phase of the November plan: a new user's first hour. [Next](#next) lists the phases still to come.
+Status, 10 November 2026, after the 0.4.0 release. Continuum is published on npm as `getcontinuum` and as a Claude Code plugin. It connects Claude Code, Codex, Cursor and GitHub Copilot in VS Code. The October 2026 plan has shipped, and so has most of the November plan: a new user's first hour, memory you can ask, evidence at the finish, a profile that follows you, and trust and control. Those after 0.4.0 are merged but not yet released. [Next](#next) lists what is left.
 
 ## Guiding principles
 
@@ -28,44 +28,15 @@ Status, 5 November 2026, after the 0.4.0 release. Continuum is published on npm 
 | **Briefings** (0.4.0) | The Handoffs page became Briefings: the text `continuum handoff` prints, with a copy button and its size in tokens, and a test proving the two match. The handoff text the browser built for itself and its browser-only history are gone. |
 | **Correct it yourself** (0.4.0) | Create a task (now or later), add a decision or known issue, and mark a record resolved or still valid from the dashboard. Each is labelled set by you and reaches the next briefing, through the same CSRF-protected write as task edits. |
 | **Two agents at once** (0.4.0) | `record_decision`, `update_task` and `get_context` act on the calling session's task, so two Claude Code or Codex sessions in one repository don't cross. Claude Code gives its MCP server `CLAUDE_CODE_SESSION_ID`, the same id its hooks report, including after `--resume`, and a resumed session counts as running again. Codex 0.149 names the session on every tool call, in `_meta["x-codex-turn-metadata"].session_id`, which is undocumented, so Continuum falls back when it's missing. `update_task` has to name a task another running session took up, and `start_task` no longer pauses that task. Continuum cannot yet tell which Copilot in VS Code or Cursor session is calling, so they are not held back. `npm run test:cross-agent` proves it with Claude Code and Codex running at once. |
+| **Memory you can ask** (unreleased) | `search_memory`, `continuum search` and a `query` in `get_context` find a decision, issue, attempt, task or session note by its words, whichever task it was recorded on. It scores the records already in memory (BM25), with no index to keep in step with `forget`, `compact` or `import`. SQLite's FTS5 was the plan, but `node:sqlite` has it only from Node.js 22.16, and 22.13 is supported. `continuum why <file or symbol>` lists the decisions, tasks, sessions and checks behind a piece of code. The evaluation has a scenario for an old decision found by a word in its body. |
+| **Evidence at the finish** (unreleased) | Marking a task completed while a check on its files failed or is out of date still closes it, and the reply names the check. `continuum check`, for a pre-commit hook, lists decisions whose anchored code the staged changes alter; it exits 0 unless `--strict`. |
+| **Follows you** (unreleased) | A personal profile: preferences kept in Continuum's per-user folder, labelled set by you, that every repository's briefing opens with, including its first. `continuum profile` and the dashboard's Settings page edit it. |
+| **Trust and control** (unreleased) | Repository settings in the dashboard, with a preview of what redaction would store, and patterns that will not compile or could hang refused with the reason. The Activity page pages back through a project's whole history by sequence number, filtered by type, agent and date; it needs no new index, because paging uses the event log's primary key. `doctor --report --open` and the dashboard open a pre-filled issue. The Windows end-to-end run can test what npm really serves. |
 | **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health); 0.3.0 (the first hour, clearer verification, the first release run entirely by the workflow). The plugin repository accepts private vulnerability reports. |
 
 ## Next
 
-In order. Each item is one pull request, tests first; sizes are rough, for one developer (S up to a day, M two to three days, L about a week). The first three phases come from gaps found in the code, because there are no user reports yet; reports reorder everything below.
-
-### Memory you can ask
-
-An agent can reach everything recorded.
-
-| # | Item | Done when | Size |
-|---|---|---|---|
-| 2 | **Search memory.** A `search_memory` MCP tool, `continuum search`, and query text in `get_context`. SQLite's FTS5 works in `node:sqlite`, so this needs no embeddings and adds nothing to the install. Today `get_context` ignores the words in a query, and an on-topic decision from another task always ranks low. The dashboard's search covers tasks, files and activity, but not memory records. | An old decision on another task is found by a word in its body. | M |
-| 3 | **`continuum why <file or symbol>`.** The decisions, tasks and checks behind a piece of code, from links already recorded. | Lists every record anchored to it, each with its evidence label. | S–M |
-
-### Evidence at the finish
-
-Honest evidence at the moment it matters: when work is called done.
-
-| # | Item | Done when | Size |
-|---|---|---|---|
-| 4 | **Warn when closing unverified work.** An agent marking a task complete while a check is failed or out of date gets a warning in the tool's reply. It never blocks. | The reply names the check. | S |
-| 5 | **Stale-decision check.** `continuum check` for a pre-commit hook lists decisions whose anchored code just changed, so an agent quietly undoing one is caught before it lands. | It names the decision and the symbol. | M |
-
-### Follows you
-
-| # | Item | Done when | Size |
-|---|---|---|---|
-| 6 | **Personal profile.** Your preferences, kept on this machine and labelled set by you, reach every repository. "Use pnpm" should not need repeating. | A new repository's first briefing includes them. | M |
-
-### Trust and control
-
-What the dashboard shows is exactly what agents receive, and you can correct it there.
-
-| # | Item | Done when | Size |
-|---|---|---|---|
-| 7 | **Repository settings in the dashboard.** Agent checks, prompt capture and redaction patterns, with a preview of what a pattern would mask. Unusable patterns are refused. | Saving a bad pattern is refused with its reason; a good one masks the sample. | M |
-| 8 | **Full activity history.** Page back through every event by sequence number, filtered by agent, type and date. Today the feed stops at the newest 200. | A store with 10,000 events can be paged to its first event. | M |
+In order. Each item is one pull request, tests first; sizes are rough, for one developer (S up to a day, M two to three days, L about a week). There are still no user reports; reports reorder everything below.
 
 ### Speed and reach
 
@@ -75,11 +46,13 @@ Order follows what users report.
 |---|---|---|---|
 | 9 | **Faster hooks at scale.** Hooks load only the graph nodes they need. Today session start takes 124 ms end to end at 10,000 events (`bench:hooks`), and opening a store with 100,000 events takes about 150 ms by itself (`bench:store`). | Session start stays under 150 ms end to end at 100,000 events. | L |
 | 11 | **More agents.** Gemini CLI, Windsurf or JetBrains Junie, in the order users ask. | Each passes `npm run test:cross-agent`. | M each |
+| 12 | **Session identity for Copilot and Cursor.** Two sessions of either agent in one repository can still cross tasks, because neither tells its MCP server which session is calling. | Fixed when either agent exposes a session id. | S |
 
 ### Only once users ask
 
 - **Teams**, after at least five separate requests: decisions shared through an opt-in file in the repository, reviewed in pull requests, with everything else staying local.
-- **Semantic search over memory**: full-text search (item 2) comes first, and local embeddings would add size and setup to every install.
+- **Semantic search over memory**: full-text search has shipped, and local embeddings would add size and setup to every install.
+- **The dashboard's own search over memory records**: it covers tasks, files and activity; agents and the terminal already search memory.
 
 ### Not planned
 

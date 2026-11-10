@@ -102,7 +102,7 @@ npm workspaces:
 | `packages/capture` | `@continuum/capture` | Git working-tree hashing, change scanning, the file watcher, symbols and verified check runs |
 | `packages/context` | `@continuum/context` | Project state judged against the live working tree, ranked retrieval and the token-bounded handoff |
 | `packages/claude-code` | `@continuum/claude-code` | Hook ingestion and project-scoped setup for Claude Code, Codex, Cursor and VS Code, and the plugin's hooks |
-| `packages/mcp` | `@continuum/mcp` | The local stdio MCP server (`get_handoff`, `get_project_state`, `get_context`, `record_decision`, `start_task`, `update_task`) |
+| `packages/mcp` | `@continuum/mcp` | The local stdio MCP server (`get_handoff`, `get_project_state`, `get_context`, `search_memory`, `record_decision`, `start_task`, `update_task`) |
 | `packages/daemon` | `@continuum/daemon` | The local daemon: maps context stores onto the dashboard's service contract and serves it on 127.0.0.1 |
 | `packages/cli` | `@continuum/cli` | The `continuum` command |
 | `apps/web` | `@continuum/web` | The dashboard (live data from the daemon, or a sample dataset in development) and the website, built with `VITE_CONTINUUM_SITE=website` |
