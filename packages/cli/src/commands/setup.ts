@@ -2,10 +2,12 @@ import { initWorkspace, locateWorkspace, readConfig, registerRepository, scanRep
 import {
   isContinuumPluginEnabled,
   MCP_FILE,
+  removeAntigravitySetup,
   removeClaudeCodeSetup,
   removeCodexSetup,
   removeCursorSetup,
   removeVsCodeSetup,
+  setupAntigravity,
   setupClaudeCode,
   setupCodex,
   setupCursor,
@@ -72,6 +74,17 @@ const TARGETS: Record<string, Target> = {
       'VS Code does not report exit codes, so record tests with `continuum run -- <command>` for verified results.',
     ],
     shared: '.vscode/mcp.json and .github/',
+  },
+  antigravity: {
+    name: 'Antigravity CLI',
+    setup: setupAntigravity,
+    remove: removeAntigravitySetup,
+    next: () => [
+      'Next: start Antigravity CLI (agy) in this repository. It loads .agents/hooks.json and .agents/mcp_config.json from the project.',
+      'New conversations are briefed on where the last one left off, and its file edits are recorded as you work.',
+      'Antigravity does not report exit codes, so record tests with `continuum run -- <command>` for verified results.',
+    ],
+    shared: '.agents/hooks.json',
   },
 }
 

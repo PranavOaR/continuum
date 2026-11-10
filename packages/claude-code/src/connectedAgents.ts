@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AgentType } from '@continuum/core'
+import { ANTIGRAVITY_HOOKS_FILE } from './antigravitySetup'
 import { CODEX_HOOKS_FILE } from './codexSetup'
 import { CURSOR_RULE_FILE, RULE_MARKER } from './cursorSetup'
 import type { HookAgent } from './hookPayload'
@@ -39,11 +40,12 @@ function hasClaudeCodeHooks(settings: string): boolean {
 
 /** Agents whose hooks this repository's own config files run Continuum from. */
 export async function connectedHookAgents(root: string): Promise<Set<HookAgent>> {
-  const [claude, codex, vscode] = await Promise.all([HOOKS_FILE, CODEX_HOOKS_FILE, VSCODE_HOOKS_FILE].map((file) => text(join(root, file))))
+  const [claude, codex, vscode, antigravity] = await Promise.all([HOOKS_FILE, CODEX_HOOKS_FILE, VSCODE_HOOKS_FILE, ANTIGRAVITY_HOOKS_FILE].map((file) => text(join(root, file))))
   const connected = new Set<HookAgent>()
   if (hasClaudeCodeHooks(claude)) connected.add('claude-code')
   if (codex.includes('ingest --agent codex')) connected.add('codex')
   if (vscode.includes('ingest --agent vscode')) connected.add('vscode')
+  if (antigravity.includes('ingest --agent antigravity')) connected.add('antigravity')
   return connected
 }
 
@@ -59,5 +61,6 @@ export async function connectedAgents(root: string, claudeConfigDir: string): Pr
     ...(hooks.has('codex') ? (['codex'] as const) : []),
     ...(cursorRule.includes(RULE_MARKER) ? (['cursor'] as const) : []),
     ...(hooks.has('vscode') ? (['vscode'] as const) : []),
+    ...(hooks.has('antigravity') ? (['antigravity'] as const) : []),
   ]
 }

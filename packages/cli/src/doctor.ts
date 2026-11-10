@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { findRepoRoot, InvalidProfileError, readProfile, InvalidConfigError, isInitialized, isTracked, loadContinuumIgnore, locateWorkspace, NotAGitRepositoryError, readConfig, readRegistry, UnreadableIgnoreFileError, type ContinuumConfig } from '@continuum/capture'
 import {
+  ANTIGRAVITY_HOOKS_FILE,
   CODEX_HOOKS_FILE,
   CURSOR_MCP_FILE,
   HOOK_EVENTS,
@@ -203,6 +204,15 @@ async function checkCodex(root: string): Promise<Finding | null> {
   }
 }
 
+/** Antigravity CLI is connected when its project hooks run Continuum; null when it is not set up here. */
+async function checkAntigravity(root: string): Promise<Finding | null> {
+  const hooks = await readJson(join(root, ANTIGRAVITY_HOOKS_FILE))
+  if (hooks === null) return null
+  if (hooks === 'invalid') return { status: 'fail', label: `${ANTIGRAVITY_HOOKS_FILE} is not a valid JSON object`, fix: 'Fix or remove it, then run `continuum setup antigravity`.' }
+  if (!JSON.stringify(hooks).includes('ingest --agent antigravity')) return null
+  return { status: 'ok', label: 'Antigravity CLI hooks registered', detail: 'Antigravity loads them from .agents/ when it starts in this repository' }
+}
+
 /** Cursor is connected when its project MCP config runs Continuum's server; null when it is not set up here. */
 async function checkCursor(root: string): Promise<Finding | null> {
   const config = await readJson(join(root, CURSOR_MCP_FILE))
@@ -283,7 +293,7 @@ export async function runDoctor(env: DoctorEnvironment): Promise<Finding[]> {
   const ignoreFile = await checkIgnoreFile(workspace.root)
   if (ignoreFile) findings.push(ignoreFile)
   const [settings, mcpConfig] = await Promise.all([readJson(join(workspace.root, HOOKS_FILE)), readJson(join(workspace.root, MCP_FILE))])
-  const others = [await checkCodex(workspace.root), await checkCursor(workspace.root), ...(await checkVsCode(workspace.root))].filter((finding): finding is Finding => finding !== null)
+  const others = [await checkCodex(workspace.root), await checkCursor(workspace.root), ...(await checkVsCode(workspace.root)), await checkAntigravity(workspace.root)].filter((finding): finding is Finding => finding !== null)
   const claudeHooks = checkHooks(settings, env.invocation)
   const claudeMissing = settings === null && claudeHooks.status === 'fail'
   if (claudeMissing && others.length > 0) {

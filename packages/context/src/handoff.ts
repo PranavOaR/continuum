@@ -60,6 +60,13 @@ export function agentName(id: string): string {
   return AGENTS.find((agent) => agent.id === id)?.name ?? code(id)
 }
 
+/** "a Codex session", "an Antigravity CLI session": the article an agent's name takes. */
+export function aSession(agent: string, capital = false): string {
+  const name = agentName(agent)
+  const article = /^[aeiou]/i.test(name) ? 'an' : 'a'
+  return `${capital ? article[0].toUpperCase() + article.slice(1) : article} ${name} session`
+}
+
 function describeSession(session: SessionSummary, now: Date): string {
   const state = session.ended ? 'ended' : 'still open'
   return `${agentName(session.agent)} session, started ${agoFromIso(session.startedAt, now)}, last active ${agoFromIso(session.lastActivityAt, now)}, ${state}`
@@ -135,7 +142,7 @@ const NEXT_STEP = /\bnext(?:\s+steps?)?(?:\s*:|\s+[\u2013\u2014-]\s)\s*(\S.*)$/i
 /** How a briefing names who changed a file since: "(outside an agent session)", "(by a Codex session)", "(deleted)". */
 function changedByLabel(change: ChangedSince): string {
   if (change.by.kind === 'deleted') return 'deleted'
-  return change.by.kind === 'outside' ? 'outside an agent session' : `by a ${agentName(change.by.agent)} session`
+  return change.by.kind === 'outside' ? 'outside an agent session' : `by ${aSession(change.by.agent)}`
 }
 
 const changedAgain = (changes: readonly ChangedSince[]) => {
@@ -197,7 +204,7 @@ function sinceSection(since: SinceYouLeft | null | undefined, now: Date): string
   for (const session of since.otherSessions) {
     const files = session.files.length > 0 ? `changed ${listPaths(session.files)}` : 'changed no files'
     const note = session.note ? ` Its last note [agent-reported]: ${quote(session.note, 200)}` : ''
-    lines.push(`- [observed] A ${agentName(session.agent)} session ${files} (${agoFromIso(session.at, now)}).${note}`)
+    lines.push(`- [observed] ${aSession(session.agent, true)} ${files} (${agoFromIso(session.at, now)}).${note}`)
   }
   if (since.outsideChanges.length > 0) {
     lines.push(`- [observed] Changed outside agent sessions (latest ${agoFromIso(since.outsideChangedAt, now)}): ${listPaths(since.outsideChanges)}`)

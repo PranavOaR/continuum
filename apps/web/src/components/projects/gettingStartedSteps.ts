@@ -18,6 +18,7 @@ const SESSION_HINT: Partial<Record<AgentType, Pick<GettingStartedStep, 'hint' | 
   'claude-code': { hint: `Start Claude Code in the repository and approve the "continuum" MCP server. ${RECORDED}` },
   codex: { hint: `Start Codex in the repository and trust the project, then run /hooks and trust Continuum's hooks. ${RECORDED}` },
   vscode: { hint: `Open the repository in VS Code, trust the workspace and start the "continuum" MCP server. ${RECORDED}` },
+  antigravity: { hint: `Start Antigravity CLI (agy) in the repository. ${RECORDED}` },
   // Cursor has no hooks, so nothing records a session until you open one.
   cursor: { hint: 'Enable the "continuum" MCP server in Cursor\'s settings. Cursor has no hooks, so open a session to record its work:', command: 'continuum session start --agent cursor' },
 }

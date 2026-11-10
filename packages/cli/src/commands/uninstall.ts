@@ -3,6 +3,8 @@ import { rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { CONTINUUM_DIR, includeInGit, locateWorkspace, unregisterRepository } from '@continuum/capture'
 import {
+  removeAntigravitySetup,
+  ANTIGRAVITY_HOOKS_FILE,
   CODEX_HOOKS_FILE,
   CURSOR_RULE_FILE,
   HOOKS_FILE,
@@ -44,7 +46,8 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
   const codex = await removeCodexSetup(root)
   const cursor = await removeCursorSetup(root)
   const vscode = await removeVsCodeSetup(root)
-  const result = { files: [...claude.files, ...codex.files, ...cursor.files, ...vscode.files] }
+  const antigravity = await removeAntigravitySetup(root)
+  const result = { files: [...claude.files, ...codex.files, ...cursor.files, ...vscode.files, ...antigravity.files] }
   await unregisterRepository(io.configDir, root)
   removeIfEmpty(join(root, dirname(HOOKS_FILE)))
   removeIfEmpty(join(root, dirname(CODEX_HOOKS_FILE)))
@@ -54,6 +57,7 @@ export async function uninstallCommand(io: Io, args: readonly string[]): Promise
   removeIfEmpty(join(root, dirname(VSCODE_HOOKS_FILE)))
   removeIfEmpty(join(root, dirname(VSCODE_INSTRUCTIONS_FILE)))
   removeIfEmpty(join(root, dirname(dirname(VSCODE_HOOKS_FILE))))
+  removeIfEmpty(join(root, dirname(ANTIGRAVITY_HOOKS_FILE)))
   for (const file of result.files) io.out(`  ${file.action.padEnd(9)} ${file.path}`)
 
   const storeDir = join(root, CONTINUUM_DIR)

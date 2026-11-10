@@ -2,7 +2,7 @@
 
 **Your work continues. Your agents change.**
 
-Continuum is local project memory for AI coding agents. Every Claude Code, Codex, Cursor or GitHub Copilot (VS Code) session starts briefed on where the work left off:
+Continuum is local project memory for AI coding agents. Every Claude Code, Codex, Cursor, GitHub Copilot (VS Code) or Antigravity CLI session starts briefed on where the work left off:
 - the current task and its next step;
 - which test results still hold for the code as it is now;
 - what another agent or a hand edit changed;
@@ -17,7 +17,7 @@ Website and documentation: [continuumgroup.dev](https://continuumgroup.dev)
 Requires Node.js 22.13+ and git, on Windows, macOS or Linux. In your project:
 
 ```bash
-npx getcontinuum setup claude-code   # or: setup codex, setup cursor, setup vscode
+npx getcontinuum setup claude-code   # or: setup codex, setup cursor, setup vscode, setup antigravity
 npx getcontinuum serve               # the dashboard for every connected repository
 ```
 
@@ -36,6 +36,7 @@ With Claude Code, you can install the plugin instead (hooks, MCP server and a `/
 | Claude Code | `setup claude-code` | Hooks in `.claude/settings.local.json` and the MCP server in `.mcp.json`. Sessions, edits, test runs, tasks and commits are recorded. |
 | Codex | `setup codex` | `.codex/hooks.json` and a block in `.codex/config.toml`. Trust the project, then review the hooks with `/hooks`. |
 | GitHub Copilot in VS Code | `setup vscode` | `.vscode/mcp.json`, agent hooks in `.github/hooks/continuum.json` and instructions for every chat. Trust the workspace and start the server. |
+| Antigravity CLI | `setup antigravity` | Hooks in `.agents/hooks.json` and the MCP server in `.agents/mcp_config.json`. Conversations, edits and tasks are recorded. |
 | Cursor | `setup cursor` | The MCP server in `.cursor/mcp.json` and an always-applied rule. |
 | Anything else | `session start --agent <name>` | Prints a briefing to paste in; `continuum start` records file changes meanwhile. |
 

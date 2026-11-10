@@ -56,6 +56,15 @@ describe('files a session changed that changed again since', () => {
   })
 })
 
+describe('agent names in a sentence', () => {
+  it('take the article they need', async () => {
+    const { aSession } = await import('../handoff')
+    expect(aSession('codex')).toBe('a Codex session')
+    expect(aSession('antigravity')).toBe('an Antigravity CLI session')
+    expect(aSession('antigravity', true)).toBe('An Antigravity CLI session')
+  })
+})
+
 describe('the briefing on a note the code moved on from', () => {
   const handHedited = { ...CURRENT_FILES, 'src/auth/login.ts': 'h-login-2' }
 
