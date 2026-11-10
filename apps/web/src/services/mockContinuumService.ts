@@ -219,6 +219,11 @@ export const mockContinuumService: ContinuumService = {
   createTask: readOnly,
   addMemory: readOnly,
   reviewMemory: readOnly,
+  getSettings() {
+    return respond({ agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: ['ACME-[0-9]{6}'] })
+  },
+  updateSettings: readOnly,
+  previewRedaction: readOnly,
   getProfile() {
     return respond({ preferences: ['Use pnpm, never npm', 'Ask before pushing to a shared branch'] })
   },

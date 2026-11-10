@@ -106,6 +106,11 @@ export interface ContinuumService {
   addMemory(projectId: string, record: NewMemory): Promise<MemoryRecord>
   /** Records your verdict on a memory record and returns it as it now stands. */
   reviewMemory(projectId: string, memoryId: string, review: MemoryReview): Promise<MemoryRecord>
+  getSettings(projectId: string): Promise<RepositorySettings>
+  /** Saves a change to a repository's settings; a redaction pattern that cannot be used is refused with its reason. */
+  updateSettings(projectId: string, change: Partial<RepositorySettings>): Promise<RepositorySettings>
+  /** What these patterns would mask in a sample. Nothing is saved or recorded. */
+  previewRedaction(projectId: string, patterns: readonly string[], sample: string): Promise<RedactionPreview>
   /** Your preferences, which every repository's briefing carries. */
   getProfile(): Promise<Profile>
   /** Replaces your preferences and returns them as stored. */
@@ -134,6 +139,31 @@ export interface ActivityPage {
 
 export const DEFAULT_ACTIVITY_PAGE = 50
 export const MAX_ACTIVITY_PAGE = 200
+
+/** One repository's settings, kept in its .continuum/config.json. */
+export interface RepositorySettings {
+  /** Record tests, lint and builds an agent runs, with the exit code it observed. */
+  agentChecks: boolean
+  /** Record the prompts you type to agents, redacted. */
+  capturePrompts: boolean
+  /** Show one line after a Claude Code reply that recorded something. */
+  receipts: boolean
+  /** Regular expressions masked before anything is stored, on top of the built-in rules. */
+  redactPatterns: string[]
+}
+
+/** What redaction would make of a sample, and the patterns it could not use. */
+export interface RedactionPreview {
+  /** The sample as it would be stored. */
+  masked: string
+  /** How many pieces were masked, by the built-in rules and the patterns together. */
+  count: number
+  /** Patterns left out of the preview, each with why. */
+  refused: { pattern: string; reason: string }[]
+}
+
+export const MAX_REDACTION_SAMPLE_CHARS = 2_000
+export const MAX_REDACT_PATTERNS = 20
 
 /** Your preferences, kept on this machine for every repository: "Use pnpm", "Never push without asking". */
 export interface Profile {

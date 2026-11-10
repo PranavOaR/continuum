@@ -14,13 +14,15 @@ import {
   type NewTask,
   type OverviewData,
   type Profile,
+  type RedactionPreview,
+  type RepositorySettings,
   type ProjectSummary,
   type ProjectTask,
   type ProjectWorkspace,
   type SearchResult,
   type TaskChange,
 } from '@continuum/core'
-import { briefingPreferences, EMPTY_PROFILE, InvalidConfigError, readProfile, writeProfile, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
+import { previewRedaction, readConfig, saveSettings, briefingPreferences, EMPTY_PROFILE, InvalidConfigError, readProfile, writeProfile, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
 import { applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
 import { keys } from '@continuum/store'
 import { asAgent, ids, storedMemoryId } from './ids'
@@ -381,6 +383,22 @@ export class LocalContinuumService implements ContinuumService {
     const snapshot = await this.snapshot(projectId)
     const preferences = await briefingPreferences(this.configDir, (await repositoryRedactor(snapshot.root)).redact)
     return renderHandoff(snapshot.state, { now: this.now(), preferences })
+  }
+
+  async getSettings(projectId: string): Promise<RepositorySettings> {
+    return readConfig((await this.snapshot(projectId)).root)
+  }
+
+  async updateSettings(projectId: string, change: Partial<RepositorySettings>): Promise<RepositorySettings> {
+    const saved = await saveSettings((await this.snapshot(projectId)).root, change)
+    this.invalidate()
+    return saved
+  }
+
+  async previewRedaction(projectId: string, patterns: readonly string[], sample: string): Promise<RedactionPreview> {
+    // The project only says whose settings these are; a preview reads and records nothing.
+    await this.snapshot(projectId)
+    return previewRedaction(patterns, sample)
   }
 
   async getProfile(): Promise<Profile> {

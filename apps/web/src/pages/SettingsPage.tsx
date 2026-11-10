@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../components/shared/Dialog'
 import { SelectField, Toggle } from '../components/shared/Fields'
 import { PageHeader } from '../components/shared/PageHeader'
 import { ProfilePanel } from '../components/settings/ProfilePanel'
+import { RepositorySettingsPanel } from '../components/settings/RepositorySettingsPanel'
 import { Panel } from '../components/shared/Panel'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useServiceQuery } from '../hooks/useServiceQuery'
@@ -120,6 +121,8 @@ export function SettingsPage() {
         </Panel>
 
         <ProfilePanel />
+
+        {isLive && <RepositorySettingsPanel />}
 
         <Panel title="Privacy and architecture">
           <div className="flex gap-3">

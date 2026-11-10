@@ -3,7 +3,7 @@ import { request } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NotFoundError, type ContinuumService, type MemoryRecord, type ProjectTask, type TaskField } from '@continuum/core'
-import { InvalidProfileError } from '@continuum/capture'
+import { InvalidProfileError, InvalidSettingsError } from '@continuum/capture'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PortInUseError, startDaemon, type RunningDaemon } from '../server'
 
@@ -45,6 +45,13 @@ const fakeService: ContinuumService = {
     edits.push({ projectId, input })
     return memory(projectId, 'acme~memory~new')
   },
+  getSettings: async () => ({ agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: [] }),
+  updateSettings: async (projectId, change) => {
+    if ((change.redactPatterns ?? []).includes('(a+)+$')) throw new InvalidSettingsError('The pattern (a+)+$ was not saved. It repeats a group that itself repeats.')
+    edits.push({ projectId, change })
+    return { agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: [], ...change }
+  },
+  previewRedaction: async (_projectId, patterns, sample) => ({ masked: sample.replace('ACME', '[redacted]'), count: 1, refused: patterns.filter((pattern) => pattern === '(').map((pattern) => ({ pattern, reason: 'It is not a valid regular expression.' })) }),
   getProfile: async () => ({ preferences: storedPreferences }),
   updateProfile: async (preferences) => {
     if (preferences.length > 2) throw new InvalidProfileError('A profile holds at most 2 preferences; remove one first.')
@@ -325,6 +332,31 @@ describe('task edits', () => {
       expect((await post(daemon, route, JSON.stringify(body), browser(daemon, extra))).status).toBe(status)
       expect(edits).toEqual([])
     })
+  })
+
+  it('saves repository settings through the same checks, refusing a bad pattern with its reason', async () => {
+    const daemon = await startWithCsrf()
+    edits.length = 0
+    expect(JSON.parse((await raw(daemon, '/api/projects/acme/settings')).body).data.agentChecks).toBe(true)
+    const saved = await post(daemon, '/api/projects/acme/settings', JSON.stringify({ capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] }), browser(daemon))
+    expect(saved.status).toBe(200)
+    expect(JSON.parse(saved.body).data).toMatchObject({ capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] })
+    const refused = await post(daemon, '/api/projects/acme/settings', JSON.stringify({ redactPatterns: ['(a+)+$'] }), browser(daemon))
+    expect(refused.status).toBe(400)
+    expect(JSON.parse(refused.body).error.message).toContain('repeats a group that itself repeats')
+    expect((await post(daemon, '/api/projects/acme/settings', JSON.stringify({ capturePrompts: true }), browser(daemon, { 'x-continuum-csrf': 'guess' }))).status).toBe(403)
+    expect((await post(daemon, '/api/projects/acme/settings', '[]', browser(daemon))).status).toBe(400)
+    expect(edits).toEqual([{ projectId: 'acme', change: { capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}'] } }])
+  })
+
+  it('previews what patterns would mask in a sample, within limits', async () => {
+    const daemon = await startWithCsrf()
+    const preview = await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: ['ACME', '('], sample: 'call ACME' }), browser(daemon))
+    expect(preview.status).toBe(200)
+    expect(JSON.parse(preview.body).data).toEqual({ masked: 'call [redacted]', count: 1, refused: [{ pattern: '(', reason: 'It is not a valid regular expression.' }] })
+    expect((await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: [], sample: 'x'.repeat(2_001) }), browser(daemon))).status).toBe(400)
+    expect((await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: Array.from({ length: 22 }, () => 'a'), sample: '' }), browser(daemon))).status).toBe(400)
+    expect((await post(daemon, '/api/projects/acme/settings/preview', JSON.stringify({ patterns: ['a'], sample: 'a' }), browser(daemon, { origin: undefined }))).status).toBe(403)
   })
 
   it('saves your profile through the same checks, and reads it back', async () => {
