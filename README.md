@@ -25,6 +25,10 @@ Requires Node.js 22.13+ and git, on Windows, macOS or Linux. [CHANGELOG.md](CHAN
 
 *Watch the demo (1:14, with sound): Claude Code fixes one of two bugs and stops; Codex starts briefed by Continuum and fixes the second; the test run is verified; the dashboard shows one task carried from one agent to the next. Every terminal line and screen is from a real run. The film is a HyperFrames project in [`scripts/demo-video/film/`](scripts/demo-video/README.md).*
 
+[![Demo: Friday's tests pass, a line changes by hand, and on Monday Codex's briefing marks the check out of date before it trusts it. Recorded from a real run.](https://continuumgroup.dev/demo/stale-test.jpg)](https://continuumgroup.dev/demo/stale-test.mp4)
+
+*And the stale-test film (0:54): Friday, Claude Code's `unit` check passes; `src/tax.js` changes by hand; Monday, Codex's briefing marks the check OUT OF DATE, the re-run fails, Codex fixes it, and the task replay shows where it went stale. Every terminal line, briefing line and replay step is from a real run ([`scripts/demo-video/stale-film/`](scripts/demo-video/README.md)).*
+
 ## Develop
 
 ```bash

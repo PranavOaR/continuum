@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Renders the website's share image (og.png, 1200×630), Apple touch icon and
-// the demo video's cover (demo/continuum-demo.jpg, 1920×1080) from HTML, with
+// the demo videos' covers (demo/continuum-demo.jpg, demo/stale-test.jpg, 1920×1080) from HTML, with
 // the site's own fonts, colours and logos, into apps/web/site-public.
 //   node scripts/site/images.mjs
 import { execFileSync } from 'node:child_process'
@@ -54,14 +54,18 @@ const OG = `<!doctype html><html><head><style>${STYLE}
   </div>
 </div></body></html>`
 
-/** The demo video's length as m:ss, read from the video itself. */
-function videoLength() {
-  const seconds = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', join(OUT, 'demo/continuum-demo.mp4')], { encoding: 'utf8' }))
+/** A video's length as m:ss, read from the video itself. */
+function videoLength(file) {
+  const seconds = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', join(OUT, file)], { encoding: 'utf8' }))
   return `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`
 }
 
-/** The video's cover: a title, a play button and the handoff it shows, not a frame from the middle of it. */
-const POSTER = `<!doctype html><html><head><style>${STYLE}
+const ARROW = '<svg class="arrow" viewBox="0 0 70 14" fill="none"><path d="M2 7 C 20 1, 40 13, 60 7" stroke="#5b45ff" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 5"/><path d="M58 2 L66 7 L58 12" stroke="#5b45ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+const agent = (name) => `<div class="agent"><span class="i">${svg(`${name}-color`)}</span><span class="w">${svg(`${name}-text`)}</span></div>`
+const check = (label, colour) => `<div class="agent" style="font-family:'Geist Mono',monospace;font-size:16px;letter-spacing:0.08em;text-transform:uppercase;color:${colour}">unit · ${label}</div>`
+
+/** A video's cover: a title, a play button and what it shows, not a frame from the middle of it. */
+const poster = ({ video, eyebrow, title, subtitle, foot }) => `<!doctype html><html><head><style>${STYLE}
   .card { position: relative; width: 1280px; height: 720px; overflow: hidden; padding: 56px 64px; display: flex; flex-direction: column; align-items: center;
     background: radial-gradient(56rem 32rem at 100% 0%, rgb(91 69 255 / 0.15), transparent 70%), radial-gradient(40rem 26rem at 0% 100%, rgb(91 69 255 / 0.07), transparent 70%), #fafaf7; }
   .dots { position: absolute; inset: 0; background-image: radial-gradient(rgb(20 19 24 / 0.12) 1px, transparent 1px); background-size: 22px 22px; mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%); }
@@ -79,15 +83,11 @@ const POSTER = `<!doctype html><html><head><style>${STYLE}
   .arrow { width: 70px; height: 14px; }
 </style></head><body><div class="card"><div class="dots"></div>
   <div class="brand">${MARK}continuum</div>
-  <div class="length">${videoLength()}</div>
-  <p class="eyebrow">Demo · recorded from real sessions</p>
-  <h1>See a real handoff.<br><span>Claude Code starts. Codex finishes.</span></h1>
+  <div class="length">${videoLength(video)}</div>
+  <p class="eyebrow">${eyebrow}</p>
+  <h1>${title}<br><span>${subtitle}</span></h1>
   <div class="play"><svg viewBox="0 0 24 24"><path d="M6 4.5v15a1 1 0 0 0 1.52.85l12-7.5a1 1 0 0 0 0-1.7l-12-7.5A1 1 0 0 0 6 4.5z" fill="#fff"/></svg></div>
-  <div class="handoff">
-    <div class="agent"><span class="i">${svg('claude-color')}</span><span class="w">${svg('claude-text')}</span></div>
-    <svg class="arrow" viewBox="0 0 70 14" fill="none"><path d="M2 7 C 20 1, 40 13, 60 7" stroke="#5b45ff" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 5"/><path d="M58 2 L66 7 L58 12" stroke="#5b45ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <div class="agent"><span class="i">${svg('codex-color')}</span><span class="w">${svg('codex-text')}</span></div>
-  </div>
+  <div class="handoff">${foot}</div>
 </div></body></html>`
 
 const ICON = `<!doctype html><html><head><style>${STYLE} .icon { width: 180px; height: 180px; display: flex; align-items: center; justify-content: center; background: #fafaf7; } .icon span { height: 124px; display: flex; }</style></head>
@@ -99,7 +99,14 @@ try {
     { html: OG, size: { width: 1200, height: 630 }, file: 'og.png' },
     { html: ICON, size: { width: 180, height: 180 }, file: 'apple-touch-icon.png' },
     // 1280×720 laid out, 1920×1080 captured, like the video itself.
-    { html: POSTER, size: { width: 1280, height: 720 }, scale: 1.5, file: 'demo/continuum-demo.jpg', jpeg: true },
+    {
+      html: poster({ video: 'demo/continuum-demo.mp4', eyebrow: 'Demo · recorded from real sessions', title: 'See a real handoff.', subtitle: 'Claude Code starts. Codex finishes.', foot: `${agent('claude')}${ARROW}${agent('codex')}` }),
+      size: { width: 1280, height: 720 }, scale: 1.5, file: 'demo/continuum-demo.jpg', jpeg: true,
+    },
+    {
+      html: poster({ video: 'demo/stale-test.mp4', eyebrow: 'Demo · recorded from a real run', title: 'Friday’s tests passed.', subtitle: 'Monday, the pass no longer counts.', foot: `${check('passed', '#12804c')}${ARROW}${check('out of date', '#a35f00')}` }),
+      size: { width: 1280, height: 720 }, scale: 1.5, file: 'demo/stale-test.jpg', jpeg: true,
+    },
   ]
   for (const { html, size, scale = 1, file, jpeg } of IMAGES) {
     const page = await browser.newPage({ viewport: size, deviceScaleFactor: scale })

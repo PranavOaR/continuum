@@ -1,0 +1,34 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:02.200
+Friday, 6:40 pm. The tests pass.
+
+00:00:02.600 --> 00:00:05.600
+Just one more line.
+
+00:00:05.850 --> 00:00:07.600
+Nobody re-runs the tests.
+
+00:00:08.600 --> 00:00:11.300
+The weekend.
+
+00:00:11.300 --> 00:00:15.800
+Monday, 9:12 am. Codex reads the briefing.
+
+00:00:16.050 --> 00:00:20.300
+The pass no longer counts.
+
+00:00:20.550 --> 00:00:30.400
+It re-runs. It fails.
+
+00:00:30.650 --> 00:00:34.200
+Fixed, and verified again.
+
+00:00:34.400 --> 00:00:45.400
+The task replay shows where it went stale.
+
+00:00:45.800 --> 00:00:48.400
+The tick goes amber when the code moves under it.
+
+00:00:49.000 --> 00:00:53.500
+Continuum. npx getcontinuum setup claude-code

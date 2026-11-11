@@ -1,0 +1,99 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #fri-world { position: absolute; inset: 0; }
+    #fri-kicker { left: 160px; top: 150px; }
+    #fri-head { left: 160px; top: 205px; height: 96px; width: 1200px; }
+    #fri-head .line { position: absolute; left: 0; top: 0; }
+    #fri-card { left: 1120px; top: 420px; }
+    #fri-editor { left: 160px; top: 420px; width: 1560px; height: 300px; }
+    .fri-gutter { display: inline-block; width: 46px; color: #5d5a66; }
+    #fri-word { position: relative; display: inline-block; }
+    #fri-sel { position: absolute; inset: 2px -3px; background: rgb(91 69 255 / 0.45); border-radius: 4px; }
+    #fri-round, #fri-trunc { display: inline-block; }
+    #fri-trunc { position: absolute; left: 0; top: 0; color: var(--term-warn); }
+    #fri-mark { position: absolute; left: -26px; top: 6px; width: 6px; height: 30px; border-radius: 3px; background: var(--term-warn); }
+    #fri-saved { position: absolute; right: 30px; top: 18px; font-family: "Geist Mono", monospace; font-size: 22px; color: var(--term-dim); }
+  </style>
+  <div id="root" data-composition-id="friday" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div id="fri-stage" class="stage">
+      <div id="fri-world">
+        <div id="fri-kicker" class="kicker">Friday · 6:40 pm</div>
+        <div id="fri-head" class="headline" data-layout-allow-overlap>
+          <div class="line" id="fri-h1"><span class="w">The</span> <span class="w">tests</span> <span class="w">pass.</span></div>
+          <div class="line" id="fri-h2"><span class="w">Just</span> <span class="w">one</span> <span class="w">more</span> <span class="w">line.</span></div>
+          <div class="line" id="fri-h3"><span class="w">Nobody</span> <span class="w">re-runs</span> <span class="w">the</span> <span class="w">tests.</span></div>
+        </div>
+
+        <!-- The editor: src/tax.js as Claude Code left it, then the hand edit (capture.json diffFriday). -->
+        <div id="fri-editor" class="term">
+          <div class="term-bar">
+            <div class="term-lights"><i></i><i></i><i></i></div>
+            <span class="term-title" data-layout-ignore>src/tax.js — checkout</span>
+            <span id="fri-saved">edited by hand</span>
+          </div>
+          <div class="term-body" style="padding-top: 44px">
+            <div class="term-line"><span class="fri-gutter">1</span><span class="dim">// Prices are in cents.</span></div>
+            <div class="term-line"><span class="fri-gutter">2</span>exports.addTax = (cents, rate) =&gt; cents + Math.<span id="fri-word"><span id="fri-sel"></span><span id="fri-round">round</span><span id="fri-trunc">trunc</span></span>(cents * rate)<span id="fri-mark"></span></div>
+          </div>
+        </div>
+
+        <!-- The unit check as Continuum recorded it on Friday. -->
+        <div id="fri-card" class="card check">
+          <div class="check-head">
+            <h3>unit</h3>
+            <span class="chip chip-ok swap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>passed</span>
+          </div>
+          <div class="check-cmd">npm test --silent</div>
+          <div class="check-line">2 tests passed</div>
+          <div class="check-foot">
+            <span class="chip chip-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>verified</span>
+            <span>Claude Code · 6:36 pm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const words = (id) => gsap.utils.toArray(`#${id} .w`);
+      const wordsIn = (id, at) => tl.fromTo(words(id), { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, stagger: 0.06, ease: "power2.out" }, at);
+      const wordsOut = (id, at) => tl.to(words(id), { opacity: 0, filter: "blur(6px)", duration: 0.16, stagger: 0.02, ease: "power2.in" }, at);
+
+      gsap.set(["#fri-h2 .w", "#fri-h3 .w", "#fri-editor", "#fri-sel", "#fri-mark", "#fri-saved"], { opacity: 0 });
+      gsap.set("#fri-trunc", { clipPath: "inset(0 100% 0 0)" });
+      gsap.set("#fri-card", { x: -480, y: -45, scale: 1.25, transformOrigin: "50% 50%" });
+
+      // Frame 0 is the thumbnail: the green tick, already there, with the day and the line.
+      tl.fromTo("#fri-world", { scale: 1.03, transformOrigin: "50% 50%" }, { scale: 1, duration: 2.2, ease: "power2.out" }, 0);
+
+      // The card steps aside; the file opens under the next line.
+      wordsOut("fri-h1", 2.2);
+      tl.to("#fri-card", { x: 70, y: -300, scale: 0.8, duration: 0.8, ease: "power2.inOut" }, 2.25);
+      tl.fromTo("#fri-editor", { opacity: 0, y: 60, filter: "blur(8px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 2.5);
+      wordsIn("fri-h2", 2.6);
+
+      // `round` selected, `trunc` typed over it.
+      tl.to("#fri-sel", { opacity: 1, duration: 0.05 }, 3.8);
+      tl.to("#fri-round", { opacity: 0, duration: 0.01 }, 4.3);
+      tl.to("#fri-sel", { opacity: 0, duration: 0.01 }, 4.3);
+      tl.to("#fri-trunc", { clipPath: "inset(0 0% 0 0)", duration: 0.45, ease: "steps(5)" }, 4.3);
+      tl.fromTo("#fri-mark", { opacity: 0, scaleY: 0.2 }, { opacity: 1, scaleY: 1, duration: 0.3, ease: "back.out(1.6)" }, 4.85);
+      tl.to("#fri-saved", { opacity: 1, duration: 0.3 }, 5.0);
+
+      // The tick stays green: nothing re-ran.
+      wordsOut("fri-h2", 5.6);
+      wordsIn("fri-h3", 5.85);
+      tl.fromTo("#fri-card", { boxShadow: "0 30px 70px -30px rgb(20 19 24 / 0.32)" }, { boxShadow: "0 0 0 6px rgb(18 128 76 / 0.25), 0 30px 70px -30px rgb(20 19 24 / 0.32)", duration: 0.4, yoyo: true, repeat: 1 }, 6.4);
+
+      // Logging off: the whole desk slides left into the weekend.
+      tl.to("#fri-world", { x: -1920, filter: "blur(10px)", duration: 0.85, ease: "power3.inOut" }, 7.6);
+      tl.set({}, {}, 8.6);
+
+      window.__timelines["friday"] = tl;
+    })();
+  </script>
+</template>

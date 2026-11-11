@@ -1,0 +1,179 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #mon-world { position: absolute; inset: 0; }
+    #mon-head { left: 120px; top: 92px; height: 96px; width: 1700px; }
+    #mon-head .line { position: absolute; left: 0; top: 0; }
+    #mon-term { left: 120px; top: 240px; width: 1160px; height: 760px; }
+    .mon-page { position: absolute; left: 44px; right: 44px; top: 94px; }
+    .mon-hi { position: absolute; left: -16px; right: -16px; top: 210px; height: 84px; border-radius: 10px; background: rgb(228 169 71 / 0.16); border-left: 5px solid var(--term-warn); }
+    .mon-type { display: inline-block; }
+    .mon-diff { background: #0e0d12; border-radius: 14px; padding: 12px 20px; margin: 6px 0 22px; }
+    .mon-del { background: rgb(240 106 106 / 0.13); color: #f6b4b4; border-radius: 6px; padding: 0 10px; }
+    .mon-add { background: rgb(60 207 138 / 0.13); color: #a6f0c9; border-radius: 6px; padding: 0 10px; margin-top: 6px; }
+    #mon-card { left: 1330px; top: 380px; transform-origin: 0 0; }
+    .mon-slot { position: absolute; left: 0; top: 0; white-space: nowrap; }
+  </style>
+  <div id="root" data-composition-id="monday" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div id="mon-stage" class="stage">
+      <div id="mon-world">
+        <div id="mon-head" class="headline" data-layout-allow-overlap>
+          <div class="line" id="mon-h1"><span class="w">Monday.</span> <span class="w">Codex</span> <span class="w">reads</span> <span class="w">the</span> <span class="w">briefing.</span></div>
+          <div class="line" id="mon-h2"><span class="w">The</span> <span class="w">pass</span> <span class="w">no</span> <span class="w">longer</span> <span class="w">counts.</span></div>
+          <div class="line" id="mon-h3"><span class="w">It</span> <span class="w">re-runs.</span> <span class="w">It</span> <span class="w">fails.</span></div>
+          <div class="line" id="mon-h4"><span class="w">Fixed,</span> <span class="w">and</span> <span class="w">verified</span> <span class="w">again.</span></div>
+        </div>
+
+        <div id="mon-term" class="term" data-layout-allow-overlap>
+          <div class="term-bar">
+            <div class="term-lights"><i></i><i></i><i></i></div>
+            <img class="term-logo" src="assets/logos/codex-color.svg" alt="" />
+            <span class="term-title" data-layout-ignore>codex — checkout</span>
+          </div>
+
+          <!-- The briefing Codex read (capture.json handoff, its own lines). -->
+          <div class="mon-page term-body" id="mon-p1" style="padding: 0">
+            <div class="mon-hi" id="mon-hi"></div>
+            <div class="term-line dim mon-l1">## Current task</div>
+            <div class="term-line mon-l1">"Round tax to the cent" (in-progress)</div>
+            <div class="term-line mon-l1">Next action: "Open the pull request"</div>
+            <div class="term-line"></div>
+            <div class="term-line dim mon-l1">## Checks</div>
+            <div class="term-line mon-l1">- [verified] <span class="warn">OUT OF DATE</span>: <span class="code">unit</span> (<span class="code">npm test --silent</span>).</div>
+            <div class="term-line mon-l1">  Ran 2d ago; changed since: <span class="code">src/tax.js</span></div>
+            <div class="term-line"></div>
+            <div class="term-line dim mon-l1">## Earlier sessions</div>
+            <div class="term-line mon-l1">- Claude Code session, ended: "…unit passes.</div>
+            <div class="term-line mon-l1">  Next: open the pull request."</div>
+            <div class="term-line dim mon-l1">  (since then <span class="code">src/tax.js</span> changed outside</div>
+            <div class="term-line dim mon-l1">   an agent session)</div>
+          </div>
+
+          <!-- Codex takes the task up and re-runs the check (capture.json mondayTakeUp, mondayFail). -->
+          <div class="mon-page term-body" id="mon-p2" style="padding: 0">
+            <div class="term-line dim mon-l2">• update_task</div>
+            <div class="term-line mon-l2">  Next: Re-run unit: src/tax.js changed since it passed</div>
+            <div class="term-line"></div>
+            <div class="term-line"><span class="dim">$ </span><span class="mon-type" id="mon-cmd1">npx getcontinuum run --name unit -- npm test --silent</span></div>
+            <div class="term-line bad mon-l2b">AssertionError [ERR_ASSERTION]: Expected values to be</div>
+            <div class="term-line bad mon-l2b">strictly equal:</div>
+            <div class="term-line"></div>
+            <div class="term-line bad mon-l2b">1082 !== 1083</div>
+            <div class="term-line"></div>
+            <div class="term-line dim mon-l2c">continuum: recorded "unit" · <span class="bad">failed</span> · exit 1 · 111ms</div>
+          </div>
+
+          <!-- The fix and the run again (capture.json diffFriday reversed, mondayRun). -->
+          <div class="mon-page term-body" id="mon-p3" style="padding: 0">
+            <div class="term-line dim mon-l3">src/tax.js</div>
+            <div class="mon-diff mon-l3">
+              <div class="term-line mon-del">- …  cents + Math.trunc(cents * rate)</div>
+              <div class="term-line mon-add">+ …  cents + Math.round(cents * rate)</div>
+            </div>
+            <div class="term-line"><span class="dim">$ </span><span class="mon-type" id="mon-cmd2">npx getcontinuum run --name unit -- npm test --silent</span></div>
+            <div class="term-line ok mon-l3b">2 tests passed</div>
+            <div class="term-line dim mon-l3c">continuum: recorded "unit" · <span class="ok">passed</span> · exit 0 · 112ms</div>
+          </div>
+        </div>
+
+        <!-- The same unit check card, now as Monday sees it. -->
+        <div id="mon-card" class="card check">
+          <div class="check-head">
+            <h3>unit</h3>
+            <span class="chip chip-ok swap mon-chip" id="mon-c-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>passed</span>
+            <span class="chip chip-warn swap mon-chip" id="mon-c-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>out of date</span>
+            <span class="chip chip-bad swap mon-chip" id="mon-c-bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>failed</span>
+            <span class="chip chip-ok swap mon-chip" id="mon-c-ok2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>passed</span>
+          </div>
+          <div class="check-cmd">npm test --silent</div>
+          <div class="check-line">
+            <span class="mon-slot" id="mon-s-ok">2 tests passed</span>
+            <span class="mon-slot" id="mon-s-warn" style="color: var(--warning)">1 file changed since it ran</span>
+            <span class="mon-slot" id="mon-s-bad" style="color: var(--danger)">1082 !== 1083</span>
+            <span class="mon-slot" id="mon-s-ok2">2 tests passed</span>
+          </div>
+          <div class="check-foot">
+            <span class="chip chip-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>verified</span>
+            <span style="position: relative; display: inline-block; width: 300px; height: 30px">
+              <span class="mon-slot" id="mon-f1">Claude Code · Fri 6:36 pm</span>
+              <span class="mon-slot" id="mon-f2">Codex · just now</span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const words = (id) => gsap.utils.toArray(`#${id} .w`);
+      const wordsIn = (id, at) => tl.fromTo(words(id), { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.14, stagger: 0.06, ease: "power2.out" }, at);
+      const wordsOut = (id, at) => tl.to(words(id), { opacity: 0, filter: "blur(6px)", duration: 0.16, stagger: 0.02, ease: "power2.in" }, at);
+      const lines = (selector, at, gap = 0.1) => tl.to(selector, { opacity: 1, duration: 0.01, stagger: gap }, at);
+      const typeIn = (selector, at, chars) => tl.to(selector, { clipPath: "inset(0 0% 0 0)", duration: chars * 0.018, ease: `steps(${chars})` }, at);
+      // A badge or line turns over on its X axis: the old face goes edge-on, the new one springs in.
+      const flip = (from, to, at) => {
+        tl.to(from, { rotationX: 90, opacity: 0, duration: 0.18, ease: "power2.in" }, at);
+        tl.fromTo(to, { rotationX: -90, opacity: 0 }, { rotationX: 0, opacity: 1, duration: 0.32, ease: "back.out(1.6)" }, at + 0.18);
+      };
+
+      gsap.set(["#mon-h1 .w", "#mon-h2 .w", "#mon-h3 .w", "#mon-h4 .w", ".mon-l1", ".mon-l2", ".mon-l2b", ".mon-l2c", ".mon-l3", ".mon-l3b", ".mon-l3c", "#mon-hi"], { opacity: 0 });
+      gsap.set(["#mon-p2", "#mon-p3"], { opacity: 0 });
+      gsap.set(["#mon-c-warn", "#mon-c-bad", "#mon-c-ok2", "#mon-s-warn", "#mon-s-bad", "#mon-s-ok2", "#mon-f2"], { opacity: 0 });
+      gsap.set(".mon-type", { clipPath: "inset(0 100% 0 0)" });
+      gsap.set("#mon-card", { scale: 0.78 });
+
+      // Monday arrives over the weekend strip.
+      tl.fromTo("#mon-stage", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power1.inOut" }, 0);
+      tl.fromTo("#mon-term", { y: 80, scale: 0.94, filter: "blur(8px)" }, { y: 0, scale: 1, filter: "blur(0px)", duration: 0.6, ease: "expo.out" }, 0.05);
+      tl.fromTo("#mon-card", { x: 120, opacity: 0 }, { x: 0, opacity: 1, duration: 0.6, ease: "expo.out" }, 0.4);
+      wordsIn("mon-h1", 0.5);
+      lines(".mon-l1", 0.8, 0.12);
+
+      // The OUT OF DATE line lights, and Friday's tick turns amber.
+      tl.fromTo("#mon-hi", { opacity: 0, scaleX: 0.96 }, { opacity: 1, scaleX: 1, duration: 0.35, ease: "expo.out" }, 3.2);
+      flip("#mon-c-ok", "#mon-c-warn", 3.3);
+      flip("#mon-s-ok", "#mon-s-warn", 3.38);
+      tl.fromTo("#mon-card", { boxShadow: "0 0 0 0px rgb(163 95 0 / 0)" }, { boxShadow: "0 0 0 8px rgb(163 95 0 / 0.18)", duration: 0.5, ease: "power2.out" }, 3.4);
+      wordsOut("mon-h1", 3.8);
+      wordsIn("mon-h2", 4.05);
+
+      // Codex takes the task up and re-runs the check before trusting it.
+      tl.to("#mon-p1", { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 7.5);
+      tl.set("#mon-p2", { opacity: 1 }, 7.8);
+      lines(".mon-l2", 7.9, 0.12);
+      wordsOut("mon-h2", 8.3);
+      wordsIn("mon-h3", 8.55);
+      typeIn("#mon-cmd1", 8.9, 55);
+      lines(".mon-l2b", 10.2, 0.08);
+      lines(".mon-l2c", 10.9);
+      flip("#mon-c-warn", "#mon-c-bad", 11.2);
+      flip("#mon-s-warn", "#mon-s-bad", 11.28);
+      flip("#mon-f1", "#mon-f2", 11.36);
+      tl.to("#mon-card", { boxShadow: "0 0 0 8px rgb(204 47 47 / 0.16)", duration: 0.4 }, 11.3);
+
+      // The fix, and the run again.
+      tl.to("#mon-p2", { opacity: 0, y: -20, duration: 0.3, ease: "power3.in" }, 14.3);
+      tl.set("#mon-p3", { opacity: 1 }, 14.6);
+      lines(".mon-l3", 14.8, 0.15);
+      typeIn("#mon-cmd2", 16.5, 55);
+      lines(".mon-l3b", 17.6);
+      lines(".mon-l3c", 18.0);
+      flip("#mon-c-bad", "#mon-c-ok2", 18.3);
+      flip("#mon-s-bad", "#mon-s-ok2", 18.38);
+      tl.to("#mon-card", { boxShadow: "0 0 0 8px rgb(18 128 76 / 0.16)", duration: 0.4 }, 18.4);
+      wordsOut("mon-h3", 18.4);
+      wordsIn("mon-h4", 18.65);
+
+      // A slow push while the verified result sits.
+      tl.to("#mon-world", { scale: 1.035, transformOrigin: "50% 50%", duration: 3.2, ease: "power1.inOut" }, 18.9);
+      // The camera pulls back as the replay comes up over it.
+      tl.to("#mon-world", { scale: 0.55, opacity: 0, filter: "blur(10px)", transformOrigin: "50% 50%", duration: 0.8, ease: "power2.inOut" }, 22.1);
+      tl.set({}, {}, 22.8);
+
+      window.__timelines["monday"] = tl;
+    })();
+  </script>
+</template>

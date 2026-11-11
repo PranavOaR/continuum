@@ -14,7 +14,7 @@ import { buttonClass } from '../components/shared/buttonClass'
 import { AgentPicker } from '../components/site/AgentPicker'
 import { DemoVideo } from '../components/site/DemoVideo'
 import { InstallCommand } from '../components/site/InstallCommand'
-import { GET_STARTED } from '../components/site/siteContent'
+import { GET_STARTED, STALE_TEST_VIDEO } from '../components/site/siteContent'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useScrollToTop } from '../hooks/useScrollToTop'
 
@@ -91,6 +91,15 @@ function DemoSection() {
           One task. Two agents. Nothing lost.
         </SectionTitle>
         <DemoVideo />
+        <div className="mt-20 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-center">
+          <div>
+            <h3 className="text-[24px] leading-[1.2] font-normal tracking-[-0.02em] text-fg">A passing test, then the code moved.</h3>
+            <p className="mt-3 text-[15px] leading-[1.6] text-muted">
+              Friday, Claude Code's tests pass. A line changes by hand before the weekend. Monday, Codex's briefing marks the check out of date before Codex trusts it, the re-run fails, and the task replay shows exactly where it went stale.
+            </p>
+          </div>
+          <DemoVideo video={STALE_TEST_VIDEO} />
+        </div>
       </div>
     </section>
   )

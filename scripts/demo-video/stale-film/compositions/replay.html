@@ -1,0 +1,103 @@
+<template>
+  <style>
+    @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+    @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+    #root { position: absolute; inset: 0; overflow: hidden; font-family: "Geist", sans-serif; }
+    #rp-world { position: absolute; inset: 0; }
+    #rp-page { position: absolute; left: 230px; top: 48px; width: 1460px; }
+    .rp-crumbs { font-family: "Geist Mono", monospace; font-size: 21px; color: var(--muted); height: 30px; }
+    .rp-crumbs b { font-weight: 400; color: var(--color-ink); }
+    .rp-title-h { font-weight: 500; font-size: 54px; letter-spacing: -0.03em; margin-top: 10px; height: 64px; }
+    .rp-desc { font-size: 24px; color: var(--muted); margin-top: 6px; height: 32px; }
+    .rp-summary { display: flex; gap: 12px; margin-top: 18px; height: 40px; align-items: center; }
+    .rp-badge { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border-radius: 9px; border: 1.5px solid var(--line); background: #fff; font-size: 20px; color: var(--muted); white-space: nowrap; }
+    .rp-badge img { width: 20px; height: 20px; }
+    .rp-badge-warn { color: var(--warning); border-color: rgb(163 95 0 / 0.38); background: rgb(163 95 0 / 0.08); }
+    .rp-badge-warn svg { width: 20px; height: 20px; }
+    .rp-day { font-family: "Geist Mono", monospace; font-size: 19px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; height: 24px; }
+    .rp-list { list-style: none; background: #fff; border: 1.5px solid var(--line); border-radius: 14px; padding: 0 12px; position: relative; }
+    .rp-row { display: flex; align-items: center; gap: 16px; height: 57px; padding: 0 12px 0 16px; border-left: 3px solid var(--line); position: relative; }
+    .rp-row + .rp-row { border-top: 1px solid #f0eee9; }
+    .rp-good { border-left-color: var(--success); }
+    .rp-bad { border-left-color: var(--danger); }
+    .rp-warn { border-left-color: var(--warning); background: rgb(163 95 0 / 0.06); }
+    .rp-row time { width: 74px; font-family: "Geist Mono", monospace; font-size: 21px; color: var(--subtle); }
+    .rp-icon { width: 22px; height: 22px; color: var(--subtle); flex-shrink: 0; }
+    .rp-icon-warn { color: var(--warning); }
+    .rp-title { font-size: 26px; font-weight: 500; white-space: nowrap; }
+    .rp-detail { font-size: 22px; color: var(--muted); white-space: nowrap; overflow: hidden; flex: 1; }
+    .rp-detail code { font-family: "Geist Mono", monospace; font-size: 20px; color: var(--color-ink); }
+    .rp-tags { display: flex; gap: 10px; align-items: center; }
+    .rp-agent { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 10px; border-radius: 8px; border: 1.5px solid var(--line); font-size: 18px; color: var(--muted); white-space: nowrap; }
+    .rp-agent img { width: 18px; height: 18px; }
+    .rp-ev { font-family: "Geist Mono", monospace; font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 9px; border-radius: 7px; border: 1.5px solid var(--line); color: var(--muted); white-space: nowrap; }
+    .rp-ev-verified { color: var(--success); border-color: rgb(18 128 76 / 0.35); }
+    #rp-thread { position: absolute; left: -34px; top: 300px; width: 4px; height: 680px; border-radius: 2px; background: var(--color-accent); transform-origin: top center; }
+  </style>
+  <div id="root" data-composition-id="replay" data-width="1920" data-height="1080" data-layout-allow-overflow>
+    <div id="rp-stage" class="stage">
+      <div id="rp-world">
+        <div id="rp-page" data-layout-allow-overlap>
+          <div id="rp-thread"></div>
+          <div class="rp-crumbs rp-head">Projects / checkout / <b>Replay</b></div>
+          <div class="rp-title-h rp-head">Round tax to the cent</div>
+          <div class="rp-desc rp-head">Everything recorded for this task, across agents and people, oldest first.</div>
+          <div class="rp-summary rp-head">
+            <span class="rp-badge">completed</span>
+            <span class="rp-badge"><img src="assets/logos/claude-color.svg" alt="" />Claude Code</span>
+            <span class="rp-badge"><img src="assets/logos/codex-color.svg" alt="" />Codex</span>
+            <span class="rp-badge">3 edits</span>
+            <span class="rp-badge">3 check runs</span>
+            <span class="rp-badge">0 decisions</span>
+            <span class="rp-badge rp-badge-warn" id="rp-stale-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>A check went stale once</span>
+          </div>
+          <div class="rp-day">Fri 6 Nov</div>
+          <ol class="rp-list">
+            <li class="rp-row rp-none" id="rp-r0"><time>18:31</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg><span class="rp-title">Task started: Round tax to the cent</span><span class="rp-detail"></span><span class="rp-tags"><span class="rp-ev rp-ev-agent-reported">agent-reported</span></span></li>
+            <li class="rp-row rp-none" id="rp-r1"><time>18:34</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M13.38 15.62a1 1 0 0 1 3 3L12 23l-4 1 1-4Z"/></svg><span class="rp-title">Claude Code edited src/tax.js</span><span class="rp-detail"></span><span class="rp-tags"><span class="rp-agent"><img src="assets/logos/claude-color.svg" alt="" />Claude Code</span><span class="rp-ev rp-ev-observed">observed</span></span></li>
+            <li class="rp-row rp-good" id="rp-r2"><time>18:36</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.53a2 2 0 0 1-.21.9L4.72 20.55A1 1 0 0 0 5.6 22h12.8a1 1 0 0 0 .88-1.45l-5.07-10.12a2 2 0 0 1-.21-.9V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg><span class="rp-title">unit passed</span><span class="rp-detail"><code>npm test --silent</code></span><span class="rp-tags"><span class="rp-ev rp-ev-verified">verified</span></span></li>
+            <li class="rp-row rp-none" id="rp-r3"><time>18:38</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M13 8H7"/><path d="M17 12H7"/></svg><span class="rp-title">Claude Code session ended</span><span class="rp-detail"></span><span class="rp-tags"><span class="rp-agent"><img src="assets/logos/claude-color.svg" alt="" />Claude Code</span><span class="rp-ev rp-ev-observed">observed</span></span></li>
+            <li class="rp-row rp-none" id="rp-r4"><time>18:52</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M13.38 15.62a1 1 0 0 1 3 3L12 23l-4 1 1-4Z"/></svg><span class="rp-title">src/tax.js changed outside an agent session</span><span class="rp-detail"></span><span class="rp-tags"><span class="rp-ev rp-ev-observed">observed</span></span></li>
+            <li class="rp-row rp-warn" id="rp-stale"><time>18:52</time><svg class="rp-icon rp-icon-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span class="rp-title">unit went out of date</span><span class="rp-detail">It passed against src/tax.js, which has changed since.</span><span class="rp-tags"><span class="rp-ev rp-ev-observed">observed</span></span></li>
+          </ol>
+          <div class="rp-day">Mon 9 Nov</div>
+          <ol class="rp-list">
+            <li class="rp-row rp-none" id="rp-r6"><time>09:12</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="rp-title">Codex session started</span><span class="rp-detail"></span><span class="rp-tags"><span class="rp-agent"><img src="assets/logos/codex-color.svg" alt="" />Codex</span><span class="rp-ev rp-ev-observed">observed</span></span></li>
+            <li class="rp-row rp-bad" id="rp-r7"><time>09:13</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.53a2 2 0 0 1-.21.9L4.72 20.55A1 1 0 0 0 5.6 22h12.8a1 1 0 0 0 .88-1.45l-5.07-10.12a2 2 0 0 1-.21-.9V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg><span class="rp-title">unit failed</span><span class="rp-detail"><code>npm test --silent</code></span><span class="rp-tags"><span class="rp-ev rp-ev-verified">verified</span></span></li>
+            <li class="rp-row rp-none" id="rp-r8"><time>09:15</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v9.5"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M13.38 15.62a1 1 0 0 1 3 3L12 23l-4 1 1-4Z"/></svg><span class="rp-title">Codex edited src/tax.js</span><span class="rp-detail"></span><span class="rp-tags"><span class="rp-agent"><img src="assets/logos/codex-color.svg" alt="" />Codex</span><span class="rp-ev rp-ev-observed">observed</span></span></li>
+            <li class="rp-row rp-good" id="rp-r9"><time>09:15</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.53a2 2 0 0 1-.21.9L4.72 20.55A1 1 0 0 0 5.6 22h12.8a1 1 0 0 0 .88-1.45l-5.07-10.12a2 2 0 0 1-.21-.9V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg><span class="rp-title">unit passed</span><span class="rp-detail"><code>npm test --silent</code></span><span class="rp-tags"><span class="rp-ev rp-ev-verified">verified</span></span></li>
+            <li class="rp-row rp-none" id="rp-r10"><time>09:16</time><svg class="rp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg><span class="rp-title">Task completed</span><span class="rp-detail"></span><span class="rp-tags"><span class="rp-ev rp-ev-agent-reported">agent-reported</span></span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const rows = gsap.utils.toArray(".rp-row");
+      gsap.set([".rp-head", ".rp-day", ".rp-list", rows], { opacity: 0 });
+      gsap.set("#rp-thread", { scaleY: 0 });
+
+      // The replay page rises out of Monday's pulled-back desk.
+      tl.fromTo("#rp-stage", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power1.inOut" }, 0);
+      tl.fromTo("#rp-page", { scale: 1.12, filter: "blur(10px)", transformOrigin: "50% 30%" }, { scale: 1, filter: "blur(0px)", duration: 0.8, ease: "power2.out" }, 0);
+      tl.to(".rp-head", { opacity: 1, duration: 0.3, stagger: 0.08 }, 0.2);
+      tl.to([".rp-day", ".rp-list"], { opacity: 1, duration: 0.25, stagger: 0.1 }, 0.7);
+      // The thread runs down the task's history, lighting each step as it passes.
+      tl.to("#rp-thread", { scaleY: 1, duration: 2.6, ease: "power1.inOut" }, 0.9);
+      tl.fromTo(rows, { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.3, stagger: 0.22, ease: "expo.out" }, 0.95);
+      tl.fromTo("#rp-stale-badge", { scale: 0.6, transformOrigin: "50% 50%" }, { scale: 1, duration: 0.4, ease: "back.out(1.7)" }, 2.3);
+
+      // Punch in on the step between Friday's pass and Monday: where the tick went amber.
+      tl.to(rows.filter((row) => row.id !== "rp-stale"), { opacity: 0.32, duration: 0.5 }, 5.2);
+      tl.to("#rp-world", { scale: 1.25, x: 0, y: -96, transformOrigin: "50% 50%", duration: 0.85, ease: "power2.inOut" }, 5.4);
+      tl.fromTo("#rp-stale", { boxShadow: "0 0 0 0px rgb(163 95 0 / 0)" }, { boxShadow: "0 0 0 5px rgb(163 95 0 / 0.22)", duration: 0.5, ease: "power2.out" }, 6.1);
+      // Hold on it with a slow drift until the claim.
+      tl.to("#rp-world", { scale: 1.29, y: -104, duration: 5.0, ease: "power1.inOut" }, 6.3);
+      tl.set({}, {}, 11.4);
+
+      window.__timelines["replay"] = tl;
+    })();
+  </script>
+</template>
