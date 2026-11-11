@@ -2,7 +2,7 @@
 // told? Every scenario's questions are put to Claude twice, once with
 // Continuum's briefing and tool replies and once with only what an agent
 // without memory has (the files and the git history), and scored by the same
-// patterns. Uses your Claude account: about 14 calls.
+// patterns. Uses your Claude account: one call per scenario in each condition (12 today).
 //
 //   npm run bench:handoff
 //

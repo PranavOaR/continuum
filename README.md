@@ -10,6 +10,8 @@ Continuum is local project memory for AI coding agents. Every Claude Code, Codex
 
 Every claim is labelled **verified**, **observed**, **agent-reported** or **set by you**. Your code and records never leave your machine.
 
+In the [handoff benchmark](https://continuumgroup.dev/docs/benchmark), Claude answered 23 of 23 start-of-session questions with Continuum's briefing, and 4 of 23 with only the files and git history.
+
 This README is for working on Continuum. **Using it?** Start at [continuumgroup.dev/docs](https://continuumgroup.dev/docs) (sources in `apps/web/src/site/docs/`), or the package's own README (`scripts/release/README.md`):
 
 ```bash

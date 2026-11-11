@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **A public handoff benchmark.** `npm run bench:handoff` asks Claude what a fresh agent needs to know at the start of a session (the task and next step, whether a passing test still holds, what another agent or a person changed, which decisions apply), once with Continuum's briefing and once with only the files and git history, and scores both the same way. First run, with `claude-opus-5-5`: 23 of 23 questions answered with Continuum, 4 of 23 without memory. The method, the caveats and the results are on the new benchmark page of the docs.
+
 ## [0.7.0] - 2026-11-11
 
 ### Added
