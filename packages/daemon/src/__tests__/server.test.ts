@@ -45,6 +45,10 @@ const fakeService: ContinuumService = {
     edits.push({ projectId, input })
     return memory(projectId, 'acme~memory~new')
   },
+  getTaskReplay: async (_projectId, taskId) => {
+    if (taskId === 'missing') throw new NotFoundError('Task', taskId)
+    return { taskId, title: 't', status: 'in-progress', steps: [], summary: { agents: [], edits: 0, checks: 0, stale: 0, decisions: 0 } }
+  },
   getSettings: async (projectId) => {
     if (projectId === 'broken') throw new InvalidConfigError('/repo/.continuum/config.json', 'a redactPatterns entry cannot be used (\\w+\\w+@: It has two repeats in a row)')
     return { agentChecks: true, capturePrompts: false, receipts: true, recall: true, reflection: false, redactPatterns: [] }
@@ -137,6 +141,12 @@ describe('daemon API', () => {
       { projectId: 'acme', query: {} },
       { projectId: 'acme', query: {} },
     ])
+  })
+
+  it('serves a task replay, and a missing task as not found', async () => {
+    const daemon = await start()
+    expect(JSON.parse((await raw(daemon, '/api/projects/acme/tasks/auth-1/replay')).body).data).toMatchObject({ taskId: 'auth-1', steps: [] })
+    expect((await raw(daemon, '/api/projects/acme/tasks/missing/replay')).status).toBe(404)
   })
 
   it('maps errors to statuses without leaking internals', async () => {

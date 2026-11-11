@@ -23,9 +23,10 @@ import {
   type ProjectWorkspace,
   type SearchResult,
   type TaskChange,
+  type TaskReplay,
 } from '@continuum/core'
 import { previewRedaction, readConfig, saveSettings, briefingPreferences, EMPTY_PROFILE, InvalidConfigError, readProfile, writeProfile, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
-import { searchMemory, applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
+import { taskReplay, searchMemory, applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
 import { keys } from '@continuum/store'
 import { asAgent, ids, storedMemoryId } from './ids'
 import { EVENT_TYPES_OF, toActivity, toActivityEvent } from './mapActivity'
@@ -365,6 +366,19 @@ export class LocalContinuumService implements ContinuumService {
       store.close()
     }
     return this.foundMemory(projectId, memoryId)
+  }
+
+  /** One task's history from the whole log; the coverage of each check is read back inline. */
+  async getTaskReplay(projectId: string, taskId: string): Promise<TaskReplay> {
+    const { store } = await openWorkspace(this.repository(projectId).cwd)
+    try {
+      if (!store.graph.has(keys.task(taskId))) throw new NotFoundError('Task', taskId)
+      const replay = taskReplay([...store.events()].map((event) => store.selfContained(event)), taskId)
+      // Compacted history lives in a checkpoint, not as events, so the replay starts after it.
+      return store.checkpoint() ? { ...replay, isPartial: true } : replay
+    } finally {
+      store.close()
+    }
   }
 
   async updateTask(projectId: string, taskId: string, change: TaskChange): Promise<ProjectTask> {

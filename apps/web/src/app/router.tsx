@@ -19,6 +19,7 @@ const ActivityPage = lazyPage(() => import('../pages/ActivityPage'), 'ActivityPa
 const MemoryPage = lazyPage(() => import('../pages/MemoryPage'), 'MemoryPage')
 const BriefingsPage = lazyPage(() => import('../pages/BriefingsPage'), 'BriefingsPage')
 const SettingsPage = lazyPage(() => import('../pages/SettingsPage'), 'SettingsPage')
+const TaskReplayPage = lazyPage(() => import('../pages/TaskReplayPage'), 'TaskReplayPage')
 
 const APP_ROUTES: RouteObject[] = [
   // `continuum serve` opens the dashboard; the landing page is for the website and local development.
@@ -31,6 +32,7 @@ const APP_ROUTES: RouteObject[] = [
       { index: true, element: <OverviewPage /> },
       { path: 'projects', element: <ProjectsPage /> },
       { path: 'projects/:projectId', element: <ProjectWorkspacePage /> },
+      { path: 'projects/:projectId/tasks/:taskId/replay', element: <TaskReplayPage /> },
       { path: 'activity', element: <ActivityPage /> },
       { path: 'memory', element: <MemoryPage /> },
       { path: 'briefings', element: <BriefingsPage /> },

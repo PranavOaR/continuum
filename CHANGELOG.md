@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **Task replay.** Every task in the dashboard has a Replay link: its whole history across agents and people, oldest first, from the record. It shows the sessions that worked on it, every change to its files (its own, another agent's, and changes made by hand), the checks that ran against them with their results, its decisions, and the moment each passing check went out of date, naming the file that changed. Each step carries its evidence label. It ends when the task is completed, and says so if `continuum compact` folded older history away.
 - **A public handoff benchmark.** `npm run bench:handoff` asks Claude what a fresh agent needs to know at the start of a session (the task and next step, whether a passing test still holds, what another agent or a person changed, which decisions apply), once with Continuum's briefing and once with only the files and git history, and scores both the same way. First run, with `claude-opus-5-5`: 23 of 23 questions answered with Continuum, 4 of 23 without memory. The method, the caveats and the results are on the new benchmark page of the docs.
 
 ### Changed
