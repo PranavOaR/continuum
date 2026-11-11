@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.7.0] - 2026-11-11
 
 ### Added
 - **Recall on every prompt.** When the words you type point to recorded decisions, known issues or failed attempts, Claude Code and Codex now see them before they answer, each with its evidence label, the task it belongs to, and whether its anchored code changed since. It speaks only when it is fairly sure (two matching words in a prompt of three or more), shows at most three records, and reminds a session of each record once. It is masked by the repository's redaction patterns and shows nothing `.continuumignore` lists. The prompt hook now runs in the foreground, with a 5-second limit; it takes about 0.13 s with the Claude Code plugin (through `npx`, add about 0.4 s for Node.js to start). Turn it off with `continuum config recall off` or in the dashboard's settings.
