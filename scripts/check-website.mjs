@@ -27,6 +27,7 @@ const PAGES = [
   ['/docs/agents', 'Agents', 'setup codex'],
   ['/docs/commands', 'Commands', 'export <file>'],
   ['/docs/data', 'What gets recorded', '.continuumignore'],
+  ['/docs/benchmark', 'Handoff benchmark', 'Without memory'],
   ['/privacy', 'Privacy', 'No cookies, no analytics'],
   [NOT_FOUND, 'This page went missing.', 'Read the docs'],
 ]

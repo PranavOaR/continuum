@@ -23,6 +23,7 @@
     "test:cross-agent": "node scripts/cross-agent.mjs",
     "plugin": "tsx scripts/plugin.ts",
     "eval": "tsx scripts/eval/run.ts",
+    "bench:handoff": "tsx scripts/eval/benchmark.ts",
     "check:website": "node scripts/check-website.mjs"
   },
   "devDependencies": {

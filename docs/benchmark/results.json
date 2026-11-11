@@ -1,0 +1,118 @@
+{
+  "date": "2026-11-11",
+  "model": "claude-opus-5-5",
+  "cli": "2.1.322 (Claude Code)",
+  "runs": [
+    {
+      "condition": "continuum",
+      "passed": 23,
+      "total": 23,
+      "scenarios": [
+        {
+          "name": "resume a half-finished task after another agent and a hand edit",
+          "passed": 8,
+          "total": 8,
+          "failed": []
+        },
+        {
+          "name": "no task recorded: pick up from the last session and pending edits",
+          "passed": 4,
+          "total": 4,
+          "failed": []
+        },
+        {
+          "name": "no task, two agents: the next step one of them named",
+          "passed": 2,
+          "total": 2,
+          "failed": []
+        },
+        {
+          "name": "a task you changed in the dashboard",
+          "passed": 4,
+          "total": 4,
+          "failed": []
+        },
+        {
+          "name": "an old decision on another task, found by a word in its body",
+          "passed": 3,
+          "total": 3,
+          "failed": []
+        },
+        {
+          "name": "a note the code moved on from: a commit by hand between sessions",
+          "passed": 2,
+          "total": 2,
+          "failed": []
+        }
+      ]
+    },
+    {
+      "condition": "none",
+      "passed": 4,
+      "total": 23,
+      "scenarios": [
+        {
+          "name": "resume a half-finished task after another agent and a hand edit",
+          "passed": 1,
+          "total": 8,
+          "failed": [
+            "task: What task is in progress? → I can't tell. There are no session notes, no project memory and no git history beyond the file list. The file names only suggest the work involves an auth flow (login, callback, session).",
+            "next: What is the next step? → I can't tell, because nothing records a plan or a next step.",
+            "unit-trust: Can the passing \"unit\" check still be trusted? Why? → I can't tell. Nothing records a \"unit\" check or whether it passed, and with no history I can't see if code changed after it ran.",
+            "e2e: What is the state of the \"e2e\" check? → I can't tell, because nothing records an \"e2e\" check.",
+            "other-agent: Did any other agent work here since your last session? What did it change? → I can't tell. There are no notes or history showing any agent's sessions or changes, including a \"last session\" of my own.",
+            "by-hand: Which files were changed outside any agent session? → I can't tell. Without git history or session logs, I can't tell agent changes from changes made outside a session.",
+            "decision: Is there a recorded decision you should follow? → No. Nothing records a decision, though I haven't opened README.md to check for one."
+          ]
+        },
+        {
+          "name": "no task recorded: pick up from the last session and pending edits",
+          "passed": 1,
+          "total": 4,
+          "failed": [
+            "left-off: Where did the last session leave off? → I can't tell. There are no notes from earlier sessions, no project memory, and no git history, so nothing records where work stopped. `notes.txt` might say, but I haven't been given what's in it.",
+            "tests: Do the tests pass on the current code? → I can't tell. Nothing shows a test run or its result, and I haven't run `tests/test_app.py` myself.",
+            "pending: Which changes have not been recorded yet? → I can't tell. Without git history or a previous record of the files, there's nothing to compare against to see what's unrecorded."
+          ]
+        },
+        {
+          "name": "no task, two agents: the next step one of them named",
+          "passed": 0,
+          "total": 2,
+          "failed": [
+            "next: What should happen next, and who said so? → I can't tell. There are no notes, memory, commit history or instructions, so nobody has said what should happen next. The only thing in the repository is `src/login.ts`.",
+            "latest: Which agent worked here most recently, and what did it do? → I can't tell. With no git history or session notes, there's no record of which agent, if any, worked here last or what it did."
+          ]
+        },
+        {
+          "name": "a task you changed in the dashboard",
+          "passed": 1,
+          "total": 4,
+          "failed": [
+            "status: What is the status of the refunds task, and who set it? → I can't tell. I have no notes, no project memory, and no task or dashboard data. The only thing here is `lib/billing.ts`, so I don't know the refunds task's status or who set it.",
+            "when: Roughly how long ago did you change the refunds task in the dashboard? → I can't tell. I have no record of changing anything in a dashboard, and since there's no git history, I have no timestamps either.",
+            "next: What should happen next? → I can't say from what's here. If you tell me the task's status or paste it from the dashboard, I can start from `lib/billing.ts`."
+          ]
+        },
+        {
+          "name": "an old decision on another task, found by a word in its body",
+          "passed": 0,
+          "total": 3,
+          "failed": [
+            "search: Can a webhook be delivered twice safely? Who says so, and for which task was it decided? → I can't know. There are no notes, project memory or git history saying whether a webhook can safely be delivered twice, who decided it, or for which task.",
+            "recall: Before answering \"make the webhook handler idempotent so provider retries are safe\", what did Continuum remind you of? → Nothing. Continuum gave me no reminder this session, and none of the context I was given mentions it, so I won't make one up.",
+            "ranked: Which recorded decision matters most for handling a webhook that is retried? → I can't say, because there are no recorded decisions. The only information is the file names `src/auth.ts` and `src/webhooks.ts`, and they don't contain any decision about retried webhooks."
+          ]
+        },
+        {
+          "name": "a note the code moved on from: a commit by hand between sessions",
+          "passed": 1,
+          "total": 2,
+          "failed": [
+            "next: What is the next step, and is anything known to have changed since it was named? → I can't tell. No next step was ever written down, so I also can't say whether anything has changed since one was set. The only change on record is that one commit."
+          ]
+        }
+      ]
+    }
+  ]
+}
