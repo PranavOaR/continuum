@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.8.0] - 2026-11-11
 
 ### Added
 - **Task replay.** Every task in the dashboard has a Replay link: its whole history across agents and people, oldest first, from the record. It shows the sessions that worked on it, every change to its files (its own, another agent's, and changes made by hand), the checks that ran against them with their results, its decisions, and the moment each passing check went out of date, naming the file that changed. Each step carries its evidence label. It ends when the task is completed, and says so if `continuum compact` folded older history away.

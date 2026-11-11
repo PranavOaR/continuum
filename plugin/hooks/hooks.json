@@ -12,7 +12,7 @@
               "--if-continuum",
               "npx",
               "-y",
-              "getcontinuum@0.7.0",
+              "getcontinuum@0.8.0",
               "ingest"
             ]
           }
@@ -31,7 +31,7 @@
               "--if-continuum",
               "npx",
               "-y",
-              "getcontinuum@0.7.0",
+              "getcontinuum@0.8.0",
               "ingest"
             ]
           }
@@ -50,7 +50,7 @@
               "--if-continuum",
               "npx",
               "-y",
-              "getcontinuum@0.7.0",
+              "getcontinuum@0.8.0",
               "ingest"
             ]
           }
@@ -71,7 +71,7 @@
               "--if-continuum",
               "npx",
               "-y",
-              "getcontinuum@0.7.0",
+              "getcontinuum@0.8.0",
               "ingest"
             ]
           }
@@ -92,7 +92,7 @@
               "--if-continuum",
               "npx",
               "-y",
-              "getcontinuum@0.7.0",
+              "getcontinuum@0.8.0",
               "ingest"
             ]
           }
@@ -111,7 +111,7 @@
               "--if-continuum",
               "npx",
               "-y",
-              "getcontinuum@0.7.0",
+              "getcontinuum@0.8.0",
               "ingest"
             ]
           }
