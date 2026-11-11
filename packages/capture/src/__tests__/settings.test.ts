@@ -23,7 +23,7 @@ describe('saveSettings', () => {
     const root = await repo()
     writeFileSync(join(root, '.continuum', 'config.json'), JSON.stringify({ somethingNewer: 1 }))
     const saved = await saveSettings(root, { capturePrompts: true, redactPatterns: ['ACME-[0-9]{6}', 'ACME-[0-9]{6}'] })
-    expect(saved).toEqual({ agentChecks: true, capturePrompts: true, receipts: true, redactPatterns: ['ACME-[0-9]{6}'] })
+    expect(saved).toEqual({ agentChecks: true, capturePrompts: true, receipts: true, recall: true, reflection: false, redactPatterns: ['ACME-[0-9]{6}'] })
     expect(await readConfig(root)).toEqual(saved)
     expect(JSON.parse(readFileSync(join(root, '.continuum', 'config.json'), 'utf8')).somethingNewer).toBe(1)
   })

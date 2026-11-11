@@ -8,7 +8,7 @@ Continuum connects to each agent per repository. It never writes to your global 
 npx getcontinuum setup claude-code
 ```
 
-Writes the hooks to `.claude/settings.local.json` and the MCP server to `.mcp.json`. Start Claude Code in the repository and approve the `continuum` server. Every session then starts with a briefing, and edits, test runs, tasks and commits are recorded as you work.
+Writes the hooks to `.claude/settings.local.json` and the MCP server to `.mcp.json`. Start Claude Code in the repository and approve the `continuum` server. Every session then starts with a briefing, each prompt brings the recorded decisions its words point to, and edits, test runs, tasks and commits are recorded as you work.
 
 You can install the **Claude Code plugin** instead, which brings the hooks, the MCP server and a `/continuum:handoff` command in one step. Its hooks do nothing in repositories that don't use Continuum.
 

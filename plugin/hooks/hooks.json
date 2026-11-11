@@ -104,8 +104,7 @@
         "hooks": [
           {
             "type": "command",
-            "async": true,
-            "timeout": 30,
+            "timeout": 5,
             "command": "node",
             "args": [
               "${CLAUDE_PLUGIN_ROOT}/launcher.mjs",

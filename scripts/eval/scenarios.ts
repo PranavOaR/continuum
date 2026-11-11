@@ -17,7 +17,7 @@ export interface Question {
   /** Briefing mode: wording the section must never contain, e.g. calling an out-of-date check "passed". */
   notInBriefing?: RegExp[]
   /** The answer is not in the briefing: the agent has to ask for it. `inBriefing` is then matched against this tool's reply. */
-  tool?: { name: 'search_memory' | 'get_context'; query: string }
+  tool?: { name: 'search_memory' | 'get_context' | 'recall'; query: string }
 }
 
 export interface Scenario {
@@ -149,6 +149,7 @@ export const SCENARIOS: Scenario[] = [
     resumingSession: { sessionId: 'claude-t', agent: 'claude-code' },
     questions: [
       { id: 'search', ask: 'Can a webhook be delivered twice safely? Who says so, and for which task was it decided?', expect: [/idempotency/i, /invoice/i], section: '', tool: { name: 'search_memory', query: 'idempotency' }, inBriefing: [/1 record matches "idempotency"/, /\[agent-reported\] decision: Retries are safe/, /checks the idempotency key before it writes/, /task "Invoice export"/, /anchored to src\/webhooks\.ts/] },
+      { id: 'recall', ask: 'Before answering "make the webhook handler idempotent so provider retries are safe", what did Continuum remind you of?', expect: [/retries are safe/i], section: '', tool: { name: 'recall', query: 'make the webhook handler idempotent so provider retries are safe' }, inBriefing: [/^Continuum recalled recorded notes that match your words\./, /- \[agent-reported\] decision: Retries are safe: Every webhook handler checks the idempotency key before it writes, so the provider may deliver twice\. \(task "Invoice export"; anchored to src\/webhooks\.ts\)/] },
       { id: 'ranked', ask: 'Which recorded decision matters most for handling a webhook that is retried?', expect: [/retries are safe|idempotency/i], section: '', tool: { name: 'get_context', query: 'webhook retries idempotency' }, inBriefing: [/^[^\n]*\n- [^\n]*Task "Add single sign-on"[^\n]*\n- \([^)]*matches "webhook", "retries", "idempotency"[^)]*\) \[agent-reported\] decision: Retries are safe/] },
     ],
   },

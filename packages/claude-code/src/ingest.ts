@@ -28,6 +28,8 @@ import { adapterSource, cleanPrompt, translateHook, type FileEdit } from './tran
 import { replyReceipt } from './receipt'
 import { VERIFIED_RUN_HINT } from './guidance'
 import { fromAntigravity } from './antigravity'
+import { recallForPrompt } from './recall'
+import { reflectionRequest } from './reflection'
 
 /** How this adapter's sessions are recorded; "since you left" compares with this agent's previous session. */
 const DEFAULT_AGENT: HookAgent = 'claude-code'
@@ -69,6 +71,10 @@ export type IngestOutcome =
       status: 'recorded'
       events: number
       additionalContext?: string
+      /** The hook whose reply carries additionalContext: a briefing at session start, or recall on a prompt. */
+      hookEvent?: 'SessionStart' | 'UserPromptSubmit'
+      /** At a Stop, with reflection on: why the agent should go on once to record its decisions. */
+      reflect?: string
       /** After a reply (Stop), one line for the person on what it recorded; Claude Code shows it as a systemMessage. */
       receipt?: string
     }
@@ -197,7 +203,8 @@ async function ingestInto(workspace: Workspace, payload: HookPayload, agent: Hoo
   const edits = await resolveEdits(workspace.root, payload)
   if (editedFiles(payload).length > 0 && edits.length === 0) return { status: 'ignored', reason: 'edited files are outside what Continuum captures' }
   const prompt = payload.hook_event_name === 'UserPromptSubmit' && config.capturePrompts ? cleanPrompt(payload.prompt, redact) : ''
-  if (payload.hook_event_name === 'UserPromptSubmit' && prompt === '') return { status: 'ignored', reason: 'prompt capture is off for this repository' }
+  const isRecall = payload.hook_event_name === 'UserPromptSubmit' && config.recall
+  if (payload.hook_event_name === 'UserPromptSubmit' && prompt === '' && !isRecall) return { status: 'ignored', reason: 'prompt capture and recall are off for this repository' }
   const sessionTaskId = reportedTaskId(payload)
   const revision = await headRevision(workspace.root)
 
@@ -221,9 +228,14 @@ async function ingestInto(workspace: Workspace, payload: HookPayload, agent: Hoo
         ...withTask(taskIdOfSession(store, payload.session_id, now)),
       }),
     )
+    const recall = isRecall && payload.hook_event_name === 'UserPromptSubmit' ? await recallForPrompt(store, workspace.root, payload.session_id, payload.prompt, redact) : undefined
+    if (payload.hook_event_name === 'UserPromptSubmit' && recorded.length === 0 && !recall) return { status: 'ignored', reason: 'nothing recorded matches this prompt' }
     const additionalContext =
-      payload.hook_event_name === 'SessionStart' ? await sessionStartContext(store, workspace.root, payload.session_id, now, agent, await briefingPreferences(configDir, redact)) : undefined
-    return { status: 'recorded', events: recorded.length, ...(additionalContext ? { additionalContext } : {}), ...(receipt ? { receipt } : {}) }
+      payload.hook_event_name === 'SessionStart' ? await sessionStartContext(store, workspace.root, payload.session_id, now, agent, await briefingPreferences(configDir, redact)) : recall
+    const hookEvent = payload.hook_event_name === 'UserPromptSubmit' ? ('UserPromptSubmit' as const) : ('SessionStart' as const)
+    // Only Claude Code is known to take a Stop hook's request to go on.
+    const reflect = payload.hook_event_name === 'Stop' && agent === 'claude-code' && config.reflection ? await reflectionRequest(store, workspace.root, payload.session_id) : undefined
+    return { status: 'recorded', events: recorded.length, ...(additionalContext ? { additionalContext, hookEvent } : {}), ...(receipt ? { receipt } : {}), ...(reflect ? { reflect } : {}) }
   } finally {
     store.close()
   }

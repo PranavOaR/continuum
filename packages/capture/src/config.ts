@@ -18,9 +18,13 @@ export interface ContinuumConfig {
   redactPatterns: string[]
   /** After a Claude Code reply that recorded something, show one line saying what. */
   receipts: boolean
+  /** On each prompt, add the recorded decisions and issues its words point to (Claude Code and Codex). */
+  recall: boolean
+  /** Once per session that changed files, ask Claude Code at its first Stop to record its decisions. Off unless turned on. */
+  reflection: boolean
 }
 
-export const DEFAULT_CONFIG: Readonly<ContinuumConfig> = { agentChecks: true, capturePrompts: false, redactPatterns: [], receipts: true }
+export const DEFAULT_CONFIG: Readonly<ContinuumConfig> = { agentChecks: true, capturePrompts: false, redactPatterns: [], receipts: true, recall: true, reflection: false }
 
 const configPath = (root: string) => join(root, CONTINUUM_DIR, CONFIG_FILE)
 
@@ -49,7 +53,7 @@ async function readRawConfig(root: string): Promise<RawConfig> {
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new InvalidConfigError(path, 'expected a JSON object')
   const values = parsed as RawConfig
-  for (const key of ['agentChecks', 'capturePrompts', 'receipts'] as const) {
+  for (const key of ['agentChecks', 'capturePrompts', 'receipts', 'recall', 'reflection'] as const) {
     if (key in values && typeof values[key] !== 'boolean') throw new InvalidConfigError(path, `${key} must be true or false`)
   }
   const patterns = values.redactPatterns
@@ -72,6 +76,8 @@ function withDefaults(values: RawConfig): ContinuumConfig {
     capturePrompts: (values.capturePrompts as boolean | undefined) ?? DEFAULT_CONFIG.capturePrompts,
     redactPatterns: (values.redactPatterns as string[] | undefined) ?? [...DEFAULT_CONFIG.redactPatterns],
     receipts: (values.receipts as boolean | undefined) ?? DEFAULT_CONFIG.receipts,
+    recall: (values.recall as boolean | undefined) ?? DEFAULT_CONFIG.recall,
+    reflection: (values.reflection as boolean | undefined) ?? DEFAULT_CONFIG.reflection,
   }
 }
 

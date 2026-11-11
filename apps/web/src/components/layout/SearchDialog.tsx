@@ -1,4 +1,4 @@
-import { Activity, CornerDownLeft, FileCode2, FolderGit2, ListChecks, Search, type LucideIcon } from 'lucide-react'
+import { Lightbulb, Activity, CornerDownLeft, FileCode2, FolderGit2, ListChecks, Search, type LucideIcon } from 'lucide-react'
 import { useId, useMemo, useState, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
@@ -19,6 +19,7 @@ const KIND_META: Record<SearchResultKind, { icon: LucideIcon; label: string }> =
   task: { icon: ListChecks, label: 'Task' },
   file: { icon: FileCode2, label: 'File' },
   activity: { icon: Activity, label: 'Activity' },
+  memory: { icon: Lightbulb, label: 'Memory' },
 }
 
 /** One row of the palette: a command or a search result. */

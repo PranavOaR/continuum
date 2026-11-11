@@ -14,9 +14,11 @@ const PREVIEW_DELAY_MS = 300
 /** The longest pattern a repository accepts; the server says so too. */
 const MAX_PATTERN_CHARS = 200
 
-const SWITCHES: { key: 'agentChecks' | 'capturePrompts' | 'receipts'; label: string; description: string }[] = [
+const SWITCHES: { key: 'agentChecks' | 'capturePrompts' | 'receipts' | 'recall' | 'reflection'; label: string; description: string }[] = [
   { key: 'agentChecks', label: 'Record checks agents run', description: 'Tests, lint and builds an agent runs, with the exit code it observed.' },
   { key: 'capturePrompts', label: 'Record your prompts', description: 'What you type to agents, redacted. Off unless you turn it on.' },
+  { key: 'recall', label: 'Recall on each prompt', description: 'Add the recorded decisions and issues your words point to, before the agent answers (Claude Code and Codex).' },
+  { key: 'reflection', label: 'Ask Claude Code to record its decisions', description: 'Once per session that changed files, Claude Code goes on for one more turn to record what it decided. Off unless you turn it on.' },
   { key: 'receipts', label: 'Receipts', description: 'One line after a Claude Code reply that recorded something.' },
 ]
 

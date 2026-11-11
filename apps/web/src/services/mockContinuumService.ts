@@ -154,7 +154,15 @@ function searchAll(query: string): SearchResult[] {
     to: `/app/activity?event=${e.id}`,
   }))
 
-  return [...projects, ...tasks, ...files, ...activity].slice(0, SEARCH_RESULT_LIMIT)
+  const memory: SearchResult[] = MOCK_MEMORY.filter((m) => matchesQuery(query, m.title, m.body)).map((m) => ({
+    id: m.id,
+    kind: 'memory',
+    title: m.title,
+    subtitle: `${projectName(m.projectId)} · ${m.kind.replace('-', ' ')}`,
+    to: `/app/memory?project=${m.projectId}&node=${encodeURIComponent(m.id)}`,
+  }))
+
+  return [...memory, ...projects, ...tasks, ...files, ...activity].slice(0, SEARCH_RESULT_LIMIT)
 }
 
 const readOnly = () => Promise.reject<never>(new Error('The demo is read-only. Run `continuum serve` to edit your own projects.'))
@@ -220,7 +228,7 @@ export const mockContinuumService: ContinuumService = {
   addMemory: readOnly,
   reviewMemory: readOnly,
   getSettings() {
-    return respond({ agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: ['ACME-[0-9]{6}'] })
+    return respond({ agentChecks: true, capturePrompts: false, receipts: true, recall: true, reflection: false, redactPatterns: ['ACME-[0-9]{6}'] })
   },
   updateSettings: readOnly,
   previewRedaction: readOnly,

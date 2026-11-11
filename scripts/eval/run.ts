@@ -11,7 +11,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { projectState, rankContext, renderContext, renderHandoff, renderSearch, searchMemory, sinceYouLeft } from '../../packages/context/src/index'
+import { projectState, rankContext, recallFor, renderContext, renderHandoff, renderRecall, renderSearch, searchMemory, sinceYouLeft } from '../../packages/context/src/index'
 import { ContextStore } from '../../packages/store/src/index'
 import { EVAL_NOW, SCENARIOS, type Question, type Scenario } from './scenarios'
 
@@ -35,8 +35,12 @@ function toldFor(scenario: Scenario): Told {
     const tree = { root: `/eval/${scenario.name.replace(/\W+/g, '-')}`, revision: 'e7a1c00', files: new Map(Object.entries(scenario.files)) }
     const { sessionId, agent } = scenario.resumingSession
     const state = projectState(store, tree, EVAL_NOW, { excludeSessionId: sessionId })
-    const reply = ({ name, query }: NonNullable<Question['tool']>) =>
-      name === 'search_memory' ? renderSearch(searchMemory(store, state, query), query, EVAL_NOW) : renderContext(rankContext(store, state, { now: EVAL_NOW, query }))
+    const reply = ({ name, query }: NonNullable<Question['tool']>) => {
+      if (name === 'search_memory') return renderSearch(searchMemory(store, state, query), query, EVAL_NOW)
+      // Recall is what the prompt hook adds when someone types `query`; the scenario's files are the code as it is now.
+      if (name === 'recall') return renderRecall(recallFor(store, query, new Map(Object.entries(scenario.files).map(([path, hash]) => [`file:${path}`, hash]))))
+      return renderContext(rankContext(store, state, { now: EVAL_NOW, query }))
+    }
     return {
       briefing: renderHandoff(state, { now: EVAL_NOW, maxChars: BRIEFING_CHARS, since: sinceYouLeft(store, agent, sessionId) }),
       toolReplies: new Map(scenario.questions.flatMap((question) => (question.tool ? [[question.id, reply(question.tool)] as const] : []))),

@@ -23,7 +23,7 @@ const GUIDE: readonly (readonly [string, readonly (readonly [string, string])[]]
     'Settings and data',
     [
       ['profile', 'Your preferences, carried into every repository\'s briefing'],
-      ['config', 'Settings: agent-checks, prompts, receipts, update-check'],
+      ['config', 'Settings: recall, reflection, agent-checks, prompts, receipts, update-check'],
       ['export <file>', 'Save the history to move it to another machine (import restores it)'],
       ['forget', 'Permanently remove recorded data'],
     ],

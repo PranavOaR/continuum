@@ -18,7 +18,7 @@ function input(overrides: Partial<ReportInput> = {}): ReportInput {
     ],
     repository: {
       store: { schemaVersion: 4, latestSchemaVersion: 4, events: 12, eventTypes: { 'file.changed': 9, 'check.recorded': 3 }, lastActivity: '2026-11-02T11:00:00.000Z', bytes: 2_621_440 },
-      settings: { agentChecks: true, capturePrompts: false, receipts: true, redactPatterns: ['ACME-[0-9]{6}'] },
+      settings: { agentChecks: true, capturePrompts: false, receipts: true, recall: true, reflection: false, redactPatterns: ['ACME-[0-9]{6}'] },
       hooks: [{ agent: 'claude-code', name: 'Claude Code', health: { lastArrivalAt: '2026-11-02T11:59:00.000Z', lastFailure: null, isFailing: false } }],
     },
     ...overrides,
@@ -42,7 +42,7 @@ describe('renderReport', () => {
     expect(report).toContain('  - Fix: Run `npm run build`.')
     expect(report).toContain('- Store: schema 4 of 4, 12 events, 2.5 MB, last activity 2026-11-02T11:00:00.000Z')
     expect(report).toContain('- Events: check.recorded 3, file.changed 9')
-    expect(report).toContain('- Settings: agent checks on, prompts off, receipts on, 1 redaction pattern')
+    expect(report).toContain('- Settings: agent checks on, prompts off, receipts on, recall on, reflection off, 1 redaction pattern')
     expect(report).toContain('- Claude Code hooks: last arrived 2026-11-02T11:59:00.000Z, no failure recorded')
   })
 
