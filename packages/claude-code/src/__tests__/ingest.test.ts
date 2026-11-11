@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { initWorkspace, scanRepository } from '@continuum/capture'
-import { createSandbox, type Sandbox } from '@continuum/capture/testing'
+import { createSandbox, removeTemporary, type Sandbox } from '@continuum/capture/testing'
 import { ContextStore } from '@continuum/store'
 import { afterEach, describe, expect, it } from 'vitest'
 import { InvalidHookPayloadError } from '../hookPayload'
@@ -14,7 +14,8 @@ const dirs: string[] = []
 
 afterEach(() => {
   for (const repo of sandboxes.splice(0)) repo.cleanup()
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  // A fake git.exe a test ran can stay locked on Windows for a moment after it exits.
+  for (const dir of dirs.splice(0)) removeTemporary(dir)
 })
 
 async function initialized(files: Record<string, string> = { 'src/a.ts': 'a', '.gitignore': 'dist/\n' }) {

@@ -8,7 +8,7 @@ Continuum is local project memory for AI coding agents. Every Claude Code, Codex
 - what another agent or a hand edit changed;
 - which decisions apply.
 
-Every claim is labelled **verified**, **observed**, **agent-reported** or **set by you**. Nothing leaves your machine.
+Every claim is labelled **verified**, **observed**, **agent-reported** or **set by you**. Your code and records never leave your machine.
 
 Website and documentation: [continuumgroup.dev](https://continuumgroup.dev)
 
@@ -62,7 +62,7 @@ Setup writes only to the repository, never to your global agent settings. `setup
 
 ## Your data
 
-Everything is stored in `.continuum/` inside your repository, kept out of git. Continuum calls no AI service and no server of its own. `.continuumignore` keeps paths out entirely; secrets in recorded commands and output are redacted.
+Everything is stored in `.continuum/` inside your repository, kept out of git. Continuum calls no AI service and no server of its own. The one request Continuum makes is to ask the npm registry, at most once a day and only when you run a command at a terminal, whether a newer version exists; it sends the package name, as `npx` does, and nothing from your repository. Turn it off with `continuum config update-check off`. `.continuumignore` keeps paths out entirely; secrets in recorded commands and output are redacted.
 
 ## Help
 

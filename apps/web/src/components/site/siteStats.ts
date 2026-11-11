@@ -42,5 +42,5 @@ export interface ScaleStat {
 export const SCALE: readonly ScaleStat[] = [
   { value: '79', unit: 'ms', label: 'to read a 50,000-file working tree, with 50 files changed' },
   { value: '0.9', unit: 'MB', label: 'for the whole CLI, hooks and MCP server, in one file' },
-  { value: '0', unit: 'requests', label: 'leave your machine: no account, no telemetry, no cloud' },
+  { value: '0', unit: 'bytes', label: 'of your code or records leave your machine: no account, no telemetry, no cloud' },
 ]

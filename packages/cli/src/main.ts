@@ -23,6 +23,7 @@ import { setupCommand } from './commands/setup'
 import { startCommand } from './commands/start'
 import { statusCommand } from './commands/status'
 import { uninstallCommand } from './commands/uninstall'
+import { updateCommand } from './commands/update'
 import { whyCommand } from './commands/why'
 import { printBanner } from './banner'
 import { VERSION } from './build'
@@ -53,7 +54,8 @@ Commands
   session start|note|end  Record a session for an agent without hooks (Cursor, a chat)
   setup <agent>        Connect claude-code, codex, cursor, vscode or antigravity to this repository
                        (--remove to undo)
-  config [name on|off] Show or change settings: agent-checks, prompts
+  config [name on|off] Show or change settings: agent-checks, prompts, receipts,
+                       update-check
   profile [add|remove] Your preferences for every repository ("Use pnpm"), kept on
                        this machine and carried by every briefing
   compact              Fold events older than 30 days into a checkpoint (--keep-days <n>)
@@ -62,6 +64,8 @@ Commands
   doctor [--report]    Check the install and this repository's setup, with fixes;
                        --report prints a scrubbed report to attach to an issue,
                        and --report --open starts that issue in your browser
+  update [--all]       Point the agents connected here (--all: in every repository)
+                       at this version; run it as npx getcontinuum@latest update
   uninstall [--purge]  Disconnect every agent; --purge also deletes .continuum/
 
 Used by agents
@@ -102,6 +106,7 @@ const COMMANDS: Record<string, Command> = {
   import: (io, args) => importCommand(io, args),
   doctor: (io, args) => doctorCommand(io, args, selfInvocation()),
   uninstall: (io, args) => uninstallCommand(io, args),
+  update: (io, args) => updateCommand(io, args, selfInvocation()),
 }
 
 interface GlobalArgs {
@@ -190,8 +195,13 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
     return EXIT_USAGE
   }
   const scoped: Io = parsed.cwd ? { ...io, cwd: resolve(io.cwd, parsed.cwd) } : io
+  // Started now, so the registry's answer arrives while the command works; shown after its output.
+  const update = io.updateCheck?.(name)
   try {
-    return await command(scoped, args)
+    const code = await command(scoped, args)
+    const notice = await update?.finish()
+    if (notice) io.err(notice)
+    return code
   } catch (error) {
     if (isExpected(error)) io.err(`continuum: ${error.message}`)
     else io.err(`continuum: unexpected error: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`)

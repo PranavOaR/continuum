@@ -50,6 +50,16 @@ export async function connectedHookAgents(root: string): Promise<Set<HookAgent>>
 }
 
 /**
+ * The agents `continuum setup` connected to this repository, from its own
+ * files: what `continuum update` re-runs setup for. The Claude Code plugin is
+ * not among them; Claude Code updates it.
+ */
+export async function setUpAgents(root: string): Promise<AgentType[]> {
+  const [hooks, cursorRule] = await Promise.all([connectedHookAgents(root), text(join(root, CURSOR_RULE_FILE))])
+  return [...hooks, ...(cursorRule.includes(RULE_MARKER) ? (['cursor'] as const) : [])]
+}
+
+/**
  * Every agent connected to this repository, by `setup` or, for Claude Code, by
  * the plugin, whose hooks live outside the repository. Cursor has no hooks; the
  * rule marks it, since setup writes that even when it leaves a tracked mcp.json alone.

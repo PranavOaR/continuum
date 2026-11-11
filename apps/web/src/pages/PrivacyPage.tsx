@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { SitePage } from '../components/site/SitePage'
 
-const LAST_UPDATED = '2026-10-19'
+const LAST_UPDATED = '2026-11-11'
 
 function Block({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -28,7 +28,10 @@ export function PrivacyPage() {
             127.0.0.1 only.
           </p>
           <p>
-            Installing it with <code className="font-mono text-fg">npx</code> downloads the package from the npm registry, under npm’s own terms.{' '}
+            Installing it with <code className="font-mono text-fg">npx</code> downloads the package from the npm registry, under npm’s own terms. When you
+            run a command at a terminal, Continuum asks that registry at most once a day whether a newer version exists, which sends the package name and
+            your IP address to npm, as <code className="font-mono text-fg">npx</code> does, and nothing from your repository. Agents, CI and piped output
+            never ask, and <code className="font-mono text-fg">continuum config update-check off</code> turns it off.{' '}
             <Link to="/docs/data" className="text-accent underline decoration-accent/40 underline-offset-4">What gets recorded</Link> lists everything
             Continuum stores, and how to turn each part off or delete it.
           </p>
