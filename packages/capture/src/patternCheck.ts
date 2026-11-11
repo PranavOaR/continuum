@@ -25,19 +25,22 @@ export function patternProblem(pattern: string): string | null {
 
 const WORKER = `
 const { parentPort, workerData } = require('node:worker_threads')
+const pattern = new RegExp(workerData.pattern, 'g')
 let count = 0
-const text = workerData.text.replace(new RegExp(workerData.pattern, 'g'), () => {
+const started = performance.now()
+const text = workerData.text.replace(pattern, () => {
   count += 1
   return workerData.replacement
 })
-parentPort.postMessage({ text, count })
+parentPort.postMessage({ text, count, ms: performance.now() - started })
 `
 
 export type Masked = { text: string; count: number }
 
 /**
- * Masks what one pattern matches in `text`, on another thread that is stopped
- * if the pattern runs past the limit (counted from when the thread is running): a regular expression cannot be interrupted where
+ * Masks what one pattern matches in `text`, on another thread. A pattern that
+ * took longer than the limit, by the worker's own clock, counts as too slow;
+ * one that never finishes is stopped at a few times the limit: a regular expression cannot be interrupted where
  * it runs, and one that hangs must not take the dashboard's server with it.
  */
 export function maskWithin(pattern: string, text: string, timeoutMs: number = PATTERN_TIME_LIMIT_MS): Promise<Masked | 'timeout'> {
@@ -53,15 +56,21 @@ export function maskWithin(pattern: string, text: string, timeoutMs: number = PA
     let timer = setTimeout(() => stop(() => reject(new Error('The pattern check could not start; try again.'))), WORKER_START_LIMIT_MS)
     worker.once('online', () => {
       clearTimeout(timer)
-      timer = setTimeout(() => stop(() => resolve('timeout')), timeoutMs)
+      timer = setTimeout(() => stop(() => resolve('timeout')), timeoutMs * HUNG_AFTER)
     })
-    worker.once('message', (masked: Masked) => stop(() => resolve(masked)))
+    worker.once('message', ({ text, count, ms }: Masked & { ms: number }) => stop(() => resolve(ms > timeoutMs ? 'timeout' : { text, count })))
     worker.once('error', (error) => stop(() => reject(error)))
   })
 }
 
 /** How long a worker may take to start before the check gives up; starting is not the pattern's time. */
 const WORKER_START_LIMIT_MS = 15_000
+/**
+ * The pattern's time is measured inside the worker, so a busy main thread
+ * cannot make a fast pattern look slow. This many times the limit, the worker
+ * is stopped as hung: a pattern that never finishes never reports.
+ */
+const HUNG_AFTER = 4
 
 /** Text built to make a badly backtracking pattern show itself: long runs of the characters it names, ending in one it cannot match. */
 function probes(pattern: string): string[] {

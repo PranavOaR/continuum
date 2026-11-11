@@ -8,7 +8,7 @@
 - **A table of commands after setup.** `setup` now ends with the commands you can run next, grouped by when you would reach for them, with what each does and the exact prefix to type.
 
 ### Fixed
-- A redaction pattern's time limit counted the time the check took to start, so on a slow machine (as on Windows CI) the dashboard could refuse a perfectly good pattern as one that could hang. The half-second now counts only the pattern itself; starting the check has its own, generous limit.
+- On a slow or busy machine (as on Windows CI), the dashboard could refuse a perfectly good redaction pattern as one that could hang: its half-second counted the check starting up and waiting for its turn. The pattern is now timed by the thread that runs it, so only the pattern's own work counts; one that never finishes is still stopped, at two seconds.
 
 ### Changed
 - The privacy wording says exactly what is true now: your code and records never leave your machine, and the only request Continuum makes is the version check above.
