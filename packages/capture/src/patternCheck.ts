@@ -37,27 +37,31 @@ export type Masked = { text: string; count: number }
 
 /**
  * Masks what one pattern matches in `text`, on another thread that is stopped
- * if it runs past the limit: a regular expression cannot be interrupted where
+ * if the pattern runs past the limit (counted from when the thread is running): a regular expression cannot be interrupted where
  * it runs, and one that hangs must not take the dashboard's server with it.
  */
 export function maskWithin(pattern: string, text: string, timeoutMs: number = PATTERN_TIME_LIMIT_MS): Promise<Masked | 'timeout'> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(WORKER, { eval: true, workerData: { pattern, text, replacement: REDACTED } })
-    const timer = setTimeout(() => {
-      void worker.terminate()
-      resolve('timeout')
-    }, timeoutMs)
-    worker.once('message', (masked: Masked) => {
+    const stop = (settle: () => void) => {
       clearTimeout(timer)
       void worker.terminate()
-      resolve(masked)
-    })
-    worker.once('error', (error) => {
+      settle()
+    }
+    // Starting a worker can take longer than the pattern's whole allowance on a busy machine, so the pattern's
+    // clock starts only once the worker runs; starting has its own, generous limit.
+    let timer = setTimeout(() => stop(() => reject(new Error('The pattern check could not start; try again.'))), WORKER_START_LIMIT_MS)
+    worker.once('online', () => {
       clearTimeout(timer)
-      reject(error)
+      timer = setTimeout(() => stop(() => resolve('timeout')), timeoutMs)
     })
+    worker.once('message', (masked: Masked) => stop(() => resolve(masked)))
+    worker.once('error', (error) => stop(() => reject(error)))
   })
 }
+
+/** How long a worker may take to start before the check gives up; starting is not the pattern's time. */
+const WORKER_START_LIMIT_MS = 15_000
 
 /** Text built to make a badly backtracking pattern show itself: long runs of the characters it names, ending in one it cannot match. */
 function probes(pattern: string): string[] {
