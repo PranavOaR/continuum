@@ -9,6 +9,7 @@ const SETTINGS: Record<string, { key: keyof ContinuumConfig; description: string
   prompts: { key: 'capturePrompts', description: 'record the prompts you type to agents, redacted' },
   receipts: { key: 'receipts', description: 'after a Claude Code reply, show one line of what was recorded' },
   recall: { key: 'recall', description: 'on each prompt, add the recorded decisions its words point to' },
+  reflection: { key: 'reflection', description: 'once per session, ask Claude Code to record its decisions before it finishes' },
 }
 
 const VALUES: Record<string, boolean> = { on: true, off: false }

@@ -11,7 +11,7 @@ export class InvalidSettingsError extends Error {
   }
 }
 
-const SWITCHES = ['agentChecks', 'capturePrompts', 'receipts', 'recall'] as const
+const SWITCHES = ['agentChecks', 'capturePrompts', 'receipts', 'recall', 'reflection'] as const
 
 /** Only the settings there are, of the right kind; anything else is refused rather than written. */
 function parseChange(change: Readonly<Record<string, unknown>>): Partial<ContinuumConfig> {

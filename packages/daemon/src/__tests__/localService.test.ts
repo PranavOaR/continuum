@@ -176,6 +176,12 @@ describe('LocalContinuumService', () => {
     // Recording 10,000 events and reading 51 pages takes a few seconds, more under coverage.
   }, HEAVY_TEST_TIMEOUT_MS)
 
+  it('finds memory records by a word in their body, linking to the record on the Memory page', async () => {
+    const { service: local } = await service()
+    const results = await local.search('bcrypt')
+    expect(results).toContainEqual({ id: 'acme~memory~d1', kind: 'memory', title: 'Passwords use argon2', subtitle: 'Architecture decision · Agent-reported', to: '/app/memory?project=acme&node=memory%3Ad1' })
+  })
+
   it('says a session resumed, not that a new one started', async () => {
     const { repo, service: local } = await service()
     const store = openStore(join(repo.root, '.continuum/context.db'))

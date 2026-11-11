@@ -71,7 +71,7 @@ export interface OverviewData {
   attention: AttentionItem[]
 }
 
-export type SearchResultKind = 'project' | 'task' | 'file' | 'activity'
+export type SearchResultKind = 'project' | 'task' | 'file' | 'activity' | 'memory'
 
 export interface SearchResult {
   id: string
@@ -150,6 +150,8 @@ export interface RepositorySettings {
   receipts: boolean
   /** On each prompt, add the recorded decisions and issues its words point to. */
   recall: boolean
+  /** Once per session that changed files, ask Claude Code to record its decisions before it finishes. */
+  reflection: boolean
   /** Regular expressions masked before anything is stored, on top of the built-in rules. */
   redactPatterns: string[]
 }

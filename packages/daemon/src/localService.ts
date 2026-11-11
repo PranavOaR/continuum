@@ -1,4 +1,6 @@
 import {
+  EVIDENCE_LABEL,
+  MEMORY_KIND_LABEL,
   DEFAULT_ACTIVITY_PAGE,
   MAX_ACTIVITY_PAGE,
   NotFoundError,
@@ -23,7 +25,7 @@ import {
   type TaskChange,
 } from '@continuum/core'
 import { previewRedaction, readConfig, saveSettings, briefingPreferences, EMPTY_PROFILE, InvalidConfigError, readProfile, writeProfile, openWorkspace, readWorkingTreeWithSymbols, repositoryRedactor, type Redactor } from '@continuum/capture'
-import { applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
+import { searchMemory, applyTaskChange, createdTask, isResolved, isTaskNode, liveHashes, newMemory, renderHandoff, reviewedMemory, summarizeTask, taskSummaries } from '@continuum/context'
 import { keys } from '@continuum/store'
 import { asAgent, ids, storedMemoryId } from './ids'
 import { EVENT_TYPES_OF, toActivity, toActivityEvent } from './mapActivity'
@@ -37,6 +39,8 @@ import { loadSnapshot, type RepoSnapshot } from './snapshot'
 export const SNAPSHOT_TTL_MS = 1_000
 const RECENT_EVENTS = 8
 const MAX_SEARCH_RESULTS = 20
+/** Memory records shown per project, best match first, before the plain-text matches. */
+const MAX_MEMORY_RESULTS = 5
 /** Events read from the log at a time while filling a page. */
 const ACTIVITY_SCAN_BATCH = 500
 /** Events one request reads at most; a rare filter over a long log is continued by the next request. */
@@ -410,11 +414,39 @@ export class LocalContinuumService implements ContinuumService {
     return writeProfile(this.configDir, preferences)
   }
 
+  /** Decisions, known issues and attempts whose words match, from each project's record. */
+  private async searchMemoryRecords(snapshot: RepoSnapshot, query: string): Promise<SearchResult[]> {
+    const { store } = await openWorkspace(this.repository(snapshot.projectId).cwd)
+    try {
+      return searchMemory(store, snapshot.state, query, { kinds: ['memory'], limit: MAX_MEMORY_RESULTS }).map((record) => ({
+        id: ids.memory(snapshot.projectId, record.id),
+        kind: 'memory',
+        title: record.title,
+        subtitle: `${MEMORY_KIND_LABEL[record.kind as keyof typeof MEMORY_KIND_LABEL] ?? 'Note'} · ${EVIDENCE_LABEL[record.evidence]}${record.resolved ? ' · resolved' : ''}`,
+        to: `/app/memory?project=${encodeURIComponent(snapshot.projectId)}&node=${encodeURIComponent(`memory:${record.id}`)}`,
+      }))
+    } finally {
+      store.close()
+    }
+  }
+
   async search(query: string): Promise<SearchResult[]> {
     const needle = query.trim().toLowerCase()
     if (!needle) return []
-    const results: SearchResult[] = []
-    for (const snapshot of await this.snapshots()) {
+    const snapshots = await this.snapshots()
+    // Memory records match by their words, ranked; they lead, since nothing else finds them.
+    const results: SearchResult[] = (
+      await Promise.all(
+        snapshots.map((snapshot) =>
+          this.searchMemoryRecords(snapshot, query).catch((error: unknown) => {
+            // One repository's store failing to open must not empty everyone's search; it is reported like any read error.
+            this.onError(snapshot.projectId, error)
+            return []
+          }),
+        ),
+      )
+    ).flat()
+    for (const snapshot of snapshots) {
       const to = `/app/projects/${snapshot.projectId}`
       if (snapshot.name.toLowerCase().includes(needle)) results.push({ id: snapshot.projectId, kind: 'project', title: snapshot.name, subtitle: snapshot.root, to })
       for (const task of toTasks(snapshot).filter((candidate) => candidate.title.toLowerCase().includes(needle))) {

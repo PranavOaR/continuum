@@ -29,6 +29,7 @@ import { replyReceipt } from './receipt'
 import { VERIFIED_RUN_HINT } from './guidance'
 import { fromAntigravity } from './antigravity'
 import { recallForPrompt } from './recall'
+import { reflectionRequest } from './reflection'
 
 /** How this adapter's sessions are recorded; "since you left" compares with this agent's previous session. */
 const DEFAULT_AGENT: HookAgent = 'claude-code'
@@ -72,6 +73,8 @@ export type IngestOutcome =
       additionalContext?: string
       /** The hook whose reply carries additionalContext: a briefing at session start, or recall on a prompt. */
       hookEvent?: 'SessionStart' | 'UserPromptSubmit'
+      /** At a Stop, with reflection on: why the agent should go on once to record its decisions. */
+      reflect?: string
       /** After a reply (Stop), one line for the person on what it recorded; Claude Code shows it as a systemMessage. */
       receipt?: string
     }
@@ -230,7 +233,9 @@ async function ingestInto(workspace: Workspace, payload: HookPayload, agent: Hoo
     const additionalContext =
       payload.hook_event_name === 'SessionStart' ? await sessionStartContext(store, workspace.root, payload.session_id, now, agent, await briefingPreferences(configDir, redact)) : recall
     const hookEvent = payload.hook_event_name === 'UserPromptSubmit' ? ('UserPromptSubmit' as const) : ('SessionStart' as const)
-    return { status: 'recorded', events: recorded.length, ...(additionalContext ? { additionalContext, hookEvent } : {}), ...(receipt ? { receipt } : {}) }
+    // Only Claude Code is known to take a Stop hook's request to go on.
+    const reflect = payload.hook_event_name === 'Stop' && agent === 'claude-code' && config.reflection ? await reflectionRequest(store, workspace.root, payload.session_id) : undefined
+    return { status: 'recorded', events: recorded.length, ...(additionalContext ? { additionalContext, hookEvent } : {}), ...(receipt ? { receipt } : {}), ...(reflect ? { reflect } : {}) }
   } finally {
     store.close()
   }

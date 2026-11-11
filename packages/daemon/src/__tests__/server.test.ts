@@ -47,12 +47,12 @@ const fakeService: ContinuumService = {
   },
   getSettings: async (projectId) => {
     if (projectId === 'broken') throw new InvalidConfigError('/repo/.continuum/config.json', 'a redactPatterns entry cannot be used (\\w+\\w+@: It has two repeats in a row)')
-    return { agentChecks: true, capturePrompts: false, receipts: true, recall: true, redactPatterns: [] }
+    return { agentChecks: true, capturePrompts: false, receipts: true, recall: true, reflection: false, redactPatterns: [] }
   },
   updateSettings: async (projectId, change) => {
     if ((change.redactPatterns ?? []).includes('(a+)+$')) throw new InvalidSettingsError('The pattern (a+)+$ was not saved. It repeats a group that itself repeats.')
     edits.push({ projectId, change })
-    return { agentChecks: true, capturePrompts: false, receipts: true, recall: true, redactPatterns: [], ...change }
+    return { agentChecks: true, capturePrompts: false, receipts: true, recall: true, reflection: false, redactPatterns: [], ...change }
   },
   previewRedaction: async (_projectId, patterns, sample) => ({ masked: sample.replace('ACME', '[redacted]'), count: 1, refused: patterns.filter((pattern) => pattern === '(').map((pattern) => ({ pattern, reason: 'It is not a valid regular expression.' })) }),
   getProfile: async () => ({ preferences: storedPreferences }),

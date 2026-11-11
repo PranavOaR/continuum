@@ -40,6 +40,9 @@ export async function ingestCommand(io: Io, args: readonly string[] = []): Promi
     io.out(JSON.stringify({ hookSpecificOutput: { hookEventName: outcome.hookEvent ?? 'SessionStart', additionalContext: outcome.additionalContext } }))
   }
   // Shown to the person, never to Claude, and it does not keep the conversation going.
-  if (outcome.status === 'recorded' && outcome.receipt) io.out(JSON.stringify({ systemMessage: outcome.receipt }))
+  // One JSON object per hook: the receipt is shown to the person, and with reflection on, Claude Code is asked to go on once.
+  if (outcome.status === 'recorded' && (outcome.receipt || outcome.reflect)) {
+    io.out(JSON.stringify({ ...(outcome.receipt ? { systemMessage: outcome.receipt } : {}), ...(outcome.reflect ? { decision: 'block', reason: outcome.reflect } : {}) }))
+  }
   return EXIT_OK
 }
