@@ -15,6 +15,8 @@ const MCP = 'mcp'
 const SESSION_START_TIMEOUT_S = 20
 const SESSION_END_TIMEOUT_S = 10
 const BACKGROUND_TIMEOUT_S = 30
+/** Seconds a prompt may wait for recall; it normally takes a fraction of one. */
+const PROMPT_TIMEOUT_S = 5
 /**
  * A path or package that is the Continuum CLI: this checkout's bin.ts, a
  * `continuum` binary, the release bundle, or the npm package: getcontinuum, or a scoped `@…/continuum`.
@@ -117,7 +119,8 @@ function ourHooks(invocation: Invocation): Record<(typeof HOOK_EVENTS)[number], 
     // A Bash command that exits non-zero arrives here instead, with "Exit code N".
     PostToolUseFailure: [{ matcher: SHELL_TOOL, hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
     // Recorded only after `continuum config prompts on`; in the background so typing is never slowed.
-    UserPromptSubmit: [{ hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
+    // In the foreground, so recall can add the decisions a prompt points to; short, so a slow moment never holds a prompt up for long.
+    UserPromptSubmit: [{ hooks: [handler({ timeout: PROMPT_TIMEOUT_S })] }],
   }
 }
 

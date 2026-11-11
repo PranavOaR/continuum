@@ -157,6 +157,22 @@ const changedAgainBriefly = (changes: readonly ChangedSince[]) =>
     .map((change) => `${code(change.path)} ${change.by.kind === 'deleted' ? 'was deleted' : `changed ${changedByLabel(change)}`}`)
     .join(', ') + (changes.length > MAX_LISTED ? ` and ${changes.length - MAX_LISTED} more` : '')
 
+const MAX_PROFILE_COMMANDS = 6
+
+/** What the repository is built with and what passes on it now, so the agent does not spend its first minutes finding out. */
+function profileSection(state: ProjectState): string[] {
+  const { stack, packageManager, passing } = state.profile
+  const built = [stack.length > 0 ? `Stack: ${stack.join(', ')}.` : '', packageManager ? `Package manager: ${packageManager.name} (${code(packageManager.lockfile)}).` : ''].filter(Boolean)
+  const verified = passing.filter((check) => check.evidence === 'verified').slice(0, MAX_PROFILE_COMMANDS)
+  const observed = passing.filter((check) => check.evidence !== 'verified').slice(0, MAX_PROFILE_COMMANDS)
+  const lines = [
+    ...(built.length > 0 ? [`[observed] ${built.join(' ')}`] : []),
+    ...(verified.length > 0 ? [`[verified] Pass on the code as it is now: ${verified.map((check) => code(check.command)).join(', ')}.`] : []),
+    ...(observed.length > 0 ? [`[observed: run by an agent] Passed on the code as it is now: ${observed.map((check) => code(check.command)).join(', ')}.`] : []),
+  ]
+  return lines.length > 0 ? ['## Project profile', ...lines] : []
+}
+
 function nextStepSection(state: ProjectState, now: Date): string[] {
   if (state.tasks.some((task) => task.id === state.currentTaskId)) return []
   for (const session of state.sessions) {
@@ -322,7 +338,7 @@ export function renderHandoff(state: ProjectState, options: HandoffOptions = {})
     'Evidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.',
   ]
   return fit(
-    [header, preferencesSection(options.preferences), sinceSection(options.since, now), taskSection(state), plannedSection(state), nextStepSection(state, now), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
+    [header, preferencesSection(options.preferences), profileSection(state), sinceSection(options.since, now), taskSection(state), plannedSection(state), nextStepSection(state, now), leftOffSection(state, now), checksSection(state, now), decisionsSection(state), outsideSessionsSection(state), earlierSection(state, now)],
     options.maxChars ?? DEFAULT_HANDOFF_CHARS,
   )
 }

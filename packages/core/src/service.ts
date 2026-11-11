@@ -148,6 +148,8 @@ export interface RepositorySettings {
   capturePrompts: boolean
   /** Show one line after a Claude Code reply that recorded something. */
   receipts: boolean
+  /** On each prompt, add the recorded decisions and issues its words point to. */
+  recall: boolean
   /** Regular expressions masked before anything is stored, on top of the built-in rules. */
   redactPatterns: string[]
 }

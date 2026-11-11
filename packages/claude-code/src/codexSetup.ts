@@ -15,6 +15,8 @@ const INGEST_SUFFIX = 'ingest --agent codex'
 const SESSION_START_TIMEOUT_S = 20
 const SYNC_TIMEOUT_S = 10
 const BACKGROUND_TIMEOUT_S = 30
+/** Seconds a prompt may wait for recall; it normally takes a fraction of one. */
+const PROMPT_TIMEOUT_S = 5
 
 type Json = Record<string, unknown>
 const isObject = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -45,7 +47,8 @@ function ourHooks(invocation: Invocation): Record<string, Json[]> {
     SessionStart: [{ hooks: [handler({ timeout: SESSION_START_TIMEOUT_S, statusMessage: 'Loading where the work left off' })] }],
     // Patches (edits) and Continuum's own task tools; Codex reports no exit code for shell commands, so they are not recorded.
     PostToolUse: [{ matcher: [`^${PATCH_TOOL}$`, ...TASK_TOOLS.map((tool) => `^${tool}$`)].join('|'), hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
-    UserPromptSubmit: [{ hooks: [handler({ async: true, timeout: BACKGROUND_TIMEOUT_S })] }],
+    // In the foreground, so recall can add the decisions a prompt points to.
+    UserPromptSubmit: [{ hooks: [handler({ timeout: PROMPT_TIMEOUT_S })] }],
     Stop: [{ hooks: [handler({ timeout: SYNC_TIMEOUT_S })] }],
     SessionEnd: [{ hooks: [handler({ timeout: 3 })] }],
   }

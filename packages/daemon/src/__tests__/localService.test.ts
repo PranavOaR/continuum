@@ -6,7 +6,8 @@ import { basename, dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectIds } from '../ids'
 import { LocalContinuumService, ProjectUnavailableError } from '../localService'
-import { detectStack, shortPath } from '../mapProject'
+import { detectStack } from '@continuum/context'
+import { shortPath } from '../mapProject'
 import { NOW, openStore, seededRepo } from './fixtures'
 
 const HEAVY_TEST_TIMEOUT_MS = 30_000

@@ -101,7 +101,7 @@ function settingsLine(settings: RepositoryFacts['settings']): string {
   if (isUnreadable(settings)) return `- Settings: could not be read (${settings.error})`
   const patterns = settings.redactPatterns.length
   // The patterns themselves can name customers or ticket formats, so only their number is shared.
-  return `- Settings: agent checks ${settings.agentChecks ? 'on' : 'off'}, prompts ${settings.capturePrompts ? 'on' : 'off'}, receipts ${settings.receipts ? 'on' : 'off'}, ${patterns} redaction pattern${patterns === 1 ? '' : 's'}`
+  return `- Settings: agent checks ${settings.agentChecks ? 'on' : 'off'}, prompts ${settings.capturePrompts ? 'on' : 'off'}, receipts ${settings.receipts ? 'on' : 'off'}, recall ${settings.recall ? 'on' : 'off'}, ${patterns} redaction pattern${patterns === 1 ? '' : 's'}`
 }
 
 function hookLine({ name, health }: HookStatus): string {

@@ -2,27 +2,12 @@ import { homedir } from 'node:os'
 import { getAgent, type FileStatus, type Project, type ProjectFile } from '@continuum/core'
 import type { UncommittedDiff } from '@continuum/capture'
 import type { GraphNode } from '@continuum/store'
+import { detectStack } from '@continuum/context'
 import { asAgent, ids, text } from './ids'
 import type { RepoSnapshot } from './snapshot'
 
 export const FILE_PREFIX = 'file:'
-const STACK_MARKERS: readonly (readonly [RegExp, string])[] = [
-  [/^package\.json$/, 'Node.js'],
-  [/^tsconfig(\..+)?\.json$/, 'TypeScript'],
-  [/^(pyproject\.toml|requirements\.txt|setup\.py)$/, 'Python'],
-  [/^go\.mod$/, 'Go'],
-  [/^Cargo\.toml$/, 'Rust'],
-  [/^Gemfile$/, 'Ruby'],
-  [/^(pom\.xml|build\.gradle(\.kts)?)$/, 'Java'],
-  [/^vite\.config\.[cm]?[jt]s$/, 'Vite'],
-  [/^next\.config\.[cm]?[jt]s$/, 'Next.js'],
-]
 
-/** Recognizable technologies from marker files at the repository root. Nothing is guessed beyond them. */
-export function detectStack(paths: Iterable<string>): string[] {
-  const rootFiles = [...paths].filter((path) => !path.includes('/'))
-  return [...new Set(STACK_MARKERS.filter(([pattern]) => rootFiles.some((file) => pattern.test(file))).map(([, label]) => label))]
-}
 
 /** The path with the home folder written as ~, as a terminal shows it. */
 export function shortPath(path: string, home: string = homedir()): string {

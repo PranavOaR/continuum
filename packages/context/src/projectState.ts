@@ -12,6 +12,7 @@ import {
   type MemoryReview,
 } from '@continuum/core'
 import { keys, type ContextStore, type GraphNode } from '@continuum/store'
+import { profileOf, type ProjectProfile } from './profile'
 import { currentTaskId, taskSummaries, type TaskSummary } from './tasks'
 
 const FILE_PREFIX = 'file:'
@@ -93,6 +94,8 @@ export interface ProjectState {
   currentTaskId: string | null
   /** Commits recorded since Continuum started watching, newest first. */
   commits: CommitSummary[]
+  /** What the repository is built with and the commands that pass on it now. */
+  profile: ProjectProfile
 }
 
 export interface CommitSummary {
@@ -243,6 +246,9 @@ export interface ProjectStateOptions {
 export function projectState(store: ContextStore, tree: WorkingTree, now: Date, options: ProjectStateOptions = {}): ProjectState {
   const current = liveHashes(store, tree)
   const sessions = nodesOfKind(store, 'session').filter((node) => node.key !== `session:${options.excludeSessionId}`)
+  const checks = nodesOfKind(store, 'check')
+    .map((node) => summarizeCheck(store, node, current))
+    .sort((a, b) => a.name.localeCompare(b.name))
   const decisions = nodesOfKind(store, 'memory')
     .map((node) => summarizeDecision(node, current))
     .sort((a, b) => newestFirst(a.recordedAt, b.recordedAt))
@@ -254,13 +260,12 @@ export function projectState(store: ContextStore, tree: WorkingTree, now: Date, 
     sessions: sessions
       .map((node) => summarizeSession(store, node, tree))
       .sort((a, b) => newestFirst(a.lastActivityAt, b.lastActivityAt)),
-    checks: nodesOfKind(store, 'check')
-      .map((node) => summarizeCheck(store, node, current))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    checks,
     decisions: decisions.filter((decision) => decision.review !== 'resolved'),
     resolvedDecisions: decisions.filter((decision) => decision.review === 'resolved'),
     tasks: taskSummaries(store),
     currentTaskId: currentTaskId(store, now) ?? null,
     commits: recentCommits(store),
+    profile: profileOf(tree.files.keys(), checks),
   }
 }
