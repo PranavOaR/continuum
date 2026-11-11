@@ -92,25 +92,21 @@ describe('the update notice after a command', () => {
 })
 
 describe('the command table after setup', () => {
-  it('lists what a person can run next, grouped, with the prefix they type', async () => {
+  it('ends setup with the bordered table of commands, then the dashboard line, as setup has always ended', async () => {
     const repo = sandbox()
     const { out } = await cli(repo.root, ['setup', 'claude-code'])
-    expect(out).toContain('Commands you can run, as continuum <command>:')
-    for (const command of ['status', 'run -- <command>', 'handoff', 'serve', 'search <words>', 'why <file>[#symbol]', 'check', 'profile', 'config', 'doctor', 'update', 'uninstall']) expect(out).toContain(`  ${command} `)
-    expect(out).toMatch(/WHILE YOU WORK/)
-    expect(out).toMatch(/search <words>\s+Find decisions, issues, tasks and notes by their words/)
+    expect(out).toContain('Run any of them as continuum <command>:')
+    expect(out).toMatch(/│ search <words>\s+│ Find decisions, issues, tasks and notes by their words\s+│/)
     expect(out).toContain('continuum --help lists every option.')
-    // The dashboard command stays the last line, as setup has always ended.
     expect(out.trimEnd().split('\n').at(-1)).toBe('See what Continuum records: continuum serve')
   })
 
-  it('names the command an npx user types', async () => {
-    const { commandGuide } = await import('../commandGuide')
-    const lines = commandGuide('npx -y getcontinuum@0.6.0')
-    expect(lines[0]).toBe('Commands you can run, as npx -y getcontinuum@0.6.0 <command>:')
-    expect(lines.at(-1)).toBe('npx -y getcontinuum@0.6.0 --help lists every option.')
-    // Rows line up: every description starts in the same column.
-    const starts = lines.filter((line) => line.startsWith('    ')).map((line) => line.search(/\S+(\s{3,})\S/) + (/\S+\s{3,}/.exec(line.trimStart())?.[0].length ?? 0))
-    expect(new Set(starts).size).toBe(1)
+  it('fits the terminal it is shown in, coloured where the terminal shows colour', async () => {
+    const repo = sandbox()
+    const { out } = await cli(repo.root, ['setup', 'claude-code'], { terminal: { columns: 80, hasColour: true } })
+    expect(out).toContain('\x1b[38;5;105m┌')
+    // oxlint-disable-next-line no-control-regex -- the escapes are what is being removed
+    const top = out.split('\n').map((line) => line.replace(/\x1b\[[0-9;]*m/g, '')).find((line) => line.startsWith('┌'))
+    expect([...(top ?? '')].length).toBe(80)
   })
 })

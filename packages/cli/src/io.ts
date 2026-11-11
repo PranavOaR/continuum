@@ -16,6 +16,8 @@ export interface Io {
   claudeConfigDir: string
   /** Lines that open a command starting Continuum; empty unless someone is reading at a terminal. */
   banner?: readonly string[]
+  /** The terminal someone is reading at, for output drawn to fit it (setup's command table); absent for agents and pipes. */
+  terminal?: { columns: number; hasColour: boolean }
   /** Starts the check for a newer Continuum for this command; its line is shown after the command. Absent in tests and checkouts. */
   updateCheck?: (command: string) => { finish(): Promise<string | null> }
   /** Raw streams for child-process output (`run`); default to the process's own. */
