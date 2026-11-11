@@ -1,4 +1,6 @@
-import { CircleCheck, CircleDashed, Compass, Pencil } from 'lucide-react'
+import { buttonClass } from '../shared/buttonClass'
+import { Link } from 'react-router-dom'
+import { History, CircleCheck, CircleDashed, Compass, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import type { ProjectTask, TaskField, TaskStatus, VerificationRecord, VerificationStatus } from '@continuum/core'
 import { cn } from '../../utils/cn'
@@ -156,6 +158,10 @@ export function TaskPanel({ tasks, task, currentTaskId, verification, onSelectTa
             <h3 className="text-[22px] font-normal tracking-[-0.02em] text-fg">{task.title}</h3>
             <TaskStatusBadge status={task.status} />
             <EvidenceBadge type={isYours ? 'user-reported' : 'agent-reported'} />
+            <Link to={`/app/projects/${encodeURIComponent(task.projectId)}/tasks/${encodeURIComponent(task.id)}/replay`} className={buttonClass('ghost', 'sm', 'ml-auto')}>
+              <History aria-hidden />
+              Replay
+            </Link>
           </div>
           {changed.length > 0 && (
             <p className="mt-1.5 flex items-center gap-2 text-[12px] text-muted">

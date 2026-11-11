@@ -6,7 +6,7 @@ import { MOCK_PROJECTS } from '../data/mockProjects'
 import { MOCK_SESSIONS } from '../data/mockSessions'
 import { MOCK_TASKS } from '../data/mockTasks'
 import { MOCK_VERIFICATION } from '../data/mockVerification'
-import type { ActivityEvent, Project, ProjectTask } from '@continuum/core'
+import type { ActivityEvent, Project, ProjectTask, ReplayStep } from '@continuum/core'
 import { matchesQuery } from '../utils/search'
 import { buildMemoryGraph } from './buildMemoryGraph'
 import {
@@ -165,6 +165,15 @@ function searchAll(query: string): SearchResult[] {
   return [...memory, ...projects, ...tasks, ...files, ...activity].slice(0, SEARCH_RESULT_LIMIT)
 }
 
+const REPLAY_KIND: Record<ActivityEvent['type'], ReplayStep['kind']> = {
+  'file-change': 'edit',
+  'task-update': 'task',
+  decision: 'decision',
+  'test-result': 'check',
+  session: 'session',
+  commit: 'edit',
+}
+
 const readOnly = () => Promise.reject<never>(new Error('The demo is read-only. Run `continuum serve` to edit your own projects.'))
 
 function sortedActivity(): ActivityEvent[] {
@@ -227,6 +236,26 @@ export const mockContinuumService: ContinuumService = {
   createTask: readOnly,
   addMemory: readOnly,
   reviewMemory: readOnly,
+  getTaskReplay(projectId, taskId) {
+    const task = MOCK_TASKS.find((candidate) => candidate.projectId === projectId && candidate.id === taskId)
+    if (!task) return Promise.reject(new NotFoundError('Task', taskId))
+    // The demo has no event log; its activity for the task, oldest first, stands in for one.
+    const steps = sortedActivity()
+      .filter((event) => event.taskId === taskId)
+      .reverse()
+      .map((event): ReplayStep => ({
+        at: event.timestamp,
+        kind: REPLAY_KIND[event.type],
+        title: event.title,
+        detail: event.description,
+        evidence: event.evidenceType,
+        ...(event.agent ? { agent: event.agent } : {}),
+        ...(event.type === 'test-result' ? { tone: /failed/i.test(event.title) ? ('bad' as const) : ('good' as const) } : {}),
+      }))
+    const agents = [...new Set(steps.flatMap((step) => (step.agent ? [step.agent] : [])))]
+    const count = (kind: ReplayStep['kind']) => steps.filter((step) => step.kind === kind).length
+    return respond({ taskId, title: task.title, status: task.status, steps, summary: { agents, edits: count('edit'), checks: count('check'), stale: 0, decisions: count('decision') } })
+  },
   getSettings() {
     return respond({ agentChecks: true, capturePrompts: false, receipts: true, recall: true, reflection: false, redactPatterns: ['ACME-[0-9]{6}'] })
   },

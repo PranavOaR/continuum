@@ -182,6 +182,22 @@ describe('LocalContinuumService', () => {
     expect(results).toContainEqual({ id: 'acme~memory~d1', kind: 'memory', title: 'Passwords use argon2', subtitle: 'Architecture decision · Agent-reported', to: '/app/memory?project=acme&node=memory%3Ad1' })
   })
 
+  it('replays a task from the log, oldest first, and refuses a task that does not exist', async () => {
+    const { repo, service: local } = await service()
+    const store = openStore(join(repo.root, '.continuum', 'context.db'))
+    const at = (minute: number) => new Date(Date.UTC(2026, 9, 16, 11, 40 + minute)).toISOString()
+    store.recordAll([
+      { type: 'task.upserted', payload: { id: 'hash', title: 'Hash passwords', status: 'in-progress' }, evidence: 'agent-reported', source: 'mcp', occurredAt: at(0) },
+      { type: 'file.changed', payload: { path: 'src/auth.ts', contentHash: 'h-auth-3', changeType: 'modified', sessionId: 's1', taskId: 'hash' }, evidence: 'observed', source: 'adapter:claude-code', occurredAt: at(1) },
+    ])
+    store.close()
+    const replay = await local.getTaskReplay('acme', 'hash')
+    expect(replay).toMatchObject({ taskId: 'hash', title: 'Hash passwords', status: 'in-progress' })
+    expect(replay.steps.map((step) => step.title)).toEqual(['Task started: Hash passwords', 'Claude Code edited src/auth.ts'])
+    expect(replay.isPartial).toBeUndefined()
+    await expect(local.getTaskReplay('acme', 'nope')).rejects.toBeInstanceOf(NotFoundError)
+  })
+
   it('says a session resumed, not that a new one started', async () => {
     const { repo, service: local } = await service()
     const store = openStore(join(repo.root, '.continuum/context.db'))

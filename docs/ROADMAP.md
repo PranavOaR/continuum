@@ -37,6 +37,7 @@ Status, 11 November 2026, with the 0.7.0 release. Continuum is published on npm 
 | **Recall that feels automatic** (0.7.0) | Recall on every prompt for Claude Code and Codex: the recorded decisions a prompt's words point to, labelled, once per session, in about 0.13 s. A project profile (stack, package manager, commands that pass) opens every briefing. The dashboard's search finds memory records. Opt-in end-of-session reflection asks Claude Code to record its decisions. |
 | **Updates reach users** (0.7.0) | After a command run at a terminal, Continuum says when npm has a newer version (asked at most once a day, never by agents, hooks or CI; `config update-check off`). `continuum update` points every agent `setup` connected at the newest version. `setup` ends with a table of the commands to run next. |
 | **A public handoff benchmark** (unreleased) | `npm run bench:handoff` asks Claude a fresh agent's questions with Continuum's briefing and with only the files and git history. First run, `claude-opus-5-5`: 23/23 with Continuum, 4/23 without memory. Published on the docs' benchmark page with its caveats. |
+| **Task replay** (unreleased) | A Replay page for every task: sessions, edits (its own, other agents', by hand), checks with results, decisions, and where a passing check went out of date, each labelled, oldest first, read from the event log. |
 | **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health); 0.3.0 (the first hour, clearer verification, the first release run entirely by the workflow). The plugin repository accepts private vulnerability reports. |
 
 ## Next
@@ -48,7 +49,6 @@ The plan from the November strategy review against Supermemory: keep the ground 
 | # | Item | Done when | Size |
 |---|---|---|---|
 | 15 | **The stale-test demo.** A 60-second film of the moment only Continuum has: an agent told that the test it trusts no longer holds. | On the website and the README. | S |
-| 16 | **Task replay.** A timeline of one task across agents in the dashboard: who did what, which checks ran, where it went stale. | A task handed between two agents reads end to end. | M |
 
 ### Teams without a cloud (0.9.0)
 

@@ -109,6 +109,7 @@ const ROUTES: readonly (readonly [RegExp, Handler])[] = [
   [/^\/api\/activity$/, (service) => service.listActivity()],
   [/^\/api\/projects\/(?<id>[^/]+)\/workspace$/, (service, params) => service.getWorkspace(params.id)],
   [/^\/api\/projects\/(?<id>[^/]+)\/activity$/, (service, params, query) => service.listActivityPage(params.id, parseActivityQuery(query))],
+  [/^\/api\/projects\/(?<id>[^/]+)\/tasks\/(?<task>[^/]+)\/replay$/, (service, params) => service.getTaskReplay(params.id, params.task)],
   [/^\/api\/projects\/(?<id>[^/]+)\/settings$/, (service, params) => service.getSettings(params.id)],
   [/^\/api\/projects\/(?<id>[^/]+)\/graph$/, (service, params) => service.getMemoryGraph(params.id)],
   [/^\/api\/projects\/(?<id>[^/]+)\/briefing$/, (service, params) => service.getBriefing(params.id)],

@@ -23,6 +23,9 @@ let noteRepo = ''
 let server: ChildProcess | undefined
 let url = ''
 let launchUrl = ''
+/** The task the MCP server started, as its reply names it. */
+let taskId = ''
+const taskIdFromHandoff = () => taskId
 /** Continuum's per-user folder for this run, so the profile written here is never the developer's own. */
 let configDir = ''
 const env = () => ({ ...process.env, CONTINUUM_CONFIG_DIR: configDir })
@@ -57,10 +60,11 @@ test.beforeAll(async () => {
   // Record a task through the real MCP server, exactly as Claude Code would.
   const mcp = new Client({ name: 'e2e', version: '0' })
   await mcp.connect(new StdioClientTransport({ command: process.execPath, args: [...CLI, '-C', repo, 'mcp'], cwd: ROOT, stderr: 'pipe' }))
-  await mcp.callTool({
+  const started = await mcp.callTool({
     name: 'start_task',
     arguments: { title: 'Load config from env', objective: 'The app reads its config from the environment', acceptance_criteria: ['Reads APP_PORT'], steps: ['Parse env', 'Validate'] },
   })
+  taskId = /Task (\S+):/.exec((started.content as { text: string }[])[0]?.text ?? '')?.[1] ?? ''
   await mcp.callTool({ name: 'update_task', arguments: { completed_steps: ['Parse env'], next_action: 'Validate the parsed values' } })
   await mcp.callTool({ name: 'record_decision', arguments: { title: 'Config comes from the environment', kind: 'decision', files: ['package.json'] } })
   await mcp.close()
@@ -432,6 +436,17 @@ test("the activity page reads one project's history back to its first event", as
   await expect(page.getByText('Claude Code session started')).toHaveCount(0)
 })
 
+test("a task's replay tells its history across sessions, from the project page", async ({ page }) => {
+  // Earlier tests start other tasks, so open the project on this one.
+  await page.goto(`${projectPage()}?task=${encodeURIComponent(taskId)}`)
+  await page.locator('#task').getByRole('link', { name: 'Replay' }).click()
+  await expect(page).toHaveURL(/\/tasks\/[^/]+\/replay$/)
+  await expect(page.getByRole('heading', { name: 'Load config from env', level: 1 })).toBeVisible()
+  await expect(page.getByText('Task started: Load config from env')).toBeVisible()
+  await expect(page.getByText(/Decision recorded: Config comes from the environment/)).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Summary' })).toContainText(/\d+ edits?/)
+})
+
 test('the forms for adding to a project have no serious or critical axe violations', async ({ page }) => {
   const { default: AxeBuilder } = await import('@axe-core/playwright')
   await page.emulateMedia({ reducedMotion: 'reduce' })
@@ -461,6 +476,7 @@ test.describe('accessibility of live screens', () => {
       ['memory', '/app/memory'],
       ['briefing', `/app/briefings?project=${slug(repo)}`],
       ['settings', '/app/settings'],
+      ['task replay', `/app/projects/${slug(repo)}/tasks/${taskIdFromHandoff()}/replay`],
     ] as const
   }
 

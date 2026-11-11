@@ -1,4 +1,5 @@
 import type {
+  EvidenceType,
   ActivityEvent,
   ActivityType,
   AgentSession,
@@ -92,6 +93,8 @@ export interface ContinuumService {
   listTasks(): Promise<ProjectTask[]>
   getWorkspace(projectId: string): Promise<ProjectWorkspace>
   listActivity(): Promise<ActivityEvent[]>
+  /** One task's history across agents and people, oldest first. */
+  getTaskReplay(projectId: string, taskId: string): Promise<TaskReplay>
   /** One page of a project's whole recorded history, back to its first event. */
   listActivityPage(projectId: string, query: ActivityQuery): Promise<ActivityPage>
   getMemoryGraph(projectId: string): Promise<MemoryGraph>
@@ -139,6 +142,30 @@ export interface ActivityPage {
 
 export const DEFAULT_ACTIVITY_PAGE = 50
 export const MAX_ACTIVITY_PAGE = 200
+
+/** One moment in a task's history, as the replay shows it. */
+export interface ReplayStep {
+  at: string
+  kind: 'task' | 'session' | 'note' | 'edit' | 'check' | 'decision' | 'stale'
+  title: string
+  detail: string
+  /** The agent whose session it was, as recorded (an AgentType for known agents). */
+  agent?: string
+  evidence: EvidenceType
+  /** What it means for the work: a check that passed or failed, or evidence going stale. */
+  tone?: 'good' | 'bad' | 'warn'
+}
+
+/** One task's history across agents and people, oldest first, from the record. */
+export interface TaskReplay {
+  taskId: string
+  title: string
+  status: string
+  steps: ReplayStep[]
+  summary: { agents: string[]; edits: number; checks: number; stale: number; decisions: number }
+  /** Older history was folded away by `continuum compact`, so the replay may start partway through. */
+  isPartial?: boolean
+}
 
 /** One repository's settings, kept in its .continuum/config.json. */
 export interface RepositorySettings {
