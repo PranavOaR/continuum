@@ -1,4 +1,5 @@
 import agents from './docs/agents.md?raw'
+import benchmark from './docs/benchmark.md?raw'
 import commands from './docs/commands.md?raw'
 import data from './docs/data.md?raw'
 import gettingStarted from './docs/getting-started.md?raw'
@@ -9,6 +10,7 @@ export const DOCS_PAGES = [
   { slug: 'agents', title: 'Agents', markdown: agents },
   { slug: 'commands', title: 'Commands', markdown: commands },
   { slug: 'data', title: 'What gets recorded', markdown: data },
+  { slug: 'benchmark', title: 'Handoff benchmark', markdown: benchmark },
 ] as const
 
 export const docsPath = (slug: string) => (slug ? `/docs/${slug}` : '/docs')
