@@ -137,7 +137,7 @@ function ClosingCta() {
         </svg>
         <div className="relative max-w-[520px]">
           <h2 className="text-[32px] leading-[1.15] font-normal tracking-display text-[#f4f2ee] sm:text-[38px]">Stop rebuilding context. Start where the work left off.</h2>
-          <p className="mt-4 text-[16px] leading-[1.6] text-[#f4f2ee]/70">One command connects your agent. Your dashboard runs on your machine, and nothing leaves it.</p>
+          <p className="mt-4 text-[16px] leading-[1.6] text-[#f4f2ee]/70">One command connects your agent. Your dashboard runs on your machine, and your code and records never leave it.</p>
           <a href="#get-started" className={buttonClass('primary', 'md', 'mt-8 h-11 px-5')}>
             Get started <ArrowRight aria-hidden />
           </a>

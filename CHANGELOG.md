@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Hear about new versions.** After a command you run at a terminal, Continuum says when a newer version is on npm: "Update available: Continuum 0.5.0 → 0.6.0. Run: npx getcontinuum@latest update". It asks the npm registry at most once a day, in the background, and waits at most a second and a half for the answer, so a command is never held up. Agents, the MCP server, hooks, CI and piped output never ask. The request sends npm the package name and your IP address, as `npx` does, and nothing from any repository. Turn it off with `continuum config update-check off`, or set `NO_UPDATE_NOTIFIER` or `CONTINUUM_NO_UPDATE_CHECK`.
+- **`continuum update`.** `setup` pins the version it was run with, so a release only reached your agents once you ran `setup` again. `npx getcontinuum@latest update` points every agent connected in this repository at the newest version (`--all` does every connected repository) and says that the Claude Code plugin updates through Claude Code.
+- **A table of commands after setup.** `setup` now ends with the commands you can run next, grouped by when you would reach for them, with what each does and the exact prefix to type.
+
+### Changed
+- The privacy wording says exactly what is true now: your code and records never leave your machine, and the only request Continuum makes is the version check above.
+
 ## [0.6.0] - 2026-11-10
 
 ### Added

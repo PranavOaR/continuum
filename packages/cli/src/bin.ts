@@ -3,6 +3,8 @@ import './warnings'
 import { defaultConfigDir } from '@continuum/capture'
 import { defaultClaudeConfigDir } from '@continuum/claude-code'
 import { terminalBanner } from './banner'
+import { BUILD_INFO } from './build'
+import { fetchLatestFromNpm, startUpdateCheck } from './updateCheck'
 import { commandName, handlesInterrupts, main, VERSION } from './main'
 import { superviseServe, WORKER_ENV } from './supervisor'
 
@@ -53,6 +55,22 @@ process.exitCode = supervise
       configDir: defaultConfigDir(),
       claudeConfigDir: defaultClaudeConfigDir(),
       banner: terminalBanner(process.stdout, process.env, VERSION),
+      // Only a published build knows its package name; a checkout never asks.
+      ...(BUILD_INFO
+        ? {
+            updateCheck: (command: string) =>
+              startUpdateCheck({
+                version: VERSION,
+                packageName: BUILD_INFO?.packageName ?? 'getcontinuum',
+                configDir: defaultConfigDir(),
+                env: process.env,
+                isInteractive: Boolean(process.stdout.isTTY && process.stderr.isTTY),
+                command,
+                now: () => new Date(),
+                fetchLatest: fetchLatestFromNpm,
+              }),
+          }
+        : {}),
     })
 
 // The IPC channel to the supervisor would otherwise keep a finished worker alive, and its restart would never come.

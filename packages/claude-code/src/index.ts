@@ -19,7 +19,7 @@ export {
 export { ANTIGRAVITY_EDIT_TOOLS, ANTIGRAVITY_EVENTS, antigravityOutput, fromAntigravity } from './antigravity'
 export { ANTIGRAVITY_HOOKS_FILE, ANTIGRAVITY_MCP_FILE, removeAntigravitySetup, setupAntigravity } from './antigravitySetup'
 export { CODEX_CONFIG_FILE, CODEX_HOOKS_FILE, removeCodexSetup, setupCodex } from './codexSetup'
-export { connectedAgents, connectedHookAgents } from './connectedAgents'
+export { connectedAgents, connectedHookAgents, setUpAgents } from './connectedAgents'
 export { CURSOR_MCP_FILE, CURSOR_RULE_FILE, removeCursorSetup, setupCursor } from './cursorSetup'
 export { guardedPluginHooks, PLUGIN_BUNDLE, pluginMcpServers } from './plugin'
 export { removeVsCodeSetup, setupVsCode, VSCODE_HOOKS_FILE, VSCODE_INSTRUCTIONS_FILE, VSCODE_MCP_FILE } from './vscodeSetup'

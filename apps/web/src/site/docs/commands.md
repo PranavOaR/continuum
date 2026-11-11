@@ -9,6 +9,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 | `setup claude-code` | Connects Claude Code to this repository. `setup codex`, `setup cursor`, `setup vscode` (GitHub Copilot in VS Code) and `setup antigravity` (Antigravity CLI) connect those agents. `--remove` undoes it. |
 | `init` | Sets up Continuum in this git repository and records its files, without connecting an agent. |
 | `doctor` | Checks the install and this repository's setup, including hooks that never arrive or fail, and says how to fix each problem. `doctor --report` prints the same checks as a Markdown report to attach to an issue: versions, settings and counts, with your paths shortened and secrets masked, and none of your code, prompts, tasks or decisions. `doctor --report --open` opens a new issue in your browser with that report filled in; nothing is submitted until you press the button there. |
+| `update` | Points every agent connected in this repository at the version you run it with, so run it as `npx getcontinuum@latest update`. `--all` does every connected repository. `setup` pins a version, so a release reaches your agents only after this. |
 | `uninstall` | Disconnects every agent. `--purge` also deletes `.continuum/`. |
 
 ## While you work
@@ -36,7 +37,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 | Command | What it does |
 |---|---|
 | `profile` | Shows your preferences for every repository, which every briefing carries labelled set by you. `profile add "Use pnpm, never npm"` adds one; `profile remove <number>` removes one. They are kept in Continuum's per-user folder, outside any repository. |
-| `config` | Shows settings. `config agent-checks off` stops recording agent-run checks; `config prompts on` records what you type to agents, redacted; `config receipts off` hides the line Claude Code shows after a reply that recorded something. |
+| `config` | Shows settings. `config agent-checks off` stops recording agent-run checks; `config prompts on` records what you type to agents, redacted; `config receipts off` hides the line Claude Code shows after a reply that recorded something. `config update-check off` stops the once-a-day question to npm about a newer version; it is your setting, for every repository. |
 | `forget` | Permanently removes recorded data: a file or folder's changes, its place in checks, decisions and commits, and its name in any text (`--path <p>`; those decisions and checks stay), what a session said and was asked (`--session <id>`), or the prompts, notes and check output from before a date (`--before <date>`). |
 | `export <file>` · `import <file>` | Moves the whole history between clones or machines as JSON. |
 | `compact` | Folds events older than 30 days into a checkpoint (`--keep-days <n>`). |

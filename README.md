@@ -8,7 +8,7 @@ Continuum is local project memory for AI coding agents. Every Claude Code, Codex
 - what another agent or a hand edit changed;
 - which decisions apply.
 
-Every claim is labelled **verified**, **observed**, **agent-reported** or **set by you**. Nothing leaves your machine.
+Every claim is labelled **verified**, **observed**, **agent-reported** or **set by you**. Your code and records never leave your machine.
 
 This README is for working on Continuum. **Using it?** Start at [continuumgroup.dev/docs](https://continuumgroup.dev/docs) (sources in `apps/web/src/site/docs/`), or the package's own README (`scripts/release/README.md`):
 

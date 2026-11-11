@@ -26,6 +26,6 @@ export const GET_STARTED = [
   {
     title: 'Open your dashboard',
     command: DASHBOARD_COMMAND,
-    body: 'It prints a private sign-in link for your dashboard on 127.0.0.1. Open it to see every connected repository. Nothing leaves your machine.',
+    body: 'It prints a private sign-in link for your dashboard on 127.0.0.1. Open it to see every connected repository. Your records never leave your machine.',
   },
 ] as const
