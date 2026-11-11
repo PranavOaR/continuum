@@ -1,0 +1,184 @@
+{
+  "init": {
+    "code": 0,
+    "out": "Initialized Continuum in /private/var/folders/n0/1jdsrmvn23x5wd5t0pvq_x3r0000gn/T/stale-film-work/checkout\n  store     .continuum/context.db (kept out of git via .git/info/exclude)\n  recorded  3 file changes across 3 tracked files\n\nNext: `continuum start` to capture changes as you work,\n      `continuum run -- <test command>` to record a verified check.\n"
+  },
+  "startTask": "Started. Task round-tax-to-the-cent-ce2c348a: \"Round tax to the cent\" is in-progress. 2 step(s) remaining.",
+  "fridayRun": {
+    "code": 0,
+    "out": "2 tests passed\ncontinuum: recorded \"unit\" · passed · exit 0 · 110ms\n"
+  },
+  "fridayUpdate": "Updated. Task round-tax-to-the-cent-ce2c348a: \"Round tax to the cent\" is in-progress. 0 step(s) remaining. Next: Open the pull request",
+  "scan": {
+    "code": 0,
+    "out": "Recorded 1 file change:\n  ~ src/tax.js\n"
+  },
+  "status": {
+    "code": 0,
+    "out": "Workspace  /private/var/folders/n0/1jdsrmvn23x5wd5t0pvq_x3r0000gn/T/stale-film-work/checkout\nRevision   3d76238\nStore      .continuum/context.db · 13 events\nFiles      3 tracked files · all recorded\nHooks      Claude Code: last arrived just now\n\nChecks\n  out of date  unit  1 file changed since it ran\n"
+  },
+  "handoff": {
+    "code": 0,
+    "out": "# Continuum handoff: checkout\nGenerated 2026-11-11T10:03:31.021Z, revision 3d76238, 3 tracked files.\nEvidence labels: [verified] = check run by Continuum, [observed: run by an agent] = an agent ran it and its exit code was observed, [agent-reported] = an agent said so, not proof, [set by you] = you set it in the dashboard.\n\n## Project profile\n[observed] Stack: Node.js.\n\n## Current task\n[agent-reported] \"Round tax to the cent\" (in-progress)\nNext action: \"Open the pull request\"\nDone:\n  - Fix addTax rounding\n  - Run the tests\nFiles touched: `src/tax.js`\n\n## Where we left off\nLatest: Codex session, started just now, last active just now, still open.\n\n## Checks\n- [verified] OUT OF DATE: `unit` (`npm test --silent`). Ran just now; changed since: `src/tax.js`\n\n## Earlier sessions\n- Claude Code session, started just now, last active just now, ended: \"addTax rounds to the cent and unit passes. Next: open the pull request.\" (since then `src/tax.js` changed outside an agent session)\n"
+  },
+  "mondayTakeUp": "Updated. Task round-tax-to-the-cent-ce2c348a: \"Round tax to the cent\" is in-progress. 0 step(s) remaining. Next: Re-run unit: src/tax.js changed since it passed",
+  "mondayFail": {
+    "code": 1,
+    "out": "node:internal/assert/utils:146\n  throw error;\n  ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n1082 !== 1083\n\n    at Object.<anonymous> (/private/var/folders/n0/1jdsrmvn23x5wd5t0pvq_x3r0000gn/T/stale-film-work/checkout/test.js:5:8)\n    at Module._compile (node:internal/modules/cjs/loader:1934:14)\n    at Object..js (node:internal/modules/cjs/loader:2074:10)\n    at Module.load (node:internal/modules/cjs/loader:1656:32)\n    at Module._load (node:internal/modules/cjs/loader:1448:12)\n    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)\n    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)\n    at node:internal/main/run_main_module:33:47 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: 1082,\n  expected: 1083,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.7.0\ncontinuum: recorded \"unit\" · failed · exit 1 · 111ms\n"
+  },
+  "mondayRun": {
+    "code": 0,
+    "out": "2 tests passed\ncontinuum: recorded \"unit\" · passed · exit 0 · 112ms\n"
+  },
+  "complete": "Updated. Task round-tax-to-the-cent-ce2c348a: \"Round tax to the cent\" is completed. 0 step(s) remaining.",
+  "diffFriday": {
+    "before": "// Prices are in cents.\nexports.addTax = (cents, rate) => cents + Math.round(cents * rate)\n",
+    "after": "// Prices are in cents.\nexports.addTax = (cents, rate) => cents + Math.trunc(cents * rate)\n"
+  },
+  "replay": {
+    "taskId": "round-tax-to-the-cent-ce2c348a",
+    "title": "Round tax to the cent",
+    "status": "completed",
+    "steps": [
+      {
+        "at": "2026-11-11T10:03:29.339Z",
+        "evidence": "agent-reported",
+        "kind": "task",
+        "title": "Task started: Round tax to the cent",
+        "detail": ""
+      },
+      {
+        "at": "2026-11-11T10:03:29.339Z",
+        "evidence": "observed",
+        "kind": "session",
+        "title": "Claude Code session took up the task",
+        "detail": "",
+        "agent": "claude-code"
+      },
+      {
+        "at": "2026-11-11T10:03:29.507Z",
+        "evidence": "observed",
+        "kind": "edit",
+        "title": "Claude Code edited src/tax.js",
+        "detail": "",
+        "agent": "claude-code"
+      },
+      {
+        "at": "2026-11-11T10:03:29.735Z",
+        "evidence": "verified",
+        "kind": "check",
+        "title": "unit passed",
+        "detail": "`npm test --silent`",
+        "tone": "good"
+      },
+      {
+        "at": "2026-11-11T10:03:29.873Z",
+        "evidence": "agent-reported",
+        "kind": "task",
+        "title": "Step done: Fix addTax rounding",
+        "detail": ""
+      },
+      {
+        "at": "2026-11-11T10:03:29.873Z",
+        "evidence": "agent-reported",
+        "kind": "task",
+        "title": "Step done: Run the tests",
+        "detail": ""
+      },
+      {
+        "at": "2026-11-11T10:03:29.873Z",
+        "evidence": "agent-reported",
+        "kind": "task",
+        "title": "Next step set",
+        "detail": "Open the pull request"
+      },
+      {
+        "at": "2026-11-11T10:03:30.043Z",
+        "evidence": "agent-reported",
+        "kind": "note",
+        "title": "Claude Code left a note",
+        "detail": "addTax rounds to the cent and unit passes. Next: open the pull request.",
+        "agent": "claude-code"
+      },
+      {
+        "at": "2026-11-11T10:03:30.231Z",
+        "evidence": "observed",
+        "kind": "note",
+        "title": "Claude Code session ended",
+        "detail": "",
+        "agent": "claude-code"
+      },
+      {
+        "at": "2026-11-11T10:03:30.444Z",
+        "evidence": "observed",
+        "kind": "edit",
+        "title": "src/tax.js changed outside an agent session",
+        "detail": ""
+      },
+      {
+        "at": "2026-11-11T10:03:30.444Z",
+        "evidence": "observed",
+        "kind": "stale",
+        "title": "unit went out of date",
+        "detail": "It passed against src/tax.js, which has changed since.",
+        "tone": "warn"
+      },
+      {
+        "at": "2026-11-11T10:03:30.807Z",
+        "evidence": "observed",
+        "kind": "session",
+        "title": "Codex session started",
+        "detail": "",
+        "agent": "codex"
+      },
+      {
+        "at": "2026-11-11T10:03:31.228Z",
+        "evidence": "agent-reported",
+        "kind": "task",
+        "title": "Next step set",
+        "detail": "Re-run unit: src/tax.js changed since it passed"
+      },
+      {
+        "at": "2026-11-11T10:03:31.422Z",
+        "evidence": "verified",
+        "kind": "check",
+        "title": "unit failed",
+        "detail": "`npm test --silent`",
+        "tone": "bad"
+      },
+      {
+        "at": "2026-11-11T10:03:31.718Z",
+        "evidence": "observed",
+        "kind": "edit",
+        "title": "Codex edited src/tax.js",
+        "detail": "",
+        "agent": "codex"
+      },
+      {
+        "at": "2026-11-11T10:03:31.945Z",
+        "evidence": "verified",
+        "kind": "check",
+        "title": "unit passed",
+        "detail": "`npm test --silent`",
+        "tone": "good"
+      },
+      {
+        "at": "2026-11-11T10:03:32.085Z",
+        "evidence": "agent-reported",
+        "kind": "task",
+        "title": "Task completed",
+        "detail": ""
+      }
+    ],
+    "summary": {
+      "agents": [
+        "claude-code",
+        "codex"
+      ],
+      "edits": 3,
+      "checks": 3,
+      "stale": 1,
+      "decisions": 0
+    }
+  }
+}

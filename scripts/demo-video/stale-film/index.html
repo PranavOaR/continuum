@@ -1,0 +1,131 @@
+<!doctype html>
+<!--
+  Continuum's stale-test film, "Friday's green tick" (SPEC.md). Every terminal
+  line, check wording and replay step comes from a real run recorded by
+  capture.mjs (assets/capture.json). No narration: the headline carries it.
+-->
+<html
+  lang="en"
+  data-composition-variables='[
+    {"id":"color-ground","type":"color","label":"Background","default":"#fafaf7"},
+    {"id":"color-ink","type":"color","label":"Text","default":"#141318"},
+    {"id":"color-accent","type":"color","label":"Accent","default":"#5b45ff"},
+    {"id":"font-display","type":"string","label":"Display font","default":"Geist"}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face { font-family: "Geist"; src: url("assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+      @font-face { font-family: "Geist Mono"; src: url("assets/fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+      :root {
+        --color-ground: #fafaf7;
+        --color-ink: #141318;
+        --color-accent: #5b45ff;
+        --font-display: "Geist";
+        --muted: #5c5a62;
+        --subtle: #8a8790;
+        --line: #e4e2dc;
+        --success: #12804c;
+        --warning: #a35f00;
+        --danger: #cc2f2f;
+        --term: #15141b;
+        --term-bar: #1c1b23;
+        --term-text: #f4f2ee;
+        --term-dim: #aeaab6;
+        --term-code: #f0c987;
+        --term-ok: #3ccf8a;
+        --term-bad: #f06a6a;
+        --term-warn: #e4a947;
+        --shadow: 0 40px 90px -30px rgb(20 19 24 / 0.45), 0 2px 6px rgb(20 19 24 / 0.08);
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--color-ground); }
+      #root { width: 100%; height: 100%; font-family: var(--font-display), sans-serif; color: var(--color-ink); }
+      #ground, .stage { position: absolute; inset: 0; background: var(--color-ground); }
+      .stage { overflow: hidden; }
+      #ground::before, .stage::before {
+        content: ""; position: absolute; inset: 0;
+        background-image: radial-gradient(rgb(20 19 24 / 0.1) 1px, transparent 1.6px);
+        background-size: 32px 32px;
+        -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, #000 45%, transparent 100%);
+        mask-image: radial-gradient(ellipse 75% 70% at 50% 50%, #000 45%, transparent 100%);
+      }
+
+      .kicker { position: absolute; font-family: "Geist Mono", monospace; font-size: 30px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+      .headline { position: absolute; font-weight: 500; font-size: 84px; line-height: 96px; letter-spacing: -0.04em; color: var(--color-ink); white-space: nowrap; }
+      .headline .w { display: inline-block; }
+
+      .term { position: absolute; background: var(--term); border-radius: 22px; box-shadow: var(--shadow); overflow: hidden; }
+      .term-bar { height: 64px; background: var(--term-bar); display: flex; align-items: center; gap: 14px; padding: 0 26px; }
+      .term-lights { display: flex; gap: 10px; margin-right: 10px; }
+      .term-lights i { width: 15px; height: 15px; border-radius: 50%; background: #3a3745; display: block; }
+      .term-logo { width: 30px; height: 30px; }
+      .term-title { font-family: "Geist Mono", monospace; font-size: 22px; color: var(--term-dim); letter-spacing: 0.01em; }
+      .term-body { padding: 30px 44px; font-family: "Geist Mono", monospace; font-size: 27px; line-height: 42px; color: var(--term-text); }
+      .term-line { position: relative; height: 42px; white-space: pre; }
+      .dim { color: var(--term-dim); }
+      .code { color: var(--term-code); }
+      .ok { color: var(--term-ok); }
+      .bad { color: var(--term-bad); }
+      .warn { color: var(--term-warn); }
+
+      .card { position: absolute; background: #fff; border: 1.5px solid var(--line); border-radius: 20px; box-shadow: 0 30px 70px -30px rgb(20 19 24 / 0.32), 0 1px 3px rgb(20 19 24 / 0.06); }
+      .chip { display: inline-flex; align-items: center; gap: 10px; border: 1.5px solid var(--line); border-radius: 10px; padding: 6px 14px; font-family: "Geist Mono", monospace; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+      .chip svg { width: 22px; height: 22px; }
+      .chip-ok { color: var(--success); border-color: rgb(18 128 76 / 0.35); background: rgb(18 128 76 / 0.07); }
+      .chip-warn { color: var(--warning); border-color: rgb(163 95 0 / 0.38); background: rgb(163 95 0 / 0.08); }
+      .chip-bad { color: var(--danger); border-color: rgb(204 47 47 / 0.35); background: rgb(204 47 47 / 0.07); }
+
+      /* The unit check card, the film's one object: the dashboard's check card rebuilt at video size. */
+      .check { width: 640px; padding: 34px 40px 36px; font-family: "Geist", sans-serif; }
+      .check-head { display: flex; align-items: center; justify-content: space-between; height: 48px; }
+      .check-head h3 { font-weight: 500; font-size: 44px; letter-spacing: -0.02em; }
+      .check-cmd { font-family: "Geist Mono", monospace; font-size: 25px; color: var(--muted); margin-top: 10px; }
+      .check-line { font-size: 30px; line-height: 40px; margin-top: 18px; height: 40px; position: relative; }
+      .check-foot { display: flex; align-items: center; gap: 18px; margin-top: 22px; font-size: 24px; color: var(--muted); height: 46px; position: relative; }
+      .swap { position: absolute; left: 0; top: 0; white-space: nowrap; }
+      .check-head .swap { left: auto; right: 0; top: 4px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="53.5" data-width="1920" data-height="1080" data-fps="30">
+      <div id="ground" class="clip" data-start="0" data-duration="53.5" data-track-index="0" data-track-kind="graphics" style="z-index: 0"></div>
+
+      <div id="friday" data-composition-id="friday" data-composition-src="compositions/friday.html" data-start="0" data-duration="8.6" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" style="z-index: 1"></div>
+      <div id="weekend" data-composition-id="weekend" data-composition-src="compositions/weekend.html" data-start="7.6" data-duration="4.8" data-track-index="2" data-track-kind="graphics" data-width="1920" data-height="1080" style="z-index: 2"></div>
+      <div id="monday" data-composition-id="monday" data-composition-src="compositions/monday.html" data-start="12.0" data-duration="22.8" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" style="z-index: 3"></div>
+      <div id="replay" data-composition-id="replay" data-composition-src="compositions/replay.html" data-start="34.2" data-duration="11.4" data-track-index="2" data-track-kind="graphics" data-width="1920" data-height="1080" style="z-index: 4"></div>
+      <div id="close" data-composition-id="close" data-composition-src="compositions/close.html" data-start="45.4" data-duration="8.1" data-track-index="1" data-track-kind="graphics" data-width="1920" data-height="1080" style="z-index: 5"></div>
+
+      <!-- Music bed: quiet under Friday, dips for the weekend, lifts at the replay and the end card. -->
+      <audio id="bed" class="clip" src="assets/audio/bed.mp3" data-start="0" data-duration="53.5" data-track-index="11" data-fade-out="1.6"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":0.2},{"t":7.4,"v":0.2},{"t":8.2,"v":0.1},{"t":12.0,"v":0.1},{"t":12.6,"v":0.18},{"t":33.8,"v":0.18},{"t":34.6,"v":0.28},{"t":35.4,"v":0.18},{"t":45.2,"v":0.18},{"t":45.8,"v":0.32},{"t":46.4,"v":0.2},{"t":49.2,"v":0.2},{"t":50.0,"v":0.36}]}]}'></audio>
+
+      <!-- Effects on visible actions. -->
+      <audio id="sfx-select" class="clip" src="assets/audio/sfx/click-soft.mp3" data-start="3.78" data-duration="0.35" data-track-index="12" data-volume="0.6" data-audio-group="sfx"></audio>
+      <audio id="sfx-trunc" class="clip" src="assets/audio/sfx/keys.mp3" data-start="4.25" data-duration="0.55" data-track-index="13" data-volume="0.55" data-fade-out="0.15" data-audio-group="sfx"></audio>
+      <audio id="sfx-leave" class="clip" src="assets/audio/sfx/swish-a.mp3" data-start="7.55" data-duration="0.66" data-track-index="12" data-volume="0.4" data-audio-group="sfx"></audio>
+      <audio id="sfx-days" class="clip" src="assets/audio/sfx/swish-b.mp3" data-start="9.3" data-duration="0.58" data-track-index="13" data-volume="0.3" data-audio-group="sfx"></audio>
+      <audio id="sfx-monday" class="clip" src="assets/audio/sfx/pop.mp3" data-start="11.0" data-duration="0.7" data-track-index="12" data-volume="0.3" data-audio-group="sfx"></audio>
+      <audio id="sfx-term" class="clip" src="assets/audio/sfx/swish-zoom.mp3" data-start="12.0" data-duration="1.18" data-track-index="13" data-volume="0.3" data-audio-group="sfx"></audio>
+      <audio id="sfx-stale" class="clip" src="assets/audio/sfx/pop.mp3" data-start="15.3" data-duration="0.7" data-track-index="12" data-volume="0.45" data-audio-group="sfx"></audio>
+      <audio id="sfx-run-1" class="clip" src="assets/audio/sfx/typing.mp3" data-start="20.9" data-duration="0.8" data-track-index="13" data-volume="0.45" data-fade-out="0.15" data-audio-group="sfx"></audio>
+      <audio id="sfx-fail" class="clip" src="assets/audio/sfx/key-press.mp3" data-start="22.2" data-duration="0.38" data-track-index="12" data-volume="0.8" data-audio-group="sfx"></audio>
+      <audio id="sfx-failed" class="clip" src="assets/audio/sfx/pop.mp3" data-start="23.2" data-duration="0.7" data-track-index="13" data-volume="0.4" data-audio-group="sfx"></audio>
+      <audio id="sfx-fix" class="clip" src="assets/audio/sfx/keys.mp3" data-start="26.9" data-duration="0.6" data-track-index="12" data-volume="0.5" data-fade-out="0.15" data-audio-group="sfx"></audio>
+      <audio id="sfx-run-2" class="clip" src="assets/audio/sfx/typing.mp3" data-start="28.5" data-duration="0.8" data-track-index="13" data-volume="0.45" data-fade-out="0.15" data-audio-group="sfx"></audio>
+      <audio id="sfx-verified" class="clip" src="assets/audio/sfx/pop.mp3" data-start="30.3" data-duration="0.7" data-track-index="12" data-volume="0.45" data-audio-group="sfx"></audio>
+      <audio id="sfx-pull" class="clip" src="assets/audio/sfx/swish-zoom.mp3" data-start="34.2" data-duration="1.18" data-track-index="13" data-volume="0.35" data-audio-group="sfx"></audio>
+      <audio id="sfx-punch" class="clip" src="assets/audio/sfx/swish-b.mp3" data-start="39.6" data-duration="0.58" data-track-index="12" data-volume="0.35" data-audio-group="sfx"></audio>
+      <audio id="sfx-flood" class="clip" src="assets/audio/sfx/swish-a.mp3" data-start="45.4" data-duration="0.66" data-track-index="13" data-volume="0.4" data-audio-group="sfx"></audio>
+      <audio id="sfx-mark" class="clip" src="assets/audio/sfx/logo-hit.mp3" data-start="49.0" data-duration="2.98" data-track-index="12" data-volume="0.35" data-audio-group="sfx"></audio>
+    </div>
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

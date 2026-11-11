@@ -43,3 +43,24 @@ The terminal scenes quote the run's text directly. A new run words its replies d
 | `capture.mjs` | Runs the real Claude Code and Codex sessions, and saves every command's output in `capture.json`. |
 
 The video and its captions live in `apps/web/site-public/`, which only the website build (`VITE_CONTINUUM_SITE=website`) uses, so they never reach the npm package.
+
+## The stale-test film
+
+`stale-film/` is a second HyperFrames project, "Friday's green tick" (0:54, no narration): Friday, Claude Code's `unit` check passes; one line of `src/tax.js` changes by hand; Monday, Codex's briefing marks the check OUT OF DATE, the re-run fails, Codex fixes it and the run is verified again; the task replay shows where it went stale. It is published as `apps/web/site-public/demo/stale-test.mp4`.
+
+```bash
+# 1. Play the scenario through this checkout's CLI and MCP server (no agent accounts) into stale-film/assets/capture.json.
+node scripts/demo-video/stale-film/capture.mjs --work ~/stale-film-work
+# 2. Preview, render, encode for the website with its captions, refresh the cover.
+cd scripts/demo-video/stale-film && npx hyperframes preview
+npx hyperframes render -q delivery -o renders/stale-test-master.mp4 && cd -
+node scripts/demo-video/stale-film/publish.mjs
+node scripts/site/images.mjs
+```
+
+| File | What it does |
+|---|---|
+| `stale-film/STORYLINES.md`, `stale-film/SPEC.md` | The three storylines considered and the picked one as a shot list, including the two labelled edits to the captured text (the briefing's "Ran 2d ago" and the replay's clock times). |
+| `stale-film/capture.mjs`, `stale-film/replay.ts` | Send the agents' hook payloads and task tool calls, run the checks, and save every output and the task replay. |
+| `stale-film/compositions/*.html` | `friday` (the pass and the hand edit), `weekend`, `monday` (the briefing, the failing re-run, the fix), `replay` (the replay page rebuilt), `close`. |
+| `stale-film/publish.mjs` | The same phone-safe encode as the first film, and captions from the on-screen headline. |

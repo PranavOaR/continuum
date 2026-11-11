@@ -18,7 +18,7 @@ const WEB = join(import.meta.dirname, '../apps/web')
 const FORBIDDEN = ['Developer Portfolio', 'Analytics Platform', 'Docs Site', 'Demo workspace', 'mock data', 'Mock data', 'sample data', 'Interactive demo', 'Explore the demo']
 /** Links the website must not show: it does not point to the source repository. */
 const FORBIDDEN_LINK = /github\.com/
-const REQUIRED_FILES = ['index.html', 'demo/continuum-demo.mp4', 'demo/continuum-demo.jpg', 'demo/continuum-demo.vtt', 'og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml']
+const REQUIRED_FILES = ['index.html', 'demo/continuum-demo.mp4', 'demo/continuum-demo.jpg', 'demo/continuum-demo.vtt', 'demo/stale-test.mp4', 'demo/stale-test.jpg', 'demo/stale-test.vtt', 'og.png', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml']
 /** Every page, with the heading and some content it must show; an unknown address must show the 404. */
 const NOT_FOUND = '/no-such-page'
 const PAGES = [
@@ -32,7 +32,7 @@ const PAGES = [
   [NOT_FOUND, 'This page went missing.', 'Read the docs'],
 ]
 const PREVIEW_PORT = 4787
-const DEMO_VIDEO = 'demo/continuum-demo.mp4'
+const DEMO_VIDEOS = ['demo/continuum-demo.mp4', 'demo/stale-test.mp4']
 /** Phones (iOS Safari, many Android decoders) refuse a whole MP4 whose AAC audio is above this. */
 const MAX_MOBILE_SAMPLE_RATE = 48_000
 /**
@@ -153,21 +153,23 @@ function h264Levels(buffer) {
   return levels
 }
 
-/** The demo video must play on phones, not only in desktop browsers. */
+/** Every demo video must play on phones, not only in desktop browsers. */
 function videoFailures(dir) {
-  const path = join(dir, DEMO_VIDEO)
-  if (!existsSync(path)) return []
-  const file = readFileSync(path)
-  const rates = audioSampleRates(file)
-  const levels = h264Levels(file)
-  return [
-    ...(rates.length === 0 ? [`${DEMO_VIDEO} has no audio track the check could read`] : []),
-    ...rates.filter((rate) => rate > MAX_MOBILE_SAMPLE_RATE).map((rate) => `${DEMO_VIDEO} has ${rate} Hz audio, which phones cannot play; re-encode it at ${MAX_MOBILE_SAMPLE_RATE} Hz`),
-    ...(levels.length === 0 ? [`${DEMO_VIDEO} has no H.264 video track the check could read`] : []),
-    ...levels
-      .filter((level) => level > MAX_MOBILE_H264_LEVEL)
-      .map((level) => `${DEMO_VIDEO} is H.264 level ${level / 10}, which some phones cannot decode; re-encode it with -level:v 4.0 (scripts/demo-video/film/publish.mjs does)`),
-  ]
+  return DEMO_VIDEOS.flatMap((video) => {
+    const path = join(dir, video)
+    if (!existsSync(path)) return []
+    const file = readFileSync(path)
+    const rates = audioSampleRates(file)
+    const levels = h264Levels(file)
+    return [
+      ...(rates.length === 0 ? [`${video} has no audio track the check could read`] : []),
+      ...rates.filter((rate) => rate > MAX_MOBILE_SAMPLE_RATE).map((rate) => `${video} has ${rate} Hz audio, which phones cannot play; re-encode it at ${MAX_MOBILE_SAMPLE_RATE} Hz`),
+      ...(levels.length === 0 ? [`${video} has no H.264 video track the check could read`] : []),
+      ...levels
+        .filter((level) => level > MAX_MOBILE_H264_LEVEL)
+        .map((level) => `${video} is H.264 level ${level / 10}, which some phones cannot decode; re-encode it with -level:v 4.0 (the film's publish.mjs does)`),
+    ]
+  })
 }
 
 const out = mkdtempSync(join(tmpdir(), 'continuum-website-'))
@@ -184,7 +186,7 @@ try {
   ]
   for (const failure of failures) console.error(`FAIL ${failure}`)
   if (failures.length > 0) process.exit(1)
-  console.log(`Website OK: ${assets.length} script(s), no demo content, a demo video phones can play, ${PAGES.length} pages render without errors.`)
+  console.log(`Website OK: ${assets.length} script(s), no demo content, demo videos phones can play, ${PAGES.length} pages render without errors.`)
 } finally {
   rmSync(out, { recursive: true, force: true })
 }
