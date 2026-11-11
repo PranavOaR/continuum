@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Recall on every prompt.** When the words you type point to recorded decisions, known issues or failed attempts, Claude Code and Codex now see them before they answer, each with its evidence label, the task it belongs to, and whether its anchored code changed since. It speaks only when it is fairly sure (two matching words in a prompt of three or more), shows at most three records, and reminds a session of each record once. It is masked by the repository's redaction patterns and shows nothing `.continuumignore` lists. The prompt hook now runs in the foreground, with a 5-second limit; it takes about 0.13 s with the Claude Code plugin (through `npx`, add about 0.4 s for Node.js to start). Turn it off with `continuum config recall off` or in the dashboard's settings.
+- **A project profile in every briefing.** Briefings open with what the repository is built with and its package manager, read from files at its root, and the commands that pass on the code as it is now, so an agent does not spend its first minutes finding out.
+- **Memory in the dashboard's search.** The search finds decisions, known issues and attempts by their words, listed first, and opens each on the Memory page.
+- **End-of-session reflection, if you want it.** With `continuum config reflection on` (off by default), Claude Code's first Stop in a session that changed files asks it to record the decisions and dead ends it made through `record_decision`, then lets it finish. It is off unless you turn it on, because it is the one hook that makes an agent go on for another turn.
+
 ## [0.6.0] - 2026-11-10
 
 ### Added

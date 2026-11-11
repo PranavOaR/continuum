@@ -34,11 +34,28 @@ Status, 10 November 2026, with the 0.6.0 release. Continuum is published on npm 
 | **Trust and control** (0.5.0) | Repository settings in the dashboard, with a preview of what redaction would store, and patterns that will not compile or could hang refused with the reason. The Activity page pages back through a project's whole history by sequence number, filtered by type, agent and date; it needs no new index, because paging uses the event log's primary key. `doctor --report --open` and the dashboard open a pre-filled issue. The Windows end-to-end run can test what npm really serves. |
 | **Notes the code moved on from** (0.5.0) | From a reader's comment. A session's note is flagged in the briefing when a file that session changed was changed again since: by hand, by another agent or deleted. Each file and who changed it is named, under the note, on the next step it named and on earlier sessions. It needs no new data: each file's latest recorded change and the working tree already say it. |
 | **Antigravity CLI** (0.6.0) | `setup antigravity` connects Antigravity CLI, which replaced Gemini CLI: hooks in `.agents/hooks.json` brief each conversation and record its edits, and the MCP server is in `.agents/mcp_config.json`. Checked against `agy` 1.5.3; recording a live edit is not yet seen. |
+| **Recall that feels automatic** (unreleased) | Recall on every prompt for Claude Code and Codex: the recorded decisions a prompt's words point to, labelled, once per session, in about 0.13 s. A project profile (stack, package manager, commands that pass) opens every briefing. The dashboard's search finds memory records. Opt-in end-of-session reflection asks Claude Code to record its decisions. |
 | **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health); 0.3.0 (the first hour, clearer verification, the first release run entirely by the workflow). The plugin repository accepts private vulnerability reports. |
 
 ## Next
 
-In order. Each item is one pull request, tests first; sizes are rough, for one developer (S up to a day, M two to three days, L about a week). There are still no user reports; reports reorder everything below.
+The plan from the November strategy review against Supermemory: keep the ground nobody else holds, evidence about code, and add what makes hosted memory feel good, without a cloud. Each item is one pull request, tests first; sizes are rough (S up to a day, M two to three days, L about a week). User reports reorder everything.
+
+### Proof (0.8.0)
+
+| # | Item | Done when | Size |
+|---|---|---|---|
+| 14 | **A public handoff benchmark.** The briefing eval, published as an open benchmark: can the next agent answer from what it was told? Scores for Continuum and for no memory. | Anyone can run it and get the published numbers. | M |
+| 15 | **The stale-test demo.** A 60-second film of the moment only Continuum has: an agent told that the test it trusts no longer holds. | On the website and the README. | S |
+| 16 | **Task replay.** A timeline of one task across agents in the dashboard: who did what, which checks ran, where it went stale. | A task handed between two agents reads end to end. | M |
+
+### Teams without a cloud (0.9.0)
+
+| # | Item | Done when | Size |
+|---|---|---|---|
+| 17 | **Shared decisions through git.** An opt-in file of decisions and known issues in the repository, reviewed in pull requests; everything else stays local. | A teammate's next briefing carries a decision you shared. | L |
+| 18 | **Briefings in pull requests.** A GitHub Action that comments which recorded decisions a PR touches and which checks it leaves out of date. | It comments on a PR that changes an anchored function. | M |
+| 19 | **Search by meaning, optional.** A small local embedding model blended with keyword search, downloaded only when you turn it on. | A decision is found by a synonym of its words. | L |
 
 ### Speed and reach
 
