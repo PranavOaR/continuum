@@ -75,6 +75,35 @@ export function baselineFor(scenario: Scenario): string {
   ].join('\n')
 }
 
+type ClaudeReply = { result?: string; is_error?: boolean; api_error?: string; modelUsage?: Record<string, unknown> }
+
+/** Raised when the claude CLI could not answer (a usage limit, sign-in, network): the run stops and nothing is published. */
+export class ClaudeUnavailableError extends Error {
+  constructor(message: string) {
+    super(`The claude CLI could not answer: ${message}`)
+    this.name = 'ClaudeUnavailableError'
+  }
+}
+
+/** One call to the claude CLI; its own errors arrive as JSON on stdout with a non-zero exit. */
+function runClaude(prompt: string, cwd: string): ClaudeReply {
+  let stdout: string
+  try {
+    stdout = execFileSync('claude', ['-p', prompt, '--output-format', 'json'], { cwd, encoding: 'utf8', timeout: CLAUDE_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 })
+  } catch (error) {
+    stdout = String((error as { stdout?: unknown }).stdout ?? '')
+    if (!stdout) throw new ClaudeUnavailableError(error instanceof Error ? error.message : String(error))
+  }
+  let reply: ClaudeReply
+  try {
+    reply = JSON.parse(stdout) as ClaudeReply
+  } catch {
+    throw new ClaudeUnavailableError(`it printed something other than JSON: ${stdout.slice(0, 200)}`)
+  }
+  if (reply.is_error) throw new ClaudeUnavailableError(reply.result ?? reply.api_error ?? 'unknown error')
+  return reply
+}
+
 export interface Asked {
   answers: Map<string, string>
   /** The model that answered, as the claude CLI reports it. */
@@ -102,7 +131,7 @@ export function askClaude(told: Told | { baseline: string }, questions: readonly
   ].join('\n')
   const empty = mkdtempSync(join(tmpdir(), 'continuum-eval-'))
   try {
-    const reply = JSON.parse(execFileSync('claude', ['-p', prompt, '--output-format', 'json'], { cwd: empty, encoding: 'utf8', timeout: CLAUDE_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024 })) as { result?: string; modelUsage?: Record<string, unknown> }
+    const reply = runClaude(prompt, empty)
     const answers = new Map<string, string>()
     for (const match of (reply.result ?? '').matchAll(/^\s*(\d+)\.\s*(.+)$/gm)) {
       const question = questions[Number(match[1]) - 1]

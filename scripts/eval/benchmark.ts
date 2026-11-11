@@ -10,7 +10,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { evaluate, type Condition, type Evaluated } from './evaluate'
+import { ClaudeUnavailableError, evaluate, type Condition, type Evaluated } from './evaluate'
 import { SCENARIOS } from './scenarios'
 
 const ROOT = join(import.meta.dirname, '..', '..')
@@ -66,7 +66,15 @@ function table(runs: readonly Run[], model: string, date: string): string {
   ].join('\n')
 }
 
-const results = CONDITIONS.map(runCondition)
+let results: ReturnType<typeof runCondition>[]
+try {
+  // Every condition must finish: a partial run would publish numbers that compare unlike things.
+  results = CONDITIONS.map(runCondition)
+} catch (error) {
+  if (!(error instanceof ClaudeUnavailableError)) throw error
+  console.error(`\n${error.message}\nNothing was written; run npm run bench:handoff again once it can answer.`)
+  process.exit(1)
+}
 const models = [...new Set(results.flatMap(({ models: used }) => [...used]))]
 const model = models.join(', ') || 'unknown'
 const runs = results.map(({ run }) => run)
