@@ -55,6 +55,8 @@ process.exitCode = supervise
       configDir: defaultConfigDir(),
       claudeConfigDir: defaultClaudeConfigDir(),
       banner: terminalBanner(process.stdout, process.env, VERSION),
+      // hasColors honours NO_COLOR and TERM=dumb; CI logs get plain borders.
+      ...(process.stdout.isTTY ? { terminal: { columns: process.stdout.columns ?? 100, hasColour: !process.env.CI && process.stdout.hasColors(256) } } : {}),
       // Only a published build knows its package name; a checkout never asks.
       ...(BUILD_INFO
         ? {

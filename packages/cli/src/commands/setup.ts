@@ -145,7 +145,7 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
         : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
   )
   io.out('')
-  for (const line of commandGuide(npx ? npx.join(' ') : 'continuum')) io.out(line)
+  for (const line of commandGuide(npx ? npx.join(' ') : 'continuum', io.terminal ?? {})) io.out(line)
   io.out('')
   // Last, so it is the line left on screen: the same command the agent's config runs, naming this exact package and version.
   io.out(`See what Continuum records: ${npx ? [...npx, 'serve'].join(' ') : 'continuum serve'}`)

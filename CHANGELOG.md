@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **The commands after setup are a proper table.** `setup` now ends with the commands drawn as a bordered table: a title, a header row, a heading row for each group spanning both columns, and a line between every row, fitted to your terminal's width with long descriptions wrapped inside their cells. Its borders and headings take Continuum's iris colour where your terminal shows colour, and plain borders elsewhere (`NO_COLOR`, CI, piped output).
+
 ## [0.7.0] - 2026-11-11
 
 ### Added
