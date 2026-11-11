@@ -1,6 +1,6 @@
 # What gets recorded
 
-Everything stays on your machine, in `.continuum/` at the repository root. Continuum calls no AI service and no server of its own.
+Everything stays on your machine, in `.continuum/` at the repository root. Continuum calls no AI service and no server of its own. The one request Continuum makes is to ask the npm registry, at most once a day and only when you run a command at a terminal, whether a newer version exists; it sends the package name, as `npx` does, and nothing from your repository. Turn it off with `continuum config update-check off`.
 
 ## What Continuum records
 

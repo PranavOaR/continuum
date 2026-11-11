@@ -45,6 +45,11 @@ describe('maskWithin', () => {
     expect(await maskWithin('ACME-[0-9]{6}', 'call ACME-123456 and ACME-654321')).toEqual({ text: 'call [redacted] and [redacted]', count: 2 })
   })
 
+  it('times only the pattern, not the worker starting up, so a slow machine does not refuse a good pattern', async () => {
+    // A busy machine (as Windows CI was) stalls while the worker starts; a plain pattern still takes well under a millisecond.
+    expect(await maskWithin('ACME-[0-9]{6}', 'call ACME-123456', 25)).toEqual({ text: 'call [redacted]', count: 1 })
+  })
+
   it('stops a pattern that would run for minutes, and says so', async () => {
     const started = Date.now()
     expect(await maskWithin('(a|aa)+$', `${'a'.repeat(45)}!`, 200)).toBe('timeout')

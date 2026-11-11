@@ -16,6 +16,7 @@ import {
   type SetupResult,
 } from '@continuum/claude-code'
 import { printBanner } from '../banner'
+import { commandGuide } from '../commandGuide'
 import { PLUGIN_AND_SETUP, PLUGIN_AND_SETUP_FIX } from '../doctor'
 import { EXIT_OK, EXIT_USAGE, type Io } from '../io'
 
@@ -29,7 +30,7 @@ interface Target {
   shared: string
 }
 
-const TARGETS: Record<string, Target> = {
+export const TARGETS: Record<string, Target> = {
   'claude-code': {
     name: 'Claude Code',
     setup: setupClaudeCode,
@@ -143,7 +144,10 @@ export async function setupCommand(io: Io, args: readonly string[], invocation: 
         ? 'The configuration runs Continuum through `cmd /c npx`, which works only on Windows, so it is kept out of git.'
         : `These files point at Continuum on this machine (${invocation.args.at(-1) ?? invocation.command}), so they are kept out of git.`,
   )
-  // The same command the agent's config runs, so it names this exact package and version.
+  io.out('')
+  for (const line of commandGuide(npx ? npx.join(' ') : 'continuum')) io.out(line)
+  io.out('')
+  // Last, so it is the line left on screen: the same command the agent's config runs, naming this exact package and version.
   io.out(`See what Continuum records: ${npx ? [...npx, 'serve'].join(' ') : 'continuum serve'}`)
   if (targetName === 'claude-code' && (await isContinuumPluginEnabled(workspace.root, io.claudeConfigDir))) {
     io.err(`continuum: ${PLUGIN_AND_SETUP}.`)

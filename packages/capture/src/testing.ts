@@ -22,7 +22,8 @@ const WINDOWS_BUSY = new Set(['EBUSY', 'EPERM'])
  * Deletes a test folder. On Windows a folder something else still holds cannot be deleted; after a
  * few tries it is left in the temp folder, which Windows cleans, rather than failing the test.
  */
-function removeTemporary(root: string): void {
+/** Deletes a test's temporary folder; one Windows still holds open (a program a test ran from it) is left to the system's temp cleaner. */
+export function removeTemporary(root: string): void {
   try {
     rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   } catch (error) {
