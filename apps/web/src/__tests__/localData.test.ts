@@ -41,6 +41,33 @@ describe('createHttpContinuumService', () => {
     expect(urls).toEqual(['/api/projects/my%20app/graph', '/api/search?q=a%26b'])
   })
 
+  it('asks the server for each newer view at its own address, writing settings and the profile as JSON', async () => {
+    const calls: { url: string; method: string; body?: string }[] = []
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method ?? 'GET', ...(init?.body ? { body: String(init.body) } : {}) })
+      return respond(200, { data: {} })
+    }) as unknown as typeof fetch
+    const service = createHttpContinuumService(fetchImpl, '', () => 'csrf')
+    await service.getTaskReplay('my app', 'task 1')
+    await service.listActivityPage('acme', { before: 120, type: 'decision' })
+    await service.listActivityPage('acme', {})
+    await service.getSettings('acme')
+    await service.updateSettings('acme', { recall: false })
+    await service.previewRedaction('acme', ['ACME-[0-9]+'], 'ACME-1')
+    await service.getProfile()
+    await service.updateProfile(['Use pnpm'])
+    expect(calls).toEqual([
+      { url: '/api/projects/my%20app/tasks/task%201/replay', method: 'GET' },
+      { url: '/api/projects/acme/activity?before=120&type=decision', method: 'GET' },
+      { url: '/api/projects/acme/activity', method: 'GET' },
+      { url: '/api/projects/acme/settings', method: 'GET' },
+      { url: '/api/projects/acme/settings', method: 'POST', body: '{"recall":false}' },
+      { url: '/api/projects/acme/settings/preview', method: 'POST', body: '{"patterns":["ACME-[0-9]+"],"sample":"ACME-1"}' },
+      { url: '/api/profile', method: 'GET' },
+      { url: '/api/profile', method: 'POST', body: '{"preferences":["Use pnpm"]}' },
+    ])
+  })
+
   it('turns not-found into NotFoundError and other failures into readable errors', async () => {
     const notFound = createHttpContinuumService(fetchReturning(() => respond(404, { error: { code: 'not-found', message: 'Project "x" was not found.' } })))
     await expect(notFound.getWorkspace('x')).rejects.toBeInstanceOf(NotFoundError)

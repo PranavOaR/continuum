@@ -62,4 +62,27 @@ describe('mock continuum service', () => {
     expect(times).toEqual([...times].sort((a, b) => b - a))
     expect((await service.listTasks()).length).toBe(8)
   })
+
+  it("replays a demo task from its sample activity, oldest first, and refuses one it does not have", async () => {
+    const replay = await service.getTaskReplay('startup-app', 'task-google-auth')
+    expect(replay).toMatchObject({ taskId: 'task-google-auth', title: 'Implement Google authentication' })
+    expect(replay.steps.length).toBeGreaterThan(0)
+    const times = replay.steps.map((step) => step.at)
+    expect(times).toEqual([...times].sort())
+    expect(replay.summary.agents.length).toBeGreaterThan(0)
+    await expect(service.getTaskReplay('startup-app', 'nope')).rejects.toBeInstanceOf(NotFoundError)
+  })
+
+  it("pages a demo project's history and filters it, and reads the demo's settings and profile", async () => {
+    const first = await service.listActivityPage('startup-app', { limit: 2 })
+    expect(first.events).toHaveLength(2)
+    expect(first.nextBefore).toBe(2)
+    const rest = await service.listActivityPage('startup-app', { before: first.nextBefore ?? 0, limit: 500 })
+    expect(rest.nextBefore).toBeNull()
+    const decisions = await service.listActivityPage('startup-app', { type: 'decision' })
+    expect(decisions.events.every((event) => event.type === 'decision')).toBe(true)
+    expect((await service.getSettings('startup-app')).recall).toBe(true)
+    expect((await service.getProfile()).preferences.length).toBeGreaterThan(0)
+    await expect(service.updateProfile(['x'])).rejects.toThrow(/read-only/)
+  })
 })
