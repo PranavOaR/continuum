@@ -1,5 +1,5 @@
 import { SCAN_SOURCE } from '@continuum/capture'
-import type { ContinuumEvent, EvidenceType, MemoryReview, TaskField } from '@continuum/core'
+import { SHARE_SOURCE, SHARED_SOURCE, type ContinuumEvent, type EvidenceType, type MemoryReview, type TaskField } from '@continuum/core'
 import type { ContextStore, GraphNode } from '@continuum/store'
 
 /** Events looked at; older history is summarized by the rest of the handoff. */
@@ -16,7 +16,8 @@ export interface SinceYouLeft {
   /** The latest result of each check run since, with how it was recorded. */
   checks: { name: string; passed: boolean; evidence: EvidenceType; at: string }[]
   commits: { hash: string; message: string; at: string }[]
-  decisions: { title: string; at: string; evidence: EvidenceType; review: MemoryReview | null }[]
+  /** `shared`: it arrived from the repository's shared decisions file, from a teammate. */
+  decisions: { title: string; at: string; evidence: EvidenceType; review: MemoryReview | null; shared?: boolean }[]
   /** Tasks you changed in the dashboard, and which parts. */
   taskEdits: { taskId: string; title: string; fields: TaskField[]; at: string }[]
 }
@@ -74,8 +75,11 @@ function fold(summary: SinceYouLeft, event: ContinuumEvent, sessionAgent: (sessi
       return { ...summary, commits: [...summary.commits, { hash: event.payload.hash, message: event.payload.message, at }] }
     }
     case 'memory.recorded': {
+      // Sharing your own record writes it to a file; nothing about it is news.
+      if (event.source === SHARE_SOURCE) return summary
       const decisions = summary.decisions.filter((decision) => decision.title !== event.payload.title)
-      return { ...summary, decisions: [...decisions, { title: event.payload.title, at: event.occurredAt, evidence: event.evidence, review: event.payload.review ?? null }] }
+      const shared = event.source === SHARED_SOURCE ? { shared: true } : {}
+      return { ...summary, decisions: [...decisions, { title: event.payload.title, at: event.occurredAt, evidence: event.evidence, review: event.payload.review ?? null, ...shared }] }
     }
     case 'task.upserted': {
       if (event.evidence !== 'user-reported') return summary

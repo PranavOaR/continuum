@@ -5,6 +5,7 @@ import { commitsSince, recordedHead, type CommitInfo } from './commits'
 import { readWorkingTree, type WorkingTree } from './git'
 import { repositoryRedactor } from './config'
 import type { Redactor } from './redact'
+import { importSharedEvents, readSharedRecords, type SharedRecord } from './shared'
 
 export const SCAN_SOURCE = 'watcher:git'
 
@@ -16,9 +17,29 @@ export interface FileChange {
   contentHash: ContentHash | null
 }
 
+/** What the scan took from the repository's shared decisions file (.continuum-decisions.json). */
+export interface SharedImport {
+  /** Records new to this clone, or newer versions of ones it imported. */
+  imported: number
+  /** Records in the file that failed validation. */
+  skipped: number
+  /** Why the file could not be read at all; the rest of the scan still ran. */
+  error: string | null
+}
+
 export interface ScanResult {
   changes: FileChange[]
   tree: WorkingTree
+  shared: SharedImport
+}
+
+/** The shared file's records; a file that cannot be read is reported, never allowed to stop a scan (hooks run it). */
+async function readShared(root: string): Promise<{ records: SharedRecord[]; skipped: number; error: string | null }> {
+  try {
+    return { ...(await readSharedRecords(root)), error: null }
+  } catch (error) {
+    return { records: [], skipped: 0, error: error instanceof Error ? error.message : String(error) }
+  }
 }
 
 export interface ScanOptions {
@@ -94,13 +115,17 @@ export async function scanRepository(store: ContextStore, root: string, options:
   // HEAD moved back (reset, checkout of an older commit): no new commits, but record where HEAD is now,
   // or every later scan would look for new commits again.
   const commits = headMoved && found.length === 0 && tree.revision ? await commitsSince(root, tree.revision, null) : found
+  const shared = await readShared(root)
   let changes: FileChange[] = []
+  let imported = 0
   // Diff inside the transaction: another process may have recorded some of these changes already.
   store.transact(() => {
     changes = diffSnapshots(recordedFiles(store), tree.files)
     // Only the process that still sees the old HEAD records the new commits.
     const commitEvents = recordedHead(store) === previousHead ? [...commits].reverse().map((commit) => commitEvent(commit, occurredAt, previousHead === null || found.length === 0, redactor)) : []
-    return [...commitEvents, ...changes.map((change) => toEvent(change, occurredAt, tree.revision, session))]
+    const sharedEvents = importSharedEvents(store, shared.records, (text) => redactor.redact(text), occurredAt)
+    imported = sharedEvents.length
+    return [...commitEvents, ...changes.map((change) => toEvent(change, occurredAt, tree.revision, session)), ...sharedEvents]
   })
-  return { changes, tree }
+  return { changes, tree, shared: { imported, skipped: shared.skipped, error: shared.error } }
 }

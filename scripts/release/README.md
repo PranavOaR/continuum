@@ -50,6 +50,7 @@ Setup writes only to the repository, never to your global agent settings. `setup
 | `continuum handoff` | Prints the briefing, for pasting into any agent or chat. |
 | `continuum search <words>` | Finds recorded decisions, known issues, attempts, tasks and session notes by their words, each with its evidence label. Agents use the `search_memory` tool. |
 | `continuum why <file>[#symbol]` | The decisions, tasks, sessions and checks behind a piece of code. |
+| `continuum share <id>` | Shares a decision with your team through `.continuum-decisions.json`, which you commit like code; teammates' briefings carry it after they pull. `share` lists what you can share; `--all`, `--remove <id>`. Nothing else leaves your clone. |
 | `continuum check` | For a pre-commit hook: lists decisions whose anchored code the staged changes alter. Exits 0 unless `--strict`. |
 | `continuum profile` | Your preferences for every repository ("Use pnpm, never npm"), carried by every briefing. `profile add "<text>"`, `profile remove <n>`. |
 | `continuum status` | Tracked files, unrecorded changes and check results. |

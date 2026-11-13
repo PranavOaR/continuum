@@ -1,6 +1,6 @@
 # What gets recorded
 
-Everything stays on your machine, in `.continuum/` at the repository root. Continuum calls no AI service and no server of its own. The one request Continuum makes is to ask the npm registry, at most once a day and only when you run a command at a terminal, whether a newer version exists; it sends the package name, as `npx` does, and nothing from your repository. Turn it off with `continuum config update-check off`.
+Everything stays on your machine, in `.continuum/` at the repository root, except decisions you choose to share with your team ([below](#sharing-decisions-with-your-team)). Continuum calls no AI service and no server of its own. The one request Continuum makes is to ask the npm registry, at most once a day and only when you run a command at a terminal, whether a newer version exists; it sends the package name, as `npx` does, and nothing from your repository. Turn it off with `continuum config update-check off`.
 
 ## What Continuum records
 
@@ -24,6 +24,14 @@ Handoffs also list **changes no agent session made**, so the next agent asks abo
 | **observed** | An agent ran it, and Continuum saw the exit code. |
 | **agent-reported** | An agent said so. A note, not proof. |
 | **set by you** | You set it in the dashboard: a task you created or changed, a decision or known issue you added, or a record you marked resolved or still valid. A resolved record stays on the page and leaves what agents are told. |
+
+## Sharing decisions with your team
+
+`continuum share <id>` writes a decision, known issue or previous attempt to `.continuum-decisions.json` at the repository root. You commit it and review it in pull requests like any other file; nothing is sent anywhere else. The file holds each record's title, text, kind, the code it is anchored to (paths and content hashes) and when it was recorded. Your sessions, prompts, edits, checks and tasks are never in it.
+
+When a teammate pulls, their clone takes the file in at its next scan (every agent session starts with one), and their agents' briefings carry each record marked *shared in the repository*. If the anchored code has changed since, the briefing says so, as it does for your own decisions. A shared record is labelled *agent-reported* in other clones whatever its author's label was: it came from a file anyone with commit access can edit, so it is a note, not proof, and never *set by you*. Records are masked by today's redaction rules when you share them and by each teammate's own rules when they arrive, and anchors on paths in `.continuumignore` are left out.
+
+A newer version of a shared record in the file replaces the copy a clone took in earlier, so a teammate's update reaches you. A record of your own that the file never held is never overwritten. Removing a record from the file (`share --remove <id>`) stops it reaching new clones; clones that already took it in keep their copy until they `forget` it.
 
 ## How to control it
 

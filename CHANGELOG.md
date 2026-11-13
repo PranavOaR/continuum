@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Share decisions with your team through git.** `continuum share <id>` writes a decision, known issue or previous attempt to `.continuum-decisions.json` at the repository root, which you commit and review in pull requests like code. When a teammate pulls, their clone takes it in at its next scan, and their agents' briefings carry it marked *shared in the repository*, flagged as usual if the code it is anchored to has changed since. `continuum share` lists what you can share and what is already shared; `--all` shares every record you have not resolved; `--remove <id>` takes one back out. It is opt-in, record by record: sessions, prompts, edits, checks and tasks never leave your clone. A shared record reads as *agent-reported* in other clones (never *verified* or *set by you*), is masked by redaction on the way out and on the way in, and a file that is broken or edited by hand never stops a scan: records that fail validation are skipped, and `continuum scan` says so.
+
 ## [0.8.0] - 2026-11-11
 
 ### Added
