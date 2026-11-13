@@ -15,6 +15,7 @@ const GUIDE: readonly (readonly [string, readonly (readonly [string, string])[]]
       ['search <words>', 'Find decisions, issues, tasks and notes by their words'],
       ['why <file>[#symbol]', 'The decisions, tasks and checks behind a piece of code'],
       ['check', 'Decisions your staged changes touch, for a pre-commit hook'],
+      ['share <id>', 'Share a decision with your team through git'],
     ],
   ],
   [

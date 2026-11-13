@@ -29,6 +29,7 @@ Run any command with `npx getcontinuum <command>`, from inside the repository. `
 | `handoff` | Prints where the project left off, for any agent or chat. |
 | `search <words ...>` | Searches recorded decisions, known issues, attempts, tasks and session notes for those words, best match first, each with its evidence label. `--limit <n>` changes how many (10). |
 | `why <file>` · `why <file>#<symbol>` | Lists what is recorded about a piece of code: decisions anchored to it, tasks and sessions that changed it, and checks that ran against it. |
+| `share` · `share <id>` · `share --all` | Shares decisions, known issues and previous attempts with your team through `.continuum-decisions.json`, a file you commit and review like code. `share` lists what you can share with a short id; `share <id>` writes that record to the file (`--all` writes every one you have not resolved; `--remove <id>` takes one back out). Each teammate's clone takes the file in at its next scan, so their agents' briefings carry it. Nothing else leaves your clone. |
 | `check` | For a pre-commit hook: lists recorded decisions whose anchored code the staged changes alter. Exits 0 whatever it finds; `--strict` exits 1 when it lists any. |
 | `serve [repo ...]` | Opens the dashboard for every connected repository, or the ones you name, on 127.0.0.1: it prints its sign-in link and opens it in your browser (`--no-open` to skip). |
 

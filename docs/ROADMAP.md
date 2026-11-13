@@ -39,6 +39,7 @@ Status, 11 November 2026, with the 0.8.0 release. Continuum is published on npm 
 | **A public handoff benchmark** (0.8.0) | `npm run bench:handoff` asks Claude a fresh agent's questions with Continuum's briefing and with only the files and git history. First run, `claude-opus-5-5`: 23/23 with Continuum, 4/23 without memory. Published on the docs' benchmark page with its caveats. |
 | **Task replay** (0.8.0) | A Replay page for every task: sessions, edits (its own, other agents', by hand), checks with results, decisions, and where a passing check went out of date, each labelled, oldest first, read from the event log. |
 | **The stale-test film** (0.8.0) | "Friday's green tick" (0:54), on the website and the README: a passing check goes out of date when a file changes by hand, Codex's briefing says so before it trusts it, the re-run fails, and the task replay shows where it went stale. Every line on screen is from a real run. |
+| **Shared decisions through git** (unreleased) | `continuum share` writes chosen decisions, known issues and previous attempts to `.continuum-decisions.json`, committed and reviewed like code. Each clone takes it in at its next scan; briefings mark the records shared and flag them when their anchored code changes. Imported records read as agent-reported, are redacted both ways, and a broken file never stops a scan. |
 | **Launch** | [continuumgroup.dev](https://continuumgroup.dev): a landing page, docs, privacy page, and a demo film, "The thread", made with HyperFrames from real sessions. Releases 0.1.0 to 0.1.2 on npm (MIT); 0.2.0 (VS Code, the faster plugin) and later are proprietary and free to use; 0.2.1 (redaction everywhere, hook health); 0.3.0 (the first hour, clearer verification, the first release run entirely by the workflow). The plugin repository accepts private vulnerability reports. |
 
 ## Next
@@ -49,8 +50,7 @@ The plan from the November strategy review against Supermemory: keep the ground 
 
 | # | Item | Done when | Size |
 |---|---|---|---|
-| 17 | **Shared decisions through git.** An opt-in file of decisions and known issues in the repository, reviewed in pull requests; everything else stays local. | A teammate's next briefing carries a decision you shared. | L |
-| 18 | **Briefings in pull requests.** A GitHub Action that comments which recorded decisions a PR touches and which checks it leaves out of date. | It comments on a PR that changes an anchored function. | M |
+| 18 | **Briefings in pull requests.** A GitHub Action that comments which shared decisions a PR touches (from `.continuum-decisions.json`, which a runner can read). | It comments on a PR that changes an anchored function. | M |
 | 19 | **Search by meaning, optional.** A small local embedding model blended with keyword search, downloaded only when you turn it on. | A decision is found by a synonym of its words. | L |
 
 ### Speed and reach

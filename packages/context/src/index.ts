@@ -1,5 +1,5 @@
 export { liveHashes, projectState, type ChangedBy, type ChangedSince, type CheckSummary, type DecisionSummary, type ProjectState, type SessionSummary } from './projectState'
-export { DEFAULT_HANDOFF_CHARS, renderHandoff, type HandoffOptions } from './handoff'
+export { DEFAULT_HANDOFF_CHARS, KIND_LABELS, renderHandoff, type HandoffOptions } from './handoff'
 export { detectStack, profileOf, type ProjectProfile } from './profile'
 export { agoFromIso, formatAgo } from './time'
 export { isQuiet, sinceYouLeft, type SinceYouLeft } from './sinceYouLeft'

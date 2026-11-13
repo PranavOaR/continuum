@@ -1,5 +1,20 @@
 export { CONTINUUM_DIR, currentBranch, findRepoRoot, gitPath, hashFiles, isIgnored, isRegularFileInRepo, isTracked, GitCommandError, headRevision, NotAGitRepositoryError, readWorkingTree, type WorkingTree } from './git'
-export { diffSnapshots, recordedFiles, SCAN_SOURCE, scanRepository, type FileChange, type ScanOptions, type ScanResult } from './scan'
+export { diffSnapshots, recordedFiles, SCAN_SOURCE, scanRepository, type FileChange, type ScanOptions, type ScanResult, type SharedImport } from './scan'
+export {
+  importSharedEvents,
+  parseSharedFile,
+  readSharedRecords,
+  SHARE_SOURCE,
+  SHARED_FILE,
+  SHARED_SOURCE,
+  SharedFileError,
+  sharedFileContent,
+  sharedHashOf,
+  shareEvent,
+  sharedRecordOf,
+  writeSharedRecords,
+  type SharedRecord,
+} from './shared'
 export { CheckInterruptedError, CommandNotFoundError, coverage, finalizeTail, MAX_OUTPUT_TAIL_CHARS, RUN_SOURCE, runCheck, type RunCheckOptions, type RunCheckResult } from './runCheck'
 export { DEFAULT_DEBOUNCE_MS, DEFAULT_MAX_WAIT_MS, DEFAULT_POLL_MS, DEFAULT_RECONCILE_MS, isIgnoredPath, startCapture, WatchUnavailableError, type CaptureHandle, type CaptureMode, type CaptureOptions } from './watch'
 export { createRedactor, MAX_CUSTOM_PATTERN_CHARS, REDACTED, redactSecrets, redactWithCount, type Redactor } from './redact'

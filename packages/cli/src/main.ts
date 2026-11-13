@@ -17,6 +17,7 @@ import { mcpCommand } from './commands/mcp'
 import { RUN_USAGE, runCommand } from './commands/run'
 import { scanCommand } from './commands/scan'
 import { searchCommand } from './commands/search'
+import { shareCommand } from './commands/share'
 import { sessionCommand } from './commands/session'
 import { serveCommand } from './commands/serve'
 import { setupCommand } from './commands/setup'
@@ -48,6 +49,8 @@ Commands
   handoff              Print where the project left off, for any agent or chat
   search <words ...>   Search recorded decisions, issues, tasks and session notes
   why <file[#symbol]>  Show the decisions, tasks and checks behind a piece of code
+  share [<id> | --all] Share decisions with your team through .continuum-decisions.json,
+                       committed like code (--remove <id> to take one back out)
   check [--strict]     List decisions whose anchored code the staged changes alter,
                        for a pre-commit hook; exits 0 unless --strict
   serve [repo ...]     Open the dashboard for these repositories on 127.0.0.1
@@ -77,7 +80,8 @@ Options
   -h, --help           Show this help
   -v, --version        Show the version
 
-Everything stays on this machine, in .continuum/ at the repository root.`
+Everything stays on this machine, in .continuum/ at the repository root, except
+what you share with continuum share.`
 
 export { VERSION }
 
@@ -92,6 +96,7 @@ const COMMANDS: Record<string, Command> = {
   handoff: (io, args) => handoffCommand(io, args),
   search: (io, args) => searchCommand(io, args),
   why: (io, args) => whyCommand(io, args),
+  share: (io, args) => shareCommand(io, args),
   check: (io, args) => checkCommand(io, args),
   serve: async (io, args) => serveCommand(io, args, VERSION, await serveWorkerOptions()),
   session: (io, args) => sessionCommand(io, args),

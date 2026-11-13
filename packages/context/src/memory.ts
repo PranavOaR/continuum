@@ -43,5 +43,7 @@ export function reviewedMemory(store: ContextStore, node: GraphNode, review: Mem
     anchors: review === 'still-valid' ? Object.fromEntries(Object.keys(anchors).flatMap((key) => (current.has(key) ? [[key, current.get(key) as ContentHash]] : []))) : anchors,
     review,
     ...(taskKey ? { taskId: taskKey.slice('task:'.length) } : {}),
+    // Your review stays yours: the record is still the version in the shared file until that file changes.
+    ...(typeof node.props.sharedHash === 'string' ? { sharedHash: node.props.sharedHash } : {}),
   }
 }

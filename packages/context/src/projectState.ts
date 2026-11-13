@@ -69,6 +69,8 @@ export interface DecisionSummary {
   status: AnchorStatus
   changed: string[]
   review: MemoryReview | null
+  /** In the repository's shared decisions file (.continuum-decisions.json): shared from here, or imported from it. */
+  shared: boolean
 }
 
 export interface ProjectState {
@@ -232,6 +234,7 @@ function summarizeDecision(node: GraphNode, current: CurrentHashes): DecisionSum
     status,
     changed: changed.map(pathOf),
     review: node.props.review === 'resolved' || node.props.review === 'still-valid' ? node.props.review : null,
+    shared: typeof node.props.sharedHash === 'string',
   }
 }
 

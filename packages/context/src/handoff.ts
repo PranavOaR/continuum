@@ -26,7 +26,7 @@ function preferencesSection(preferences: readonly string[] | undefined): string[
   return ['## Your preferences', '[set by you] Written by you for every repository on this machine, not recorded from this one.', ...preferences.map((preference) => `- ${quote(preference, 300)}`)]
 }
 
-const KIND_LABELS: Record<DecisionSummary['kind'], string> = {
+export const KIND_LABELS: Record<DecisionSummary['kind'], string> = {
   decision: 'Decision',
   'known-issue': 'Known issue',
   'previous-attempt': 'Previous attempt',
@@ -239,7 +239,10 @@ function sinceSection(since: SinceYouLeft | null | undefined, now: Date): string
     lines.push(`- ${tag} ${code(check.name)} ${check.passed ? 'passed' : 'FAILED'} (${agoFromIso(check.at, now)}).`)
   }
   for (const commit of since.commits.slice(-MAX_LISTED)) lines.push(`- [observed] Committed ${code(commit.hash.slice(0, 7))} ${quote(commit.message, 120)} (${agoFromIso(commit.at, now)})`)
-  for (const decision of since.decisions) lines.push(`- ${evidenceTag(decision.evidence)} ${SINCE_VERB[decision.review ?? 'recorded']}: ${quote(decision.title, 160)} (${agoFromIso(decision.at, now)})`)
+  for (const decision of since.decisions) {
+    const verb = decision.shared ? 'Shared in the repository' : SINCE_VERB[decision.review ?? 'recorded']
+    lines.push(`- ${evidenceTag(decision.evidence)} ${verb}: ${quote(decision.title, 160)} (${agoFromIso(decision.at, now)})`)
+  }
   return lines
 }
 
@@ -275,7 +278,8 @@ function decisionsSection(state: ProjectState): string[] {
       const stale = decision.status === 'anchor-changed' ? ` (anchored code changed since: ${listPaths(decision.changed)})` : ''
       const body = decision.body ? ` ${quote(decision.body).slice(1, -1)}` : ''
       const confirmed = decision.review === 'still-valid' ? ' (you confirmed it still holds)' : ''
-      return `- ${evidenceTag(decision.evidence)} ${KIND_LABELS[decision.kind]}: ${quote(decision.title).slice(1, -1)}.${body}${confirmed}${stale}`
+      const shared = decision.shared ? ' (shared in the repository)' : ''
+      return `- ${evidenceTag(decision.evidence)} ${KIND_LABELS[decision.kind]}: ${quote(decision.title).slice(1, -1)}.${body}${confirmed}${shared}${stale}`
     }),
   ]
 }

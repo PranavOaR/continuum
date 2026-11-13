@@ -151,8 +151,9 @@ export function project(store: Mutations, event: ContinuumEvent): void {
       const { id, taskId, anchors, ...rest } = event.payload
       const memory = keys.memory(id)
       const recordHash = store.putObject('memory', event.payload)
-      const previous = rest.review ? store.getNode(memory) : undefined
-      // A review is your verdict on the record, not authorship of it: the text keeps its author's label and its date.
+      const previous = rest.review || rest.sharedHash ? store.getNode(memory) : undefined
+      // A review is your verdict on the record, not authorship of it, and sharing it is not a new record:
+      // the text keeps its author's label and its date.
       const origin = previous ? { evidence: previous.props.evidence ?? event.evidence, recordedAt: previous.props.recordedAt ?? previous.updatedAt } : { evidence: event.evidence }
       store.upsertNode(memory, { hash: recordHash, props: { ...rest, anchors, recordHash, ...origin }, at })
       for (const anchor of Object.keys((previous?.props.anchors ?? {}) as Record<IdentityKey, ContentHash>)) {

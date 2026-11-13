@@ -46,10 +46,25 @@ export type CheckRecordedEvent = EventBase<
   }
 >
 
+/** Source of a decision imported from the repository's shared file (.continuum-decisions.json). */
+export const SHARED_SOURCE = 'shared'
+/** Source of the event that marks a local record as the version just written to the shared file. */
+export const SHARE_SOURCE = 'cli:share'
+
 /** Recording an existing id replaces it: this is how your review reaches the graph, so stores stay readable by older versions. */
 export type MemoryRecordedEvent = EventBase<
   'memory.recorded',
-  { id: string; kind: MemoryKind; title: string; body: string; taskId?: string; anchors: Record<IdentityKey, ContentHash>; review?: MemoryReview }
+  {
+    id: string
+    kind: MemoryKind
+    title: string
+    body: string
+    taskId?: string
+    anchors: Record<IdentityKey, ContentHash>
+    review?: MemoryReview
+    /** The version of the record in the repository's shared file (.continuum-decisions.json) this clone holds: set when it is shared or imported. */
+    sharedHash?: ContentHash
+  }
 >
 
 export interface RecordedCriterion {
